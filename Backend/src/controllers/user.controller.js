@@ -9,6 +9,9 @@ import {
     USER_ROLES
 } from "../utils/constants.js";
 
+import fs from "fs";
+import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Used for both setting and clearing, so clearCookie always matches.
@@ -120,39 +123,124 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 // ---- LOGIN ----
-// Send either `username` or `mobile` (explicit, because a username can be all digits).
-// Soft-deleted accounts are restored here if the 10-day grace period is still running.
+// Drop-in replacement for loginUser in controllers/user.controller.js.
+//
+// Needs in that file (add any that are missing):
+//   import bcrypt from "bcrypt";
+//   and the helpers it already has: asyncHandler, ApiError, ApiResponse, User, normalizeMobile,
+//   isString, loginCookieOptions, ACCOUNT_DELETION_GRACE_DAYS, DAY_MS
+//
+// Body it accepts (JSON, Content-Type: application/json), any ONE of these with the password:
+//   { "identifier": "student_a" | "9876543210" | "+91 98765 43210", "password": "..." }
+//   { "username": "student_a", "password": "..." }
+//   { "mobile": "9876543210", "password": "..." }
+//
+// What makes it safe:
+//   - Only strings are accepted, so {"$ne": null} style injection can never reach the query.
+//   - Inputs have length limits, so nobody can make the server hash a huge password.
+//   - Unknown account, wrong password and over-long input all return the same 401, and the
+//     unknown-account path does the same amount of hashing work, so response time does not
+//     reveal which accounts exist.
+//   - Account status (inactive, deleted) is revealed only after the password is correct.
+//   - Every check runs before anything is saved, so a refused login never changes the account.
+//   - The password is never logged or returned.
+//   - An empty or non-JSON body gets its own clear message instead of "Password is required".
+
+const MAX_IDENTIFIER_LENGTH = 50;
+const MAX_PASSWORD_LENGTH = 128;
+
+// Created once, on first use. Compared against when the account does not exist.
+let dummyHashPromise = null;
+const getDummyHash = () => {
+    dummyHashPromise ??= bcrypt.hash("not-a-real-password", 10);
+    return dummyHashPromise;
+};
+
+// --- helper start (pure: easy to test on its own)
+// Turns the three possible fields into one safe query, or throws.
+const resolveLoginQuery = ({ identifier, mobile, username }) => {
+    const candidates = [
+        ["identifier", identifier],
+        ["mobile", mobile],
+        ["username", username],
+    ];
+
+    // The first field that was actually filled in. Missing, null and blank text are skipped.
+    const picked = candidates.find(
+        ([, value]) => value !== undefined && value !== null && !(isString(value) && !value.trim())
+    );
+    if (!picked) {
+        throw new ApiError(400, "Username or mobile number is required");
+    }
+
+    const [field, value] = picked;
+
+    // Objects and arrays (for example {"$ne": null}) are refused here, before any query exists
+    if (!isString(value)) {
+        throw new ApiError(400, "Username or mobile number must be text");
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.length > MAX_IDENTIFIER_LENGTH) {
+        throw new ApiError(401, "Invalid credentials");
+    }
+
+    if (field === "mobile") {
+        return { mobile: normalizeMobile(trimmed) };
+    }
+    if (field === "username") {
+        return { username: trimmed.toLowerCase() };
+    }
+
+    // "identifier": a valid Indian mobile number means mobile, anything else is a username
+    const asMobile = normalizeMobile(trimmed);
+    if (/^[6-9]\d{9}$/.test(asMobile)) {
+        return { mobile: asMobile };
+    }
+    return { username: trimmed.toLowerCase() };
+};
+// --- helper end
+
 const loginUser = asyncHandler(async (req, res) => {
-    const { username, mobile, password } = req.body || {};
+    const body = req.body;
+
+    // Tells "the server received no JSON" apart from "the password is missing"
+    if (!body || typeof body !== "object" || Array.isArray(body) || !Object.keys(body).length) {
+        throw new ApiError(
+            400,
+            "No data received. Send a JSON body with the header Content-Type: application/json"
+        );
+    }
+
+    const { identifier, mobile, username, password } = body;
 
     if (!isString(password) || !password) {
         throw new ApiError(400, "Password is required");
     }
-
-    let query;
-    if (isString(mobile) && mobile.trim()) {
-        query = { mobile: normalizeMobile(mobile) };
-    } else if (isString(username) && username.trim()) {
-        query = { username: username.trim().toLowerCase() };
-    } else {
-        throw new ApiError(400, "Username or mobile number is required");
+    if (password.length > MAX_PASSWORD_LENGTH) {
+        throw new ApiError(401, "Invalid credentials");
     }
+
+    const query = resolveLoginQuery({ identifier, mobile, username });
 
     const user = await User.findOne(query).select("+password");
 
-    // Same generic error for unknown account and wrong password.
+    // Unknown account: do the same hashing work as a real check, then give the same answer
     if (!user) {
+        await bcrypt.compare(password, await getDummyHash());
         throw new ApiError(401, "Invalid credentials");
     }
 
     const isPasswordValid = await user.isPasswordCorrect(password);
-
     if (!isPasswordValid) {
         throw new ApiError(401, "Invalid credentials");
     }
 
-    // Status checks only happen after valid credentials so they don't leak
-    // whether an account exists.
+    // The password is correct from here on, so these messages cannot be used to find accounts
+    if (!user.isActive) {
+        throw new ApiError(403, "This account is not active. Please contact the administrator.");
+    }
+
     let accountRestored = false;
 
     if (user.isDeleted) {
@@ -166,14 +254,10 @@ const loginUser = asyncHandler(async (req, res) => {
 
         user.isDeleted = false;
         user.deletedAt = null;
-        await user.save({ validateBeforeSave: false });
         accountRestored = true;
     }
 
-    if (!user.isActive) {
-        throw new ApiError(403, "This account is not active. Please contact the administrator.");
-    }
-
+    // One save for the restore (if any) and the login time
     user.lastLoginAt = new Date();
     await user.save({ validateBeforeSave: false });
 
@@ -193,6 +277,8 @@ const loginUser = asyncHandler(async (req, res) => {
             )
         );
 });
+
+
 
 // ---- LOGOUT ----
 // Clears this device's cookie only. Other devices stay logged in.
@@ -216,67 +302,74 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 // Anything else in the body (role, isActive, password...) is ignored.
 const updateCurrentUser = asyncHandler(async (req, res) => {
     const updates = req.body || {};
-
-    const user = await User.findById(req.user._id);
-
-    if (!user) {
-        throw new ApiError(404, "User not found");
-    }
-
-    let hasChanges = false;
-
-    // Required fields: cannot be blanked out.
-    for (const field of ["fullName", "username", "mobile", "branch", "section"]) {
-        if (updates[field] === undefined) continue;
-
-        if (!isString(updates[field]) || !updates[field].trim()) {
-            throw new ApiError(400, `${field} cannot be empty`);
-        }
-        user[field] = updates[field]; // setters trim / lowercase / normalize
-        hasChanges = true;
-    }
-
-    // Optional: rollNo can be added, changed or removed.
-    if (updates.rollNo !== undefined) {
-        if (updates.rollNo !== null && !isString(updates.rollNo)) {
-            throw new ApiError(400, "rollNo must be a string");
-        }
-        user.rollNo = (updates.rollNo && updates.rollNo.trim()) || null;
-        hasChanges = true;
-    }
-
-    // Optional: empty value removes the email (stored as absent, not "").
-    if (updates.email !== undefined) {
-        if (updates.email !== null && !isString(updates.email)) {
-            throw new ApiError(400, "email must be a string");
-        }
-        user.email = (updates.email && updates.email.trim()) || undefined;
-        hasChanges = true;
-    }
-
-    if (updates.avatar !== undefined) {
-        if (updates.avatar !== null && !isString(updates.avatar)) {
-            throw new ApiError(400, "avatar must be a string");
-        }
-        user.avatar = (updates.avatar && updates.avatar.trim()) || "";
-        hasChanges = true;
-    }
-
-    if (!hasChanges) {
-        throw new ApiError(400, "No valid fields to update");
-    }
+    const localFile = req.file?.path;
+    let uploaded = null;
 
     try {
-        await user.save();
-    } catch (error) {
-        throw toApiError(error);
+        const user = await User.findById(req.user._id).select("+avatarPublicId");
+        if (!user) throw new ApiError(404, "User not found");
+
+        let hasChanges = false;
+
+        for (const field of ["fullName", "username", "mobile", "branch", "section"]) {
+            if (updates[field] === undefined) continue;
+            if (!isString(updates[field]) || !updates[field].trim()) {
+                throw new ApiError(400, `${field} cannot be empty`);
+            }
+            user[field] = updates[field];
+            hasChanges = true;
+        }
+
+        if (updates.rollNo !== undefined) {
+            if (updates.rollNo !== null && !isString(updates.rollNo)) {
+                throw new ApiError(400, "rollNo must be a string");
+            }
+            user.rollNo = (updates.rollNo && updates.rollNo.trim()) || null;
+            hasChanges = true;
+        }
+
+        if (updates.email !== undefined) {
+            if (updates.email !== null && !isString(updates.email)) {
+                throw new ApiError(400, "email must be a string");
+            }
+            user.email = (updates.email && updates.email.trim()) || undefined;
+            hasChanges = true;
+        }
+
+        // Avatar: a file replaces it; removeAvatar=true clears it.
+        const oldPublicId = user.avatarPublicId;
+        if (localFile) {
+            uploaded = await uploadOnCloudinary(localFile);
+            if (!uploaded) throw new ApiError(502, "Image upload failed. Try again");
+            user.avatar = uploaded.secure_url;
+            user.avatarPublicId = uploaded.public_id;
+            hasChanges = true;
+        } else if (String(updates.removeAvatar) === "true") {
+            user.avatar = "";
+            user.avatarPublicId = "";
+            hasChanges = true;
+        }
+
+        if (!hasChanges) throw new ApiError(400, "No valid fields to update");
+
+        try {
+            await user.save();
+        } catch (error) {
+            if (uploaded) deleteFromCloudinary(uploaded.public_id); // don't leave an orphan
+            throw toApiError(error);
+        }
+
+        // Delete the previous image only after the save succeeded.
+        if (oldPublicId && oldPublicId !== user.avatarPublicId) {
+            deleteFromCloudinary(oldPublicId);
+        }
+
+        return res.status(200).json(new ApiResponse(200, user, "Profile updated successfully"));
+    } finally {
+        // If we threw before the upload ran, the temp file is still on disk.
+        if (localFile) fs.promises.unlink(localFile).catch(() => {});
     }
-
-    return res
-        .status(200)
-        .json(new ApiResponse(200, user, "Profile updated successfully"));
 });
-
 // ---- CHANGE PASSWORD ----
 const changePassword = asyncHandler(async (req, res) => {
     const { currentPassword, newPassword } = req.body || {};

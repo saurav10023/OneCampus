@@ -89,7 +89,7 @@ setupSchema.index(
 );
 
 // Runs on every save, so it also covers partial updates done via document.save()
-setupSchema.pre('validate', function (next) {
+setupSchema.pre('validate', function () {
   if (this.startDate && this.endDate && this.endDate < this.startDate) {
     this.invalidate('endDate', 'endDate must be on or after startDate');
   }
@@ -109,8 +109,6 @@ setupSchema.pre('validate', function (next) {
   if (scopeChanged) {
     this.scopeKey = buildScopeKey(this);
   }
-
-  next();
 });
 
 const Setup = mongoose.model('Setup', setupSchema);

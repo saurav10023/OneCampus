@@ -16,18 +16,19 @@ import {
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { authorizeRoles } from "../middlewares/authorizeRoles.middleware.js";
 import { loginLimiter } from "../middlewares/rateLimiting.middleware.js";
+import { uploadAvatar } from "../middlewares/multer.middleware.js";
 
 const router = Router();
 
 // Public
 router.route("/register").post(registerUser);
 router.route("/login").post(loginLimiter, loginUser);
-router.route("/logout").post(logoutUser); // only clears this device's cookie
+router.route("/logout").post(logoutUser); 
 
 // Logged-in user (keep /me routes above the /:username routes)
 router.route("/me")
     .get(verifyJWT, getCurrentUser)
-    .patch(verifyJWT, updateCurrentUser)
+    .patch(verifyJWT,uploadAvatar, updateCurrentUser)
     .delete(verifyJWT, requestAccountDeletion);
 router.route("/me/password").patch(verifyJWT, changePassword);
 

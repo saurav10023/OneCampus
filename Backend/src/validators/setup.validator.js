@@ -1,4 +1,5 @@
 import ApiError from '../utils/ApiError.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 import { parseDateOnly } from '../utils/date.util.js';
 import { ACADEMIC_YEAR_REGEX } from '../utils/constants.js';
 
@@ -14,19 +15,15 @@ const isValidTimezone = (tz) => {
   }
 };
 
-// Builds a whitelisted body so unknown fields can never reach the controller or the model.
-// Dropped on purpose: ownerId, status, scopeKey, officialScheduleId, joinedOfficialAt,
-// officialGroups, lastSyncedContentRevision and the sharing fields. Only the join service sets
-// the official ones.
-//
-// Control flags (not stored on the setup):
-//   archivePrevious (create): archive an existing active setup with the same scope
-//   leaveOfficial   (update): confirm that changing the scope of a joined setup is intended
+// Whitelist: only the fields built here reach the controller, so official fields
+// (source, officialScheduleId, scopeKey, sharing pointers) can never come from a student.
 const buildCleanBody = (rawBody, { partial }) => {
-  const body = rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody) ? rawBody : {};
+  const body =
+    rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody) ? rawBody : {};
   const errors = [];
   const clean = {};
 
+  // Text fields
   for (const field of TEXT_FIELDS) {
     const value = body[field];
     if (value === undefined) {
@@ -38,22 +35,27 @@ const buildCleanBody = (rawBody, { partial }) => {
     }
   }
 
-  // The year is checked by pattern here so the student gets a clear 400
+  // Academic year
   if (clean.academicYear && !ACADEMIC_YEAR_REGEX.test(clean.academicYear)) {
     errors.push('academicYear must look like 2026-27');
   }
 
+  // Dates
   for (const field of DATE_FIELDS) {
     const value = body[field];
     if (value === undefined) {
       if (!partial) errors.push(`${field} is required`);
     } else {
       const parsed = parseDateOnly(value);
-      if (!parsed) errors.push(`${field} must be a valid date in YYYY-MM-DD format`);
-      else clean[field] = parsed;
+      if (!parsed) {
+        errors.push(`${field} must be a valid date in YYYY-MM-DD format`);
+      } else {
+        clean[field] = parsed;
+      }
     }
   }
 
+  // Timezone
   if (body.timezone !== undefined) {
     if (typeof body.timezone !== 'string' || !isValidTimezone(body.timezone)) {
       errors.push('timezone must be a valid IANA timezone, e.g. Asia/Kolkata');
@@ -62,7 +64,7 @@ const buildCleanBody = (rawBody, { partial }) => {
     }
   }
 
-  // Overall attendance target, 0 to 100. A subject's own target overrides it.
+  // Attendance target
   if (body.targetPercentage !== undefined) {
     const value = body.targetPercentage;
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
@@ -77,36 +79,44 @@ const buildCleanBody = (rawBody, { partial }) => {
     if (body.leaveOfficial !== undefined) {
       if (typeof body.leaveOfficial !== 'boolean') {
         errors.push('leaveOfficial must be true or false');
-      } else clean.leaveOfficial = body.leaveOfficial;
+      } else {
+        clean.leaveOfficial = body.leaveOfficial;
+      }
     }
   } else if (body.archivePrevious !== undefined) {
     if (typeof body.archivePrevious !== 'boolean') {
       errors.push('archivePrevious must be true or false');
-    } else clean.archivePrevious = body.archivePrevious;
+    } else {
+      clean.archivePrevious = body.archivePrevious;
+    }
   }
 
+  // Date range
   if (clean.startDate && clean.endDate && clean.endDate < clean.startDate) {
     errors.push('endDate must be on or after startDate');
   }
 
-  if (errors.length) throw new ApiError(400, 'Validation failed', errors);
+  if (errors.length) {
+    throw new ApiError(400, 'Validation failed', errors);
+  }
   return clean;
 };
 
-const validateCreateSetup = (req, _res, next) => {
+// Validation middleware. next() is required: it is how Express reaches the controller.
+const validateCreateSetup = asyncHandler(async(req, res, next) => {
   req.body = buildCleanBody(req.body, { partial: false });
-  next();
-};
+  return next();
+});
 
-const validateUpdateSetup = (req, _res, next) => {
+const validateUpdateSetup = asyncHandler(async(req, res, next) => {
   const clean = buildCleanBody(req.body, { partial: true });
-  // A request with only the leaveOfficial flag changes nothing
-  const { leaveOfficial, ...changes } = clean;
-  if (!Object.keys(changes).length) {
+  // leaveOfficial is a flag, not a change, so it does not count as a field to update
+  const changeCount = Object.keys(clean).filter((k) => k !== 'leaveOfficial').length;
+  if (changeCount === 0) {
     throw new ApiError(400, 'No valid fields to update');
   }
   req.body = clean;
-  next();
-};
+  return next();
+});
 
 export { validateCreateSetup, validateUpdateSetup };
