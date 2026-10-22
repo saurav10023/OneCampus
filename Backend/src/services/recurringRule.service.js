@@ -81,6 +81,9 @@ const reapplyConfirmedEvents = async ({ setupId, userId, ruleId, from, to }) => 
       userId,
       filter: { from: eventFrom, to: eventTo, occurrenceIds },
       cause: { type: CAUSE_TYPE.CALENDAR_EVENT, id: event._id },
+      // This runs over the rule's existing classes too. A class the student marked or
+      // overrode must not be cancelled again.
+      skipMarked: true,
     });
     cancelled += result.cancelled;
   }
@@ -253,6 +256,8 @@ const getRuleDeleteImpact = async (rule, userId) => {
 
 // Order: statuses, then classes, then the rule last, so a failure can be retried.
 // An official rule is also added to the setup's hidden list so the next sync does not add it back.
+// Order: statuses, then classes, then the rule last, so a failure can be retried.
+// The hide record for an official rule is written by the controller, before this runs.
 const deleteRuleWithChildren = async ({ setup, rule, userId }) => {
   const occurrenceIds = await Occurrence.distinct('_id', {
     setupId: setup._id,
@@ -261,6 +266,7 @@ const deleteRuleWithChildren = async ({ setup, rule, userId }) => {
 
   let deletedStatuses = 0;
   if (occurrenceIds.length) {
+    // Status rows first, so a crash never leaves a row pointing at a deleted class
     const statusResult = await OccurrenceStatus.deleteMany({
       userId,
       occurrenceId: { $in: occurrenceIds },
@@ -269,21 +275,10 @@ const deleteRuleWithChildren = async ({ setup, rule, userId }) => {
     await Occurrence.deleteMany({ _id: { $in: occurrenceIds } });
   }
 
-  let hidden = false;
-  if (rule.origin === ORIGIN.OFFICIAL && rule.officialRuleId) {
-    // Needs `officialOptOuts: [{ kind, id }]` in the Setup schema, or this write is ignored
-    await Setup.updateOne(
-      { _id: setup._id },
-      { $addToSet: { officialOptOuts: { kind: 'rule', id: rule.officialRuleId } } }
-    );
-    hidden = true;
-  }
-
   await RecurringRule.deleteOne({ _id: rule._id });
 
-  return { deletedClasses: occurrenceIds.length, deletedStatuses, hiddenFromSync: hidden };
+  return { deletedClasses: occurrenceIds.length, deletedStatuses };
 };
-
 export {
   findOverlaps,
   generateForRule,

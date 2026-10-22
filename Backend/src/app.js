@@ -24,6 +24,9 @@ import subjectRoutes from "./routes/subject.routes.js";
 import setupRoutes from "./routes/setup.routes.js";
 import recurringRuleRoutes from "./routes/recurringRule.routes.js";
 import occurrenceRoutes from "./routes/occurrence.routes.js";
+
+import attendanceRoutes from "./routes/attendance.routes.js";
+app.use("/api/v1/setup/:setupId/attendance", attendanceRoutes);
 app.use("/api/v1/setup/:setupId/occurrences", occurrenceRoutes);
 // TODO: uncomment once the login middleware is added inside calendarEvent.routes.js
 // import {calendarEventRoutes }from "./routes/calendarEvent.routes.js";
