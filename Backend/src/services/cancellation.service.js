@@ -1,7 +1,3 @@
-import Occurrence from '../models/Schedule/occurrence.model.js';
-import RecurringRule from '../models/TimeTable/recurringRule.model.js';
-import OccurrenceStatus from '../models/Attendance/occurrenceStatus.model.js';
-import CalendarEvent from '../models/Calendar/calendarEvent.model.js';
 import {
   ATTENDANCE_STATUS,
   CAUSE_TYPE,
@@ -9,28 +5,31 @@ import {
   STATUS_SOURCE,
 } from '../utils/constants.js';
 
-// The one place that cancels and un-cancels classes. Calendar events (manual, imported and
-// official), class cancels, image-import confirmation and mass bunk all call it, so the rules
-// live here only. The official sync calls it on read; there is no follow job.
+// A calendar event may take a class from these (rule 3). The mark from before is kept.
+const TAKEOVER_FROM = Object.freeze([CAUSE_TYPE.MASS_BUNK, CAUSE_TYPE.CLASS_CANCEL]);
+// A student's own marks. skipMarked leaves these alone (used by the sync).
+const STUDENT_MARKS = Object.freeze([
+  ATTENDANCE_STATUS.PRESENT,
+  ATTENDANCE_STATUS.ABSENT,
+  ATTENDANCE_STATUS.EXCUSED,
+]);
+
+// The one place that cancels and un-cancels classes. Calendar events, the official-date follow
+// job, image-import confirmation and (later) mass bunk all call it, so the rules live here only.
 //
 // Rules (see OneCampus_Official_Dates_Spec.md §5.1):
 //  1. Classes that are not_counted, or that the student cancelled themselves, are never touched.
-//  2. A mass bunk or class cancel never acts on a class a calendar event already cancels
-//     (holiday days count for no other action).
-//  3. A calendar event takes over a class held by a mass bunk or a class cancel. The mark from
-//     before that hold is kept, and the hold on that class is dropped. If the event is later
-//     removed, the class returns to that earlier mark.
+//  2. A mass bunk never acts on a class a calendar event already cancels (holiday days count
+//     for no other action).
+//  3. A calendar event takes over a class held by a mass bunk. The mark from before the bunk is
+//     kept, and the bunk's hold on that class is dropped.
 //  4. When an event is removed or edited, a class is restored only if no other confirmed event
 //     that affects classes still covers it. If one does, the class is handed to that event.
 //  5. Every step is idempotent, so a failed request can be retried.
-//
-// Bulk writes skip the OccurrenceStatus validation hook, so every write below sets causeType,
-// causeId, source and previousStatus together.
 
 const CAUSE_VALUES = Object.values(CAUSE_TYPE);
 
-// Causes whose hold a calendar event may take over (rule 3)
-const TAKEOVER_CAUSES = Object.freeze([CAUSE_TYPE.MASS_BUNK, CAUSE_TYPE.CLASS_CANCEL]);
+
 
 const assertCause = (cause) => {
   if (!cause || !CAUSE_VALUES.includes(cause.type) || !cause.id) {
@@ -42,15 +41,17 @@ const isSameCause = (row, cause) =>
   row.causeType === cause.type && String(row.causeId) === String(cause.id);
 
 // Finds the setup's classes that match the filter.
-// filter: { from, to, subjectIds, classTypes, occurrenceIds, time: { startTime, endTime } }
+// filter: { from, to, subjectIds, classTypes, groups, occurrenceIds, time: { startTime, endTime } }
+// groups: batch names to match; include null to match whole-section classes too.
 // A filter with no condition at all is refused, so a bug can never cancel a whole setup.
 const resolveOccurrences = async (setupId, filter = {}) => {
-  const { from, to, subjectIds, classTypes, occurrenceIds, time } = filter;
+  const { from, to, subjectIds, classTypes, groups, occurrenceIds, time } = filter;
   const hasTime = Boolean(time?.startTime && time?.endTime);
 
   const hasCondition =
     from || to || hasTime ||
-    Array.isArray(subjectIds) || Array.isArray(classTypes) || Array.isArray(occurrenceIds);
+    Array.isArray(subjectIds) || Array.isArray(classTypes) || Array.isArray(groups) ||
+    Array.isArray(occurrenceIds);
   if (!hasCondition) {
     throw new Error('A cancellation filter needs at least one condition');
   }
@@ -70,14 +71,9 @@ const resolveOccurrences = async (setupId, filter = {}) => {
     query.plannedStartTime = { $lt: time.endTime };
     query.plannedEndTime = { $gt: time.startTime };
   }
-  // classType is stored on the rule, not on the class. Classes with no rule never match.
-  if (Array.isArray(classTypes)) {
-    const ruleIds = await RecurringRule.distinct('_id', {
-      setupId,
-      classType: { $in: classTypes },
-    });
-    query.recurringRuleId = { $in: ruleIds };
-  }
+  // classType and group are copied onto every class, so this also works for classes with no rule
+  if (Array.isArray(classTypes)) query.classType = { $in: classTypes };
+  if (Array.isArray(groups)) query.group = { $in: groups };
 
   return Occurrence.find(query).select('_id date').sort({ date: 1 }).lean();
 };
@@ -87,7 +83,7 @@ const resolveOccurrences = async (setupId, filter = {}) => {
 //   toCancel:       [{ occurrenceId, date, mode: 'new' | 'takeover', previousStatus }]
 //   alreadyApplied: ids this same cause already cancels
 //   skipped:        { notCounted, userCancelled, heldByOther } (ids)
-const planCancellation = async ({ setupId, userId, filter, cause }) => {
+const planCancellation = async ({ setupId, userId, filter, cause, skipMarked = false }) => {
   assertCause(cause);
 
   const occurrences = await resolveOccurrences(setupId, filter);
@@ -95,7 +91,7 @@ const planCancellation = async ({ setupId, userId, filter, cause }) => {
     matched: occurrences.length,
     toCancel: [],
     alreadyApplied: [],
-    skipped: { notCounted: [], userCancelled: [], heldByOther: [] },
+    skipped: { notCounted: [], userCancelled: [], heldByOther: [], marked: [] },
   };
   if (!occurrences.length) return plan;
 
@@ -127,10 +123,7 @@ const planCancellation = async ({ setupId, userId, filter, cause }) => {
           continue;
         }
         // A calendar event may take a class from a mass bunk or a class cancel (rule 3)
-        if (
-          cause.type === CAUSE_TYPE.CALENDAR_EVENT &&
-          TAKEOVER_CAUSES.includes(row.causeType)
-        ) {
+        if (cause.type === CAUSE_TYPE.CALENDAR_EVENT && TAKEOVER_FROM.includes(row.causeType)) {
           plan.toCancel.push({
             ...base,
             mode: 'takeover',
@@ -140,15 +133,20 @@ const planCancellation = async ({ setupId, userId, filter, cause }) => {
           });
           continue;
         }
-        // Held by another event, a bunk or a class cancel: leave it where it is (rules 2 and 4)
+        // Held by another event or another cause: leave it where it is (rules 2 and 4)
         plan.skipped.heldByOther.push(occurrence._id);
+        continue;
+      }
+
+      // Automatic callers (the sync) never overwrite a class the student marked
+      if (skipMarked && STUDENT_MARKS.includes(row.status)) {
+        plan.skipped.marked.push(occurrence._id);
         continue;
       }
     }
 
     // Overwrite and remember. A class nobody marked (no row, or pending) remembers nothing,
     // so removing the cause later drops the row and the class is pending again.
-    // A student's excused leave is remembered like any other mark.
     const previousStatus =
       row && row.status !== ATTENDANCE_STATUS.PENDING ? row.status : null;
     plan.toCancel.push({ ...base, mode: 'new', previousStatus });
@@ -157,13 +155,12 @@ const planCancellation = async ({ setupId, userId, filter, cause }) => {
   return plan;
 };
 
-// Cancels the matching classes for one user. Safe to run twice.
-const applyCancellation = async ({ setupId, userId, filter, cause }) => {
-  const plan = await planCancellation({ setupId, userId, filter, cause });
+const applyCancellation = async ({ setupId, userId, filter, cause, skipMarked = false }) => {
+  const plan = await planCancellation({ setupId, userId, filter, cause, skipMarked });
 
   const operations = plan.toCancel.map((item) => {
     if (item.mode === 'takeover') {
-      // previousStatus and reason stay as they are: it is still the mark from before the hold
+      // previousStatus and reason stay as they are: it is still the mark from before the old cause
       return {
         updateOne: {
           filter: {
@@ -214,6 +211,7 @@ const applyCancellation = async ({ setupId, userId, filter, cause }) => {
       notCounted: plan.skipped.notCounted.length,
       userCancelled: plan.skipped.userCancelled.length,
       heldByOther: plan.skipped.heldByOther.length,
+      marked: plan.skipped.marked.length,
     },
   };
 };
@@ -233,8 +231,7 @@ const revertCause = async ({ setupId, userId, cause }) => {
   if (!rows.length) return result;
 
   // Rule 4: an event being removed or edited hands a class to another confirmed event that
-  // still covers it, instead of restoring it. Mass bunks and class cancels never overlap
-  // events (rule 2), so only calendar-event causes need this lookup.
+  // still covers it, instead of restoring it. Mass bunks never overlap events (rule 2).
   let otherEvents = [];
   const dateByOccurrence = new Map();
   if (cause.type === CAUSE_TYPE.CALENDAR_EVENT) {
@@ -316,4 +313,4 @@ const revertCause = async ({ setupId, userId, cause }) => {
   return result;
 };
 
-export { planCancellation, applyCancellation, revertCause };
+export { planCancellation, applyCancellation, revertCause }; 

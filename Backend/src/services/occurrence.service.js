@@ -1,15 +1,24 @@
 import RecurringRule from '../models/TimeTable/recurringRule.model.js';
 import Occurrence from '../models/Schedule/occurrence.model.js';
 import OccurrenceStatus from '../models/Attendance/occurrenceStatus.model.js';
-import { ATTENDANCE_STATUS, STATUS_SOURCE, DAY_MS } from '../utils/constants.js';
+import { ATTENDANCE_STATUS, STATUS_SOURCE, CLASS_TYPE, DAY_MS } from '../utils/constants.js';
 
 const maxDate = (a, b) => (a > b ? a : b);
 const minDate = (a, b) => (a < b ? a : b);
 
 // Generates classes for active rules inside [from, to] (inclusive, UTC dates).
 // Upserts on setupId + recurringRuleId + date, so calling it twice never duplicates
-const generateOccurrences = async (setupId, from, to) => {
-  const rules = await RecurringRule.find({ setupId, isActive: true });
+// options.rules:   plain rule objects to generate from instead of reading rules from the database.
+//                  The rule service passes the new values of a rule that is not saved yet.
+// options.ruleIds: limit the run to these saved rules.
+const generateOccurrences = async (setupId, from, to, { rules: givenRules, ruleIds } = {}) => {
+  const rules =
+    givenRules ??
+    (await RecurringRule.find({
+      setupId,
+      isActive: true,
+      ...(ruleIds ? { _id: { $in: ruleIds } } : {}),
+    }));
   const operations = [];
 
   for (const rule of rules) {
@@ -31,6 +40,10 @@ const generateOccurrences = async (setupId, from, to) => {
               attendanceUnits: rule.attendanceUnits,
               sourceType: 'recurring_rule',
               generatedRuleVersion: rule.ruleVersion,
+              // Copied onto the class so mass bunk can match without looking up the rule.
+              // Rules saved before classType existed count as lectures.
+              classType: rule.classType ?? CLASS_TYPE.LECTURE,
+              group: rule.group ?? null,
             },
           },
           upsert: true,

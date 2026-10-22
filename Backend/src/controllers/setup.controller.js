@@ -14,7 +14,9 @@ import {
 } from '../services/setup.service.js';
 
 // Only these fields can be set when a student creates a setup. ownerId comes from the token;
-// scopeKey is computed; status, the official link and the sharing fields are never client input.
+// scopeKey is computed; status, the official link (officialScheduleId, joinedOfficialAt,
+// officialGroups, lastSyncedContentRevision, officialOptOuts) and the sharing fields are
+// never client input.
 const CREATE_FIELDS = [
   'name',
   'academicYear',
@@ -112,7 +114,42 @@ const getMySetups = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { setups }, 'Setups fetched successfully'));
 });
 
+// The setup the app opens on launch. Uses the user's pointer; if it is missing or stale
+// (setup archived or deleted), falls back to the newest active setup and repairs the pointer.
+// Mount this route before '/:setupId' so "active" is not read as an id.
+const getActiveSetup = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  const user = await User.findById(userId).select('activeSetupId').lean();
+  let setup = null;
+
+  if (user?.activeSetupId) {
+    setup = await Setup.findOne({
+      _id: user.activeSetupId,
+      ownerId: userId,
+      status: 'active',
+    });
+  }
+
+  if (!setup) {
+    setup = await Setup.findOne({ ownerId: userId, status: 'active' }).sort({ createdAt: -1 });
+    if (setup) {
+      await User.updateOne({ _id: userId }, { $set: { activeSetupId: setup._id } });
+    }
+  }
+
+  if (!setup) {
+    throw new ApiError(404, 'You have no active setup. Create one to get started.');
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { setup }, 'Active setup fetched successfully'));
+});
+
 const getSetupById = asyncHandler(async (req, res) => {
+  // When the sync service exists (lifecycle §6.2), call it here and return the summary and
+  // officialStatus beside the setup. Not added yet so this file loads without that service.
   return res
     .status(200)
     .json(new ApiResponse(200, { setup: req.setup }, 'Setup fetched successfully'));
@@ -265,7 +302,7 @@ const deleteSetup = asyncHandler(async (req, res) => {
     ]);
   }
 
-  // REMOVE alsoUnpublish and the publication check in the sharing cut-over (lifecycle Section 5)
+  // Sharing stays (lifecycle §2), so alsoUnpublish and the publication check stay too
   const { alsoUnpublish } = req.body;
   if (alsoUnpublish !== undefined && typeof alsoUnpublish !== 'boolean') {
     throw new ApiError(400, 'alsoUnpublish must be true or false');
@@ -296,6 +333,7 @@ const deleteSetup = asyncHandler(async (req, res) => {
 export {
   createSetup,
   getMySetups,
+  getActiveSetup,
   getSetupById,
   updateSetup,
   archiveSetup,

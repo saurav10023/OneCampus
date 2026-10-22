@@ -22,7 +22,9 @@ app.use(cookieParser())  // use cookie in ueer controller   or anywhere
 import userRoutes from "./routes/user.routes.js";
 import subjectRoutes from "./routes/subject.routes.js";
 import setupRoutes from "./routes/setup.routes.js";
-
+import recurringRuleRoutes from "./routes/recurringRule.routes.js";
+import occurrenceRoutes from "./routes/occurrence.routes.js";
+app.use("/api/v1/setup/:setupId/occurrences", occurrenceRoutes);
 // TODO: uncomment once the login middleware is added inside calendarEvent.routes.js
 // import {calendarEventRoutes }from "./routes/calendarEvent.routes.js";
 
@@ -37,10 +39,10 @@ app.use("/api/v1/users", userRoutes);
 app.use(
     "/api/v1/setup/:setupId/subjects",subjectRoutes
 );
+app.use("/api/v1/setup/:setupId/rules", recurringRuleRoutes);
 
 app.use("/api/v1/setup",  (req, res, next)=>{console.log("setup MOUNT HIT", req.method, req.originalUrl);
     next();} ,setupRoutes);
-
 
 // Calendar events live under a setup: /api/v1/setup/:setupId/calendar-events
 // app.use("/api/v1/setup/:setupId/calendar-events", calendarEventRoutes);

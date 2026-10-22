@@ -37,6 +37,25 @@ export const DEFAULT_TARGET_PERCENTAGE = 75;
 export const ACADEMIC_YEAR_REGEX = /^\d{4}-\d{2}$/;
 
 /* ------------------------------------------------------------------ */
+/* Official link (Lifecycle §5.1)                                     */
+/* ------------------------------------------------------------------ */
+
+// Where a Subject or RecurringRule came from. officialRuleId / officialKey are set only
+// when origin is 'official'. 'shared_copy' marks content copied from a shared setup.
+export const ORIGIN = Object.freeze({
+  MANUAL: 'manual',
+  OFFICIAL: 'official',
+  SHARED_COPY: 'shared_copy',
+});
+
+// Setup.officialOptOuts[].kind: what kind of official item the student hid
+export const OPT_OUT_KIND = Object.freeze({
+  SUBJECT: 'subject',
+  RULE: 'rule',
+  ITEM: 'item',
+});
+
+/* ------------------------------------------------------------------ */
 /* Calendar events (student's CalendarEvent)                          */
 /* ------------------------------------------------------------------ */
 
@@ -67,15 +86,18 @@ export const TIMED_EVENT_TYPES = Object.freeze([EVENT_TYPE.QUIZ, EVENT_TYPE.EVEN
 export const EVENT_SOURCE = Object.freeze({
   MANUAL: 'manual',
   IMAGE_IMPORT: 'image_import',
-  SHARED_SETUP: 'shared_setup', // legacy: events created before sharing was retired
+  SHARED_SETUP: 'shared_setup', // events copied from a shared setup (sharing stays)
   OFFICIAL: 'official',
 });
 
 // CalendarEvent.officialRef.kind: which kind of official item the event came from.
 // A mass bunk is its own MassBunk record, not an event, so it is deliberately not here.
+// SLOT and CALENDAR_ITEM stay until calendarEvent.model.js moves to the single ITEM kind
+// (Lifecycle v2: one ScheduleItem for holiday, quiz, exam and mass bunk).
 export const OFFICIAL_REF_KIND = Object.freeze({
   SLOT: 'slot',
   CALENDAR_ITEM: 'calendar_item',
+  ITEM: 'item',
 });
 
 /* ------------------------------------------------------------------ */
@@ -295,8 +317,8 @@ const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Stops people rating a setup they never used.
-// REMOVE in the sharing cut-over (Section 5): ratings go away with SharedPublication.
+// Stops people rating a setup they never used: a student must have recorded at least this
+// many classes before rating a shared setup.
 const MIN_RECORDED_CLASSES_TO_RATE = 10;
 
 export {

@@ -4,6 +4,7 @@ import ApiError from '../utils/ApiError.js';
 import ApiResponse from '../utils/ApiResponse.js';
 import Setup from '../models/TimeTable/setup.model.js';
 import CalendarEvent from '../models/Calendar/calendarEvent.model.js';
+import { editOfficialEvent, deleteOfficialEvent } from '../services/officialOverride.service.js';
 import { EVENT_SOURCE } from '../utils/constants.js';
 import {
   listEvents,
@@ -52,20 +53,16 @@ const assertWritable = (setup) => {
 };
 
 // Loads the event inside the caller's setup. Official events are read-only for students.
-const getEditableEvent = async (req, setup) => {
+const getEditableEvent = async (req, setup, { allowOfficial = false } = {}) => {
   const { eventId } = req.params;
   if (!mongoose.isValidObjectId(eventId)) throw new ApiError(404, 'Event not found');
   const event = await CalendarEvent.findOne({ _id: eventId, setupId: setup._id });
   if (!event) throw new ApiError(404, 'Event not found');
-  if (event.source === EVENT_SOURCE.OFFICIAL) {
-    throw new ApiError(
-      403,
-      'Official calendar events cannot be changed. Add your own event instead.'
-    );
+  if (event.source === EVENT_SOURCE.OFFICIAL && !allowOfficial) {
+    throw new ApiError(403, 'Official calendar events cannot be confirmed. They arrive already confirmed.');
   }
   return event;
 };
-
 const list = asyncHandler(async (req, res) => {
   const setup = await getOwnedSetup(req);
   // Lifecycle Section 3: the sync-on-read middleware runs before this handler
@@ -85,9 +82,10 @@ const create = asyncHandler(async (req, res) => {
 const update = asyncHandler(async (req, res) => {
   const setup = await getOwnedSetup(req);
   assertWritable(setup);
-  const event = await getEditableEvent(req, setup);
+  const event = await getEditableEvent(req, setup, { allowOfficial: true });
+  const run = event.source === EVENT_SOURCE.OFFICIAL ? editOfficialEvent : updateEvent;
   const result = await guard(() =>
-    updateEvent({ setup, userId: req.user._id, event, input: req.validated.body })
+    run({ setup, userId: req.user._id, event, input: req.validated.body })
   );
   return res.status(200).json(new ApiResponse(200, result, 'Event updated successfully'));
 });
@@ -95,11 +93,11 @@ const update = asyncHandler(async (req, res) => {
 const remove = asyncHandler(async (req, res) => {
   const setup = await getOwnedSetup(req);
   assertWritable(setup);
-  const event = await getEditableEvent(req, setup);
-  const result = await guard(() => deleteEvent({ setup, userId: req.user._id, event }));
+  const event = await getEditableEvent(req, setup, { allowOfficial: true });
+  const run = event.source === EVENT_SOURCE.OFFICIAL ? deleteOfficialEvent : deleteEvent;
+  const result = await guard(() => run({ setup, userId: req.user._id, event }));
   return res.status(200).json(new ApiResponse(200, result, 'Event deleted successfully'));
 });
-
 const confirm = asyncHandler(async (req, res) => {
   const setup = await getOwnedSetup(req);
   assertWritable(setup);
