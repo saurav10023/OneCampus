@@ -250,7 +250,61 @@ export const SCHEDULE_ROLE_STATUS = Object.freeze({
   PENDING: 'pending',
   ACTIVE: 'active',
   REVOKED: 'revoked',
+  REJECTED: 'rejected', // an admin said no; the same user waits ROLE_REQUEST_COOLDOWN_HOURS
 });
+
+/* ------------------------------------------------------------------ */
+/* Official schedule: one ScheduleItem collection (Lifecycle v2)      */
+/* ------------------------------------------------------------------ */
+
+export const SCHEDULE_ITEM_KIND = Object.freeze({
+  HOLIDAY: 'holiday',
+  BREAK: 'break',
+  LAST_WORKING_DAY: 'last_working_day',
+  EVENT: 'event',
+  QUIZ: 'quiz',
+  EXAM: 'exam',
+  MASS_BUNK: 'mass_bunk',
+  CLASS_CANCEL: 'class_cancel',
+});
+
+// Derived on the server from the kind. The CR never chooses it. A quiz never cancels classes.
+export const ITEM_KIND_AFFECTS_CLASSES = Object.freeze({
+  holiday: true,
+  break: true,
+  last_working_day: false,
+  event: false,
+  quiz: false,
+  exam: true,
+  mass_bunk: true,
+  class_cancel: true,
+});
+
+// Fixed slots for quizzes (per subject) and exams
+export const SLOT_KEYS = Object.freeze(['quiz_1', 'quiz_2', 'midsem', 'endsem']);
+
+export const GROUP_KIND = Object.freeze({ LAB: 'lab', ELECTIVE: 'elective', OTHER: 'other' });
+export const MAX_SCHEDULE_GROUPS = 20;
+
+// The action log (every CR change). Redo is an undo of an undo, so there is no separate op.
+export const ACTION_TARGET = Object.freeze({
+  SUBJECT: 'subject',
+  RULE: 'rule',
+  ITEM: 'item',
+  SCHEDULE: 'schedule',
+});
+export const ACTION_OP = Object.freeze({
+  CREATE: 'create',
+  UPDATE: 'update',
+  WITHDRAW: 'withdraw',
+  PUBLISH: 'publish',
+  UNPUBLISH: 'unpublish',
+  UNDO: 'undo',
+});
+
+// Sync re-reads this many revisions before a student's last one. Two CR edits that commit out of
+// order can otherwise be skipped. Safe because every sync step is repeatable.
+export const SYNC_OVERLAP_REVISIONS = 25;
 
 // More active CRs than this per class (branch and section) is rejected
 export const MAX_ACTIVE_CRS_PER_SCHEDULE = 3;

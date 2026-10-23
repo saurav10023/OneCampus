@@ -16,6 +16,16 @@ const sameValue = (a, b) =>
     ? new Date(a).getTime() === new Date(b).getTime()
     : (a ?? null) === (b ?? null);
 
+// An official event that cancels classes can only be changed by the CR, so students cannot
+// unlock their own classes by editing or hiding it
+const assertStudentMayChange = (event) => {
+  if (event.affectsClasses) {
+    throw new ApiError(
+      403,
+      'This official event cancels classes, so only your CR can change it. Ask them to correct it.'
+    );
+  }
+};
 // $addToSet makes this idempotent, so a retried delete never duplicates an entry.
 // updateOne is used on purpose: no other part of the setup is rewritten.
 const addOptOuts = async (setupId, entries) => {
@@ -34,6 +44,7 @@ const getOptOutSet = (setup) =>
 // Official events are the student's own copy, so they may be edited (v2). Only the allowed
 // fields reach the normal update. Auto-follow is turned off only when the schedule changed.
 const editOfficialEvent = async ({ setup, userId, event, input }) => {
+  assertStudentMayChange(event);
   if (input.type !== undefined && input.type !== event.type) {
     throw new ApiError(400, 'The type of an official event cannot be changed');
   }
@@ -67,6 +78,7 @@ const editOfficialEvent = async ({ setup, userId, event, input }) => {
 // Deleting an official event hides it from future syncs and gives its classes back.
 // The hide record goes first, so a retry after a crash still hides it.
 const deleteOfficialEvent = async ({ setup, userId, event }) => {
+  assertStudentMayChange(event);
   if (!event.officialRef?.id) throw new ApiError(500, 'Official event has no officialRef');
   await addOptOuts(setup._id, [{ kind: OPT_OUT_KIND.ITEM, id: event.officialRef.id }]);
   const result = await deleteEvent({ setup, userId, event });

@@ -1,3 +1,6 @@
+import Occurrence from '../models/Schedule/occurrence.model.js';
+import OccurrenceStatus from '../models/Attendance/occurrenceStatus.model.js';
+import CalendarEvent from '../models/Calendar/calendarEvent.model.js';
 import {
   ATTENDANCE_STATUS,
   CAUSE_TYPE,
@@ -313,4 +316,4 @@ const revertCause = async ({ setupId, userId, cause }) => {
   return result;
 };
 
-export { planCancellation, applyCancellation, revertCause }; 
+export { planCancellation, applyCancellation, revertCause };

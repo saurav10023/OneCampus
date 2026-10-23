@@ -7,6 +7,10 @@ const extraClassAdjustmentSchema = new Schema(
     totalCount: { type: Number, required: true, min: 0, default: 0 },
     attendedCount: { type: Number, required: true, min: 0, default: 0 },
     missedCount: { type: Number, required: true, min: 0, default: 0 },
+        // Optional reminder of why these exist, for example "makeup for the 12 Oct lab"
+    note: { type: String, trim: true, maxlength: [300, 'note can be at most 300 characters'], default: undefined },
+        // Subjects already folded into this record by a merge. Makes a retried merge safe.
+    mergedSources: { type: [Schema.Types.ObjectId], default: undefined, select: false },
   },
   { timestamps: true }
 );

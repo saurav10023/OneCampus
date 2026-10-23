@@ -1,6 +1,6 @@
 import ApiError from '../utils/ApiError.js';
 import { toNameKey } from '../models/TimeTable/subject.model.js';
-
+import mongoose from 'mongoose';
 const CODE_REGEX = /^[A-Z0-9][A-Z0-9 ._/-]{0,19}$/;
 const COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 const MAX_BULK = 20;
@@ -235,10 +235,54 @@ const validateCheckQuery = (req, _res, next) => {
   next();
 };
 
+const PREFER = ['target', 'source'];
+
+// GET /:subjectId/merge-preview?into=<subjectId>&prefer=target
+const validateMergeQuery = (req, _res, next) => {
+  const q = asObject(req.query);
+  const errors = [];
+  const out = { prefer: 'target' };
+
+  if (typeof q.into !== 'string' || !mongoose.isValidObjectId(q.into)) {
+    errors.push('into is required and must be a valid subject id');
+  } else out.into = q.into;
+  if (q.prefer !== undefined) {
+    if (!PREFER.includes(q.prefer)) errors.push('prefer must be target or source');
+    else out.prefer = q.prefer;
+  }
+
+  if (errors.length) throw new ApiError(400, 'Validation failed', errors);
+  req.validatedQuery = out;
+  next();
+};
+
+// POST /:subjectId/merge { "into": "<subjectId>", "prefer": "target", "confirm": true }
+// prefer: when both subjects have a different mark for the same class, whose mark is kept
+const validateMergeBody = (req, _res, next) => {
+  const body = asObject(req.body);
+  const errors = [];
+  const out = { prefer: 'target' };
+
+  if (typeof body.into !== 'string' || !mongoose.isValidObjectId(body.into)) {
+    errors.push('into is required and must be a valid subject id');
+  } else out.into = body.into;
+  if (body.prefer !== undefined) {
+    if (!PREFER.includes(body.prefer)) errors.push('prefer must be target or source');
+    else out.prefer = body.prefer;
+  }
+  if (body.confirm !== true) errors.push('confirm must be true: merging removes the first subject');
+
+  if (errors.length) throw new ApiError(400, 'Validation failed', errors);
+  req.body = out;
+  next();
+};
+
 export {
   validateCreateSubject,
   validateUpdateSubject,
   validateBulkCreateSubjects,
   validateListQuery,
   validateCheckQuery,
+  validateMergeBody ,
+  validateMergeQuery
 };

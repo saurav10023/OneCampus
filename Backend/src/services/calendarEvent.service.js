@@ -10,8 +10,6 @@ import {
 import { applyCancellation, revertCause } from './cancellation.service.js';
 
 // All cancelling and restoring goes through the shared cancellation service.
-// ASSUMPTION: revertCause({ setupId, userId, cause }) takes the same cause object as
-// applyCancellation. If your signature differs, change it in revertFootprint only.
 
 // Fields a student request may set. source, confirmedAt, officialRef, followOfficial,
 // importJobId, extraction and every other official field are never read from input.

@@ -32,6 +32,8 @@ const occurrenceSchema = new Schema(
       default: 'recurring_rule',
     },
     generatedRuleVersion: { type: Number },
+        // true once the student edited this one class on its own. Rule edits then leave it alone.
+    isCustomized: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

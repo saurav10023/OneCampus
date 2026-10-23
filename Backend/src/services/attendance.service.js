@@ -59,6 +59,10 @@ const getAttendance = async ({ setup, userId, includeArchived = false }) => {
       const id = String(subject._id);
       const bucket = bucketBySubject.get(id);
       const extra = adjustmentBySubject.get(id) ?? null;
+
+      // Totals from timetable classes alone, taken before extra classes are added.
+      // "Match my college record" needs them to work out the extra-class counters.
+      const timetable = { attendedUnits: bucket.attendedUnits, heldUnits: bucket.heldUnits };
       addExtra(bucket, extra);
 
       const hasOwnTarget = subject.targetPercentage !== null && subject.targetPercentage !== undefined;
@@ -75,6 +79,7 @@ const getAttendance = async ({ setup, userId, includeArchived = false }) => {
             isActive: subject.isActive !== false,
           },
           targetSource: hasOwnTarget ? 'subject' : 'setup',
+          timetable,
           ...summarize(bucket, target),
           extra: extra
             ? {

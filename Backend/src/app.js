@@ -1,7 +1,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from "cors" ;
-
+import './models/index.js';
 const app = express()
 
 app.use(cors({
@@ -26,6 +26,10 @@ import recurringRuleRoutes from "./routes/recurringRule.routes.js";
 import occurrenceRoutes from "./routes/occurrence.routes.js";
 
 import attendanceRoutes from "./routes/attendance.routes.js";
+import extraClassRoutes from "./routes/extraClassAdjustment.routes.js";
+import calendarEventRoutes from "./routes/calendarEvent.routes.js";
+app.use("/api/v1/setup/:setupId/calendar-events", calendarEventRoutes);
+app.use("/api/v1/setup/:setupId/extra-classes", extraClassRoutes);
 app.use("/api/v1/setup/:setupId/attendance", attendanceRoutes);
 app.use("/api/v1/setup/:setupId/occurrences", occurrenceRoutes);
 // TODO: uncomment once the login middleware is added inside calendarEvent.routes.js

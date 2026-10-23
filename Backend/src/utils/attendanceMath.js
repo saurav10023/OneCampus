@@ -59,10 +59,17 @@ const tallyClass = (bucket, { status, units, isUpcoming }) => {
 };
 
 // One extra-class record counts each class as one unit
+// One extra-class record counts each class as one unit.
+// Extras that are announced but not yet decided are still to come, so they count as upcoming
+// (they can be skipped or attended in the projection) and in neither attended nor held.
 const addExtra = (bucket, extra) => {
   if (!extra) return;
   bucket.attendedUnits += extra.attendedCount;
   bucket.heldUnits += extra.attendedCount + extra.missedCount;
+
+  const undecided = Math.max(0, extra.totalCount - extra.attendedCount - extra.missedCount);
+  bucket.upcomingClasses += undecided;
+  bucket.upcomingUnits += undecided;
 };
 
 const mergeBuckets = (buckets) => {

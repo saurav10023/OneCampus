@@ -135,6 +135,7 @@ const syncRuleOccurrences = async ({ setupId, userId, desired, previous, boundar
       {
         setupId,
         recurringRuleId: ruleId,
+        isCustomized: { $ne: true },
         date: {
           $gte: maxDate(boundary, desired.effectiveStartDate),
           $lte: desired.effectiveEndDate,

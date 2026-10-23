@@ -8,6 +8,8 @@ import {
   validateBulkCreateSubjects,
   validateListQuery,
   validateCheckQuery,
+  validateMergeQuery,
+  validateMergeBody,
 } from '../validators/subject.validator.js';
 import {
   createSubject,
@@ -20,6 +22,8 @@ import {
   restoreSubject,
   getSubjectDeleteImpact,
   deleteSubject,
+  mergeSubject,
+  previewMerge,
 } from '../controllers/subject.controller.js';
 
 const router = Router({ mergeParams: true }); // so :setupId from the mount path is visible
@@ -39,5 +43,7 @@ router
 router.get('/:subjectId/delete-impact', getSubjectDeleteImpact);
 router.patch('/:subjectId/archive', archiveSubject);
 router.patch('/:subjectId/restore', restoreSubject);
+router.get('/:subjectId/merge-preview', validateMergeQuery, previewMerge);
+router.post('/:subjectId/merge', validateMergeBody, mergeSubject);
 
 export default router;

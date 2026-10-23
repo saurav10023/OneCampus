@@ -9,7 +9,7 @@ import {
   isDuplicateKey,
   isValidId,
 } from '../services/subject.service.js';
-
+import { previewSubjectMerge, mergeSubjects } from '../services/subjectMerge.service.js';
 const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const assertWritable = (setup) => {
@@ -209,6 +209,36 @@ const deleteSubject = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, { deleted: impact, hiddenFromOfficial }, 'Subject and all its data deleted permanently'));
 });
+// What a merge would do, without changing anything
+const previewMerge = asyncHandler(async (req, res) => {
+  const { subjectId } = req.params;
+  if (!isValidId(subjectId)) throw new ApiError(400, 'Invalid subjectId');
+  const { into, prefer } = req.validatedQuery;
+  const preview = await previewSubjectMerge({
+    setup: req.setup,
+    userId: req.user._id,
+    sourceId: subjectId,
+    targetId: into,
+    prefer,
+  });
+  return res.status(200).json(new ApiResponse(200, { preview }, 'Merge preview fetched successfully'));
+});
+
+// Merges :subjectId INTO the subject named in the body. :subjectId disappears.
+const mergeSubject = asyncHandler(async (req, res) => {
+  assertWritable(req.setup);
+  const { subjectId } = req.params;
+  if (!isValidId(subjectId)) throw new ApiError(400, 'Invalid subjectId');
+  const { into, prefer } = req.body;
+  const result = await mergeSubjects({
+    setup: req.setup,
+    userId: req.user._id,
+    sourceId: subjectId,
+    targetId: into,
+    prefer,
+  });
+  return res.status(200).json(new ApiResponse(200, { result }, 'Subjects merged'));
+});
 
 export {
   createSubject,
@@ -221,4 +251,6 @@ export {
   restoreSubject,
   getSubjectDeleteImpact,
   deleteSubject,
+  mergeSubject , 
+  previewMerge
 };
