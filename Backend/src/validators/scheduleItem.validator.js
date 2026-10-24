@@ -17,6 +17,7 @@ const MAX_TITLE = 120;
 const MAX_NOTE = 500;
 const MAX_KEY = 64;
 const MAX_GROUP = 20;
+const MAX_BULK_ITEMS = 100;
 
 const KINDS = Object.values(SCHEDULE_ITEM_KIND);
 const STATUSES = Object.values(ITEM_STATUS);
@@ -78,11 +79,12 @@ const readGroup = (value, errors) => {
   return text || undefined;
 };
 
-// POST /   { kind, title, startDate, endDate?, startTime?, endTime?, subjectKey?, slotKey?, classType?, group?, note? }
+// Cleans one item for creation. Shared by POST / and POST /bulk.
+// { kind, title, startDate, endDate?, startTime?, endTime?, subjectKey?, slotKey?, classType?, group?, note? }
 // endDate defaults to startDate. status, revision, affectsClasses, scheduleId and every other field
 // are dropped. null on an optional field is the same as leaving it out.
-const validateCreateItem = (req, _res, next) => {
-  const body = asObject(req.body);
+const cleanCreateItem = (raw) => {
+  const body = asObject(raw);
   const errors = [];
   const clean = {};
   const given = (field) => body[field] !== undefined && body[field] !== null;
@@ -108,8 +110,42 @@ const validateCreateItem = (req, _res, next) => {
   if (given('group')) clean.group = readGroup(body.group, errors);
   if (given('note')) clean.note = readText(body.note, 'note', MAX_NOTE, errors);
 
+  return { clean, errors };
+};
+
+// POST /
+const validateCreateItem = (req, _res, next) => {
+  const { clean, errors } = cleanCreateItem(req.body);
   if (errors.length) throw new ApiError(400, 'Validation failed', errors);
   req.body = clean;
+  next();
+};
+
+// POST /bulk   { items: [ <same fields as POST />, ... ], note? }
+// 1 to 100 items. Every item is checked and every problem is reported with its position, e.g.
+// "items[2].endDate must be on or after startDate". Nothing is saved unless all items pass.
+const validateBulkCreateItems = (req, _res, next) => {
+  const body = asObject(req.body);
+  const errors = [];
+
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    throw new ApiError(400, 'Validation failed', ['items must be a non-empty list']);
+  }
+  if (body.items.length > MAX_BULK_ITEMS) {
+    throw new ApiError(400, 'Validation failed', [`items can have at most ${MAX_BULK_ITEMS} entries`]);
+  }
+
+  const items = body.items.map((raw, index) => {
+    const result = cleanCreateItem(raw);
+    result.errors.forEach((message) => errors.push(`items[${index}].${message}`));
+    return result.clean;
+  });
+
+  let note;
+  if (body.note !== undefined && body.note !== null) note = readText(body.note, 'note', MAX_NOTE, errors);
+
+  if (errors.length) throw new ApiError(400, 'Validation failed', errors);
+  req.body = note === undefined ? { items } : { items, note };
   next();
 };
 
@@ -203,6 +239,7 @@ const validateItemIdParam = (req, _res, next) => {
 
 export {
   validateCreateItem,
+  validateBulkCreateItems,
   validateUpdateItem,
   validateItemNoteBody,
   validateItemListQuery,

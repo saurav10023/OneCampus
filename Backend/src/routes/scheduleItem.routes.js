@@ -3,12 +3,21 @@ import { verifyJWT } from '../middlewares/auth.middleware.js';
 import { validateScheduleIdParam } from '../validators/officialSchedule.validator.js';
 import {
   validateCreateItem,
+  validateBulkCreateItems,
   validateUpdateItem,
   validateItemNoteBody,
   validateItemListQuery,
   validateItemIdParam,
 } from '../validators/scheduleItem.validator.js';
-import { list, get, create, update, withdraw, restore } from '../controllers/scheduleItem.controller.js';
+import {
+  list,
+  get,
+  create,
+  bulkCreate,
+  update,
+  withdraw,
+  restore,
+} from '../controllers/scheduleItem.controller.js';
 
 // Mount in app.js, before the schedule router:
 //   app.use('/api/v1/official-schedules/:scheduleId/items', scheduleItemRoutes);
@@ -18,6 +27,10 @@ const router = Router({ mergeParams: true }); // so :scheduleId from the mount p
 router.use(verifyJWT, validateScheduleIdParam);
 
 router.route('/').get(validateItemListQuery, list).post(validateCreateItem, create);
+
+// Keep /bulk above /:itemId routes so "bulk" is never read as an item id
+router.post('/bulk', validateBulkCreateItems, bulkCreate);
+
 router
   .route('/:itemId')
   .get(validateItemIdParam, get)

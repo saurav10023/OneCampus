@@ -4,6 +4,7 @@ import {
   listItems,
   getItem,
   createItem,
+  bulkCreateItems,
   updateItem,
   withdrawItem,
   restoreItem,
@@ -36,6 +37,17 @@ const get = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   const result = await createItem({ user: req.user, scheduleId: req.params.scheduleId, input: req.body });
   return res.status(201).json(new ApiResponse(201, result, 'Item added'));
+});
+
+// POST /bulk
+const bulkCreate = asyncHandler(async (req, res) => {
+  const result = await bulkCreateItems({
+    user: req.user,
+    scheduleId: req.params.scheduleId,
+    items: req.body.items,
+    note: req.body.note,
+  });
+  return res.status(201).json(new ApiResponse(201, result, `${result.count} item(s) added`));
 });
 
 // PATCH /:itemId
@@ -71,4 +83,4 @@ const restore = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, result, 'Item restored'));
 });
 
-export { list, get, create, update, withdraw, restore };
+export { list, get, create, bulkCreate, update, withdraw, restore };

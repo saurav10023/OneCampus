@@ -156,10 +156,8 @@ const getItem = async ({ user, scheduleId, itemId }) => {
 
 // input (already cleaned by the validator):
 //   { kind, title, startDate, endDate, startTime?, endTime?, subjectKey?, slotKey?, classType?, group?, note? }
-const createItem = async ({ user, scheduleId, input }) => {
-  const { schedule, actor } = await loadEditableSchedule({ user, scheduleId });
-
-  const item = new ScheduleItem({
+const buildItem = (schedule, input) =>
+  new ScheduleItem({
     scheduleId: schedule._id,
     kind: input.kind,
     title: input.title,
@@ -174,12 +172,17 @@ const createItem = async ({ user, scheduleId, input }) => {
     note: input.note,
     status: ITEM_STATUS.ACTIVE,
   });
-  // The model's own rules (times, subject, slot, one date) are refused before a revision is used
-  await validateOrThrow(item);
 
-  const values = { kind: item.kind, subjectKey: item.subjectKey, group: item.group, slotKey: item.slotKey };
-  await checkRefs({ schedule, values, changed: changedRefs({}, values) });
+const refsOf = (item) => ({
+  kind: item.kind,
+  subjectKey: item.subjectKey,
+  group: item.group,
+  slotKey: item.slotKey,
+});
 
+// Steps 2 to 4 for one new, already validated item. If the log entry cannot be written the item is
+// removed again, so the request can simply be sent again.
+const persistItem = async ({ schedule, actor, item, note, affectedStudents }) => {
   const seq = await allocateRevision(schedule._id);
   item.revision = seq;
   await saveOrThrow(item, { duplicate: SLOT_TAKEN });
@@ -194,20 +197,135 @@ const createItem = async ({ user, scheduleId, input }) => {
       after: canonicalSnapshot('item', item),
       actor,
       summary: `Added ${describeItem(item)}`,
-      note: input.note ?? '',
+      note: note ?? '',
       // The number of students attached to the schedule: an upper bound until the impact preview
       // (undo, redo and preview step) narrows it by group and subject
-      affectedStudents: await countAttachedStudents(schedule._id),
+      affectedStudents,
     });
   } catch (err) {
-    // Leave nothing half-done, so the request can simply be sent again
     await ScheduleItem.deleteOne({ _id: item._id }).catch(() => {});
     throw err;
   }
+};
+
+const createItem = async ({ user, scheduleId, input }) => {
+  const { schedule, actor } = await loadEditableSchedule({ user, scheduleId });
+
+  const item = buildItem(schedule, input);
+  // The model's own rules (times, subject, slot, one date) are refused before a revision is used
+  await validateOrThrow(item);
+
+  const values = refsOf(item);
+  await checkRefs({ schedule, values, changed: changedRefs({}, values) });
+
+  await persistItem({
+    schedule,
+    actor,
+    item,
+    note: input.note,
+    affectedStudents: await countAttachedStudents(schedule._id),
+  });
 
   return {
     item: await shapeOne(schedule._id, item.toObject()),
     warnings: itemWarnings(item, schedule, LONG_RANGE_WARNING_DAYS),
+  };
+};
+
+// ---------- Bulk create ----------
+
+const errorsOf = (err) => (err.errors?.length ? err.errors : [err.message]);
+
+const sameItemKey = (item) =>
+  [item.kind, item.title.trim().toLowerCase(), dateText(item.startDate), dateText(item.endDate)].join('|');
+
+// items (already cleaned by the validator): a list of the same shape createItem takes.
+// All or nothing on validation: every item is checked first (model rules, subject, group, slot,
+// repeats inside the list, repeats of items already in the schedule). If any fail, nothing is saved
+// and every problem is returned with its position. Then the items are saved one by one, in order,
+// each with its own revision and log entry, so the CR can undo or withdraw any one of them.
+// note (optional) is written on the log entry of every item that has no note of its own.
+const bulkCreateItems = async ({ user, scheduleId, items, note }) => {
+  const { schedule, actor } = await loadEditableSchedule({ user, scheduleId });
+
+  const errors = [];
+  const built = [];
+  const seenSlots = new Set();
+  const seenItems = new Set();
+
+  for (let index = 0; index < items.length; index += 1) {
+    const item = buildItem(schedule, items[index]);
+    const problems = [];
+
+    try {
+      await validateOrThrow(item);
+      const values = refsOf(item);
+      await checkRefs({ schedule, values, changed: changedRefs({}, values) });
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+      problems.push(...errorsOf(err));
+    }
+
+    if (!problems.length) {
+      // repeats inside this request
+      if (isSlotKind(item.kind) && item.slotKey) {
+        const slotId = `${item.subjectKey ?? ''}|${item.slotKey}|${item.kind}`;
+        if (seenSlots.has(slotId)) problems.push('Another item in this request uses the same subject and slot');
+        seenSlots.add(slotId);
+      }
+      const itemId = sameItemKey(item);
+      if (seenItems.has(itemId)) problems.push('This item appears twice in the request');
+      seenItems.add(itemId);
+    }
+
+    problems.forEach((message) => errors.push(`items[${index}] (${items[index].title}): ${message}`));
+    built.push(item);
+  }
+
+  // repeats of items already in the schedule (one query), so sending the same list twice does not
+  // create every holiday twice
+  if (!errors.length) {
+    const existing = await ScheduleItem.find({
+      scheduleId: schedule._id,
+      status: ITEM_STATUS.ACTIVE,
+      $or: built.map((i) => ({ kind: i.kind, title: i.title, startDate: i.startDate, endDate: i.endDate })),
+    })
+      .select('kind title startDate endDate')
+      .lean();
+    const existingKeys = new Set(existing.map(sameItemKey));
+    built.forEach((item, index) => {
+      if (existingKeys.has(sameItemKey(item))) {
+        errors.push(`items[${index}] (${item.title}): The schedule already has this item`);
+      }
+    });
+  }
+
+  if (errors.length) {
+    throw new ApiError(400, `Nothing was saved. ${errors.length} problem(s) found in the list.`, errors);
+  }
+
+  const affectedStudents = await countAttachedStudents(schedule._id);
+  const saved = [];
+  try {
+    for (const item of built) {
+      await persistItem({ schedule, actor, item, note: item.note ?? note, affectedStudents });
+      saved.push(item);
+    }
+  } catch (err) {
+    // Items saved before the error stay, and each is fully logged, so none is left half-done
+    throw new ApiError(err.statusCode ?? 500, err.message || 'Could not save every item', [
+      ...(err.errors ?? []),
+      `${saved.length} of ${built.length} items were saved before the error. Reload the list, then send only the missing ones.`,
+    ]);
+  }
+
+  const names = await loadSubjectNames(schedule._id, saved);
+  return {
+    items: saved.map((item) => shapeItem(item.toObject(), names)),
+    count: saved.length,
+    warnings: saved.flatMap((item) =>
+      itemWarnings(item, schedule, LONG_RANGE_WARNING_DAYS).map((w) => `${item.title}: ${w}`)
+    ),
   };
 };
 
@@ -310,7 +428,7 @@ const restoreItem = async ({ user, scheduleId, itemId, note }) => {
 
   await checkRefs({
     schedule,
-    values: { kind: item.kind, subjectKey: item.subjectKey, group: item.group, slotKey: item.slotKey },
+    values: refsOf(item),
     changed: ALL_REFS_CHANGED,
     excludeId: item._id,
   });
@@ -339,4 +457,4 @@ const restoreItem = async ({ user, scheduleId, itemId, note }) => {
   };
 };
 
-export { listItems, getItem, createItem, updateItem, withdrawItem, restoreItem, checkRefs };
+export { listItems, getItem, createItem, bulkCreateItems, updateItem, withdrawItem, restoreItem, checkRefs };
