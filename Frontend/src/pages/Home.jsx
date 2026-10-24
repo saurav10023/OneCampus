@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { CalendarDays, CheckCircle2, Users } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { Button, Card } from "../components/ui";
+import { Button, Card } from "../components/Ui";
 
 const features = [
   { icon: CalendarDays, title: "Weekly timetable", text: "Build a setup once; classes are generated for the whole semester." },
