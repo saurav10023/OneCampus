@@ -1,9 +1,6 @@
-{
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    },
-      { "source": "/api/:path*", "destination": "https://https://onecampus-0s7c.onrender.com/api/:path*" }
-  ]
-}
+   {
+     "rewrites": [
+       { "source": "/api/:path*", "destination": "https://onecampus-0s7c.onrender.com/api/:path*" },
+       { "source": "/(.*)", "destination": "/index.html" }
+     ]
+   }

@@ -1,36 +1,62 @@
 import axios from "axios";
 
+// ---------------------------------------------------------------------------
+// Base URL
+//
+// Production (Vercel): always same-origin, so vercel.json forwards /api/* to Render and the
+// cookie belongs to the Vercel domain. A leftover VITE_API_URL cannot break this.
+// Development: VITE_API_URL (e.g. http://localhost:10000), or "" if you use a Vite proxy.
+// ---------------------------------------------------------------------------
+
+const BASE_URL = import.meta.env.PROD ? "" : import.meta.env.VITE_API_URL ?? "";
+
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: BASE_URL,
   withCredentials: true,
+  timeout: 60000, // a Render free-tier cold start can take close to a minute
 });
 
 // ---------------------------------------------------------------------------
-// Local storage helpers
+// Storage helpers (never throw: storage can be blocked in private mode)
 // ---------------------------------------------------------------------------
 
-const setSession = ({ user, accessToken } = {}) => {
-  if (user) {
-    localStorage.setItem("user", JSON.stringify(user));
-  }
+const storage = {
+  get(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* ignore */
+    }
+  },
+  remove(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+  },
+};
 
-  if (accessToken) {
-    localStorage.setItem("accessToken", accessToken);
-  }
+const setSession = ({ user, accessToken } = {}) => {
+  if (user) storage.set("user", JSON.stringify(user));
+  if (accessToken) storage.set("accessToken", accessToken);
 };
 
 const clearSession = () => {
-  localStorage.removeItem("user");
-  localStorage.removeItem("accessToken");
+  storage.remove("user");
+  storage.remove("accessToken");
 };
 
 const getStoredUser = () => {
-  const raw = localStorage.getItem("user");
-
-  if (!raw) {
-    return null;
-  }
-
+  const raw = storage.get("user");
+  if (!raw) return null;
   try {
     return JSON.parse(raw);
   } catch {
@@ -39,28 +65,21 @@ const getStoredUser = () => {
 };
 
 // ---------------------------------------------------------------------------
-// Request interceptor: attach the access token
+// Request interceptor: attach the access token if one is stored.
+// With cookie-only login there is none, and the httpOnly cookie is used instead.
 // ---------------------------------------------------------------------------
 
 API.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken");
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
+    const token = storage.get("accessToken");
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
   (error) => Promise.reject(error)
 );
 
 // ---------------------------------------------------------------------------
-// Optional token refresh
-//
-// Your user routes do not have a refresh-token endpoint yet, so this is OFF.
-// When you add one (e.g. POST /api/v1/users/refresh-token), set
-// REFRESH_ENDPOINT below and the interceptor will start using it.
+// Optional token refresh (OFF until the backend has a refresh endpoint)
 // ---------------------------------------------------------------------------
 
 const REFRESH_ENDPOINT = null; // e.g. "/api/v1/users/refresh-token"
@@ -69,33 +88,31 @@ let isRefreshing = false;
 let refreshPromise = null;
 
 const performRefresh = async () => {
-  const res = await axios.post(
-    `${import.meta.env.VITE_API_URL}${REFRESH_ENDPOINT}`,
-    {},
-    { withCredentials: true }
-  );
-
+  const res = await axios.post(`${BASE_URL}${REFRESH_ENDPOINT}`, {}, { withCredentials: true });
   const newAccessToken = res.data.data?.accessToken;
-
-  if (!newAccessToken) {
-    throw new Error("Refresh did not return an access token");
-  }
-
-  localStorage.setItem("accessToken", newAccessToken);
-
+  if (!newAccessToken) throw new Error("Refresh did not return an access token");
+  storage.set("accessToken", newAccessToken);
   return newAccessToken;
 };
 
-// Tell the app the session is over. AuthContext listens for this and
-// ProtectedRoute then sends the user to /login.
+// Tell the app the session is over. Sent once, even if several requests fail together.
+let expiring = false;
 const expireSession = () => {
+  if (expiring) return;
+  expiring = true;
   clearSession();
   window.dispatchEvent(new Event("auth:session-expired"));
+  setTimeout(() => {
+    expiring = false;
+  }, 1000);
 };
 
 // ---------------------------------------------------------------------------
-// Response interceptor
+// Response interceptor: only a real 401 ends the session.
+// Network errors, timeouts, 5xx and cold starts never log the user out.
 // ---------------------------------------------------------------------------
+
+const AUTH_PATHS = ["/login", "/register", "/logout", "/refresh"];
 
 API.interceptors.response.use(
   (response) => response,
@@ -107,45 +124,31 @@ API.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // No cached user means nobody was logged in (a wrong password on /login
-    // also lands here). Nothing to refresh or expire.
-    if (!localStorage.getItem("user")) {
-      return Promise.reject(error);
-    }
+    // Nobody was logged in (for example a wrong password on /login)
+    if (!storage.get("user")) return Promise.reject(error);
 
-    // Never try to refresh because login/logout/refresh themselves failed.
+    // Auth calls failing must not trigger a refresh or an expiry
     const url = originalRequest.url || "";
-    if (url.includes("/login") || url.includes("/logout") || url.includes("/refresh")) {
-      return Promise.reject(error);
-    }
+    if (AUTH_PATHS.some((p) => url.includes(p))) return Promise.reject(error);
 
-    // No refresh endpoint configured: the session is simply over.
+    // No refresh endpoint: the session is over
     if (!REFRESH_ENDPOINT) {
       expireSession();
       return Promise.reject(error);
     }
 
-    // Prevent infinite retry loops.
-    if (originalRequest._retry) {
-      return Promise.reject(error);
-    }
-
+    if (originalRequest._retry) return Promise.reject(error);
     originalRequest._retry = true;
 
     try {
-      // If another request is already refreshing, wait for it.
       if (!isRefreshing) {
         isRefreshing = true;
-
         refreshPromise = performRefresh().finally(() => {
           isRefreshing = false;
           refreshPromise = null;
         });
       }
-
       await refreshPromise;
-
-      // The request interceptor re-reads the new token on retry.
       return API(originalRequest);
     } catch (refreshError) {
       expireSession();
@@ -155,31 +158,25 @@ API.interceptors.response.use(
 );
 
 // ---------------------------------------------------------------------------
-// Auth endpoints  (backend: /api/v1/users)
+// Auth endpoints (backend: /api/v1/users)
 // ---------------------------------------------------------------------------
 
 const AUTH_BASE = "/api/v1/users";
 
-// Login. Body: { identifier, password }  (identifier = username or 10-digit mobile)
-// Response: { user, accountRestored }. The accessToken lives in an httpOnly cookie.
+// Body: { identifier, password }. The token is in an httpOnly cookie;
+// if the backend also returns accessToken, it is stored and sent as a Bearer header.
 export const loginUser = async (credentials) => {
   const res = await API.post(`${AUTH_BASE}/login`, credentials);
-
-  const { user } = res.data.data;
-
-  setSession({ user });
-
+  const { user, accessToken } = res.data.data;
+  setSession({ user, accessToken });
   return user;
 };
 
-// Register a new student account
 export const registerUser = async (payload) => {
   const res = await API.post(`${AUTH_BASE}/register`, payload);
-
   return res.data.data;
 };
 
-// Logout
 export const logoutUser = async () => {
   try {
     await API.post(`${AUTH_BASE}/logout`);
@@ -188,30 +185,17 @@ export const logoutUser = async () => {
   }
 };
 
-// Get the currently logged-in user
 export const fetchCurrentUser = async () => {
   const res = await API.get(`${AUTH_BASE}/me`);
-
   const user = res.data.data;
-
   setSession({ user });
-
   return user;
 };
 
-// Change password
 export const changePassword = async ({ currentPassword, newPassword }) => {
-  const res = await API.patch(`${AUTH_BASE}/me/password`, {
-    currentPassword,
-    newPassword,
-  });
-
+  const res = await API.patch(`${AUTH_BASE}/me/password`, { currentPassword, newPassword });
   return res.data.data;
 };
-
-// ---------------------------------------------------------------------------
-// Exports
-// ---------------------------------------------------------------------------
 
 export { getStoredUser, clearSession };
 
