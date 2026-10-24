@@ -3,6 +3,7 @@
     {
       "source": "/(.*)",
       "destination": "/index.html"
-    }
+    },
+      { "source": "/api/:path*", "destination": "https://https://onecampus-0s7c.onrender.com/api/:path*" }
   ]
 }
