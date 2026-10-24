@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { LogIn } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { Alert, Button, Card, Field } from "../components/ui";
+import { Alert, Button, Card, Field } from "../components/Ui";
 import { errMsg } from "../api/endpoints";
 
 const Login = () => {
