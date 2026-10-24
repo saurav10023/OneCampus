@@ -14,6 +14,8 @@ import Attendance from "./pages/Attendance";
 import Setups from "./pages/Setups";
 import SetupDetail from "./pages/SetupDetail";
 import Profile from "./pages/Profile";
+import CRStudio from "./pages/CRStudio";
+import CRSchedule from "./pages/CRSchedule";
 import NotFound from "./pages/NotFound";
 
 const App = () => (
@@ -32,6 +34,8 @@ const App = () => (
           <Route path="/setups" element={<Setups />} />
           <Route path="/setups/:setupId" element={<SetupDetail />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/cr-studio" element={<CRStudio />} />
+          <Route path="/cr-studio/:scheduleId" element={<CRSchedule />} />
 
           {/* logged in AND has an active setup (otherwise -> onboarding) */}
           <Route element={<ActiveSetupRoute />}>

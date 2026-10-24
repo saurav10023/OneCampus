@@ -53,23 +53,6 @@ app.use('/api/v1/official-schedules', officialScheduleRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/setup",  (req, res, next)=>{console.log("setup MOUNT HIT", req.method, req.originalUrl);
     next();} ,setupRoutes);
-// TODO: uncomment once the login middleware is added inside calendarEvent.routes.js
-// import {calendarEventRoutes }from "./routes/calendarEvent.routes.js";
-
-
-
-
-
-
-
-// app.use("/api/v1/setup/:setupId/subjects", subjectRoutes);
-
-
-
-
-
-// Calendar events live under a setup: /api/v1/setup/:setupId/calendar-events
-// app.use("/api/v1/setup/:setupId/calendar-events", calendarEventRoutes);
 
 
 

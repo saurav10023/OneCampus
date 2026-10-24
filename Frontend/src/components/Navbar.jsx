@@ -22,6 +22,7 @@ import {
   LayoutDashboard,
   LogIn,
   LogOut,
+  Megaphone,
   Sparkles,
   User,
   UserPlus,
@@ -37,6 +38,7 @@ const NAV = [
   { to: "/timetable", label: "Timetable", hint: "Weekly classes", icon: CalendarDays, auth: true },
   { to: "/attendance", label: "Attendance", hint: "Percentages and bunk calculator", icon: BarChart3, auth: true },
   { to: "/setups", label: "Setups", hint: "Subjects, calendar, official sync", icon: Layers, auth: true },
+  { to: "/cr-studio", label: "CR Studio", hint: "Publish your class timetable", icon: Megaphone, auth: true, menuOnly: true },
 ];
 
 const SCROLL_RANGE = 90; // px of scrolling over which the bar morphs
@@ -455,7 +457,7 @@ const Navbar = () => {
                   )}
 
                   {!authLoading &&
-                    links.map((l) => {
+                    links.filter((l) => !l.menuOnly).map((l) => {
                       const active = isActive(l);
                       return (
                         <Link
