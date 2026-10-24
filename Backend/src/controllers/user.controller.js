@@ -18,7 +18,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const baseCookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict"
+    sameSite: "none"
 };
 
 // maxAge is kept out of baseCookieOptions on purpose: Express 4's clearCookie
