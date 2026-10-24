@@ -1,20 +1,15 @@
 import API from "./axios";
 
 // ---------------------------------------------------------------------------
-// Base paths. app.js mounts setups at /api/v1/setup (singular).
-// If your routes are /api/v1/setups, change this one line.
+// VITE_API_URL is the server root (e.g. http://localhost:8000), NOT .../api/v1.
 // ---------------------------------------------------------------------------
 
-export const SETUP_BASE = "/api/v1/setup";
-const USER_BASE = "/api/v1/users";
-
-// ---------------------------------------------------------------------------
-// Helpers: every backend reply is { data: ... } (ApiResponse)
-// ---------------------------------------------------------------------------
+const V1 = "/api/v1";
+const S = (setupId) => `${V1}/setup/${setupId}`;
+const USER_BASE = `${V1}/users`;
 
 const unwrap = (res) => res.data.data;
 
-// Lists may come back as [] or { setups: [] } / { items: [] } ...
 export const asList = (d, ...keys) => {
   if (Array.isArray(d)) return d;
   for (const k of [...keys, "items", "results", "docs"]) {
@@ -23,7 +18,6 @@ export const asList = (d, ...keys) => {
   return [];
 };
 
-// A single record may come back bare or wrapped: { setup: {...} }
 export const pick = (d, key) => d?.[key] ?? d;
 
 export const toDateInput = (d) => (d ? String(d).slice(0, 10) : "");
@@ -36,55 +30,98 @@ export const errMsg = (e, fallback = "Something went wrong") => {
 };
 
 // ---------------------------------------------------------------------------
-// Setups
+// Setups  (/setup)
 // ---------------------------------------------------------------------------
 
 export const setupsApi = {
-  list: async (status) =>
-    asList(unwrap(await API.get(SETUP_BASE, { params: status ? { status } : {} })), "setups"),
-  get: async (id) => pick(unwrap(await API.get(`${SETUP_BASE}/${id}`)), "setup"),
-  create: async (body) => unwrap(await API.post(SETUP_BASE, body)),
-  update: async (id, body) => unwrap(await API.patch(`${SETUP_BASE}/${id}`, body)),
-  archive: async (id) => unwrap(await API.patch(`${SETUP_BASE}/${id}/archive`)),
-  activate: async (id) => unwrap(await API.patch(`${SETUP_BASE}/${id}/activate`)),
-  deleteImpact: async (id) => unwrap(await API.get(`${SETUP_BASE}/${id}/delete-impact`)),
-  remove: async (id, body) => unwrap(await API.delete(`${SETUP_BASE}/${id}`, { data: body })),
+  list: async (status) => asList(unwrap(await API.get(`${V1}/setup`, { params: status ? { status } : {} })), "setups"),
+  active: async () => pick(unwrap(await API.get(`${V1}/setup/active`)), "setup"),
+  get: async (id) => pick(unwrap(await API.get(S(id))), "setup"),
+  create: async (body) => unwrap(await API.post(`${V1}/setup`, body)), // { setup, archivedSetupId }
+  update: async (id, body) => unwrap(await API.patch(S(id), body)), // { setup, warnings }
+  archive: async (id) => unwrap(await API.patch(`${S(id)}/archive`)),
+  activate: async (id) => unwrap(await API.patch(`${S(id)}/activate`)),
+  deleteImpact: async (id) => pick(unwrap(await API.get(`${S(id)}/delete-impact`)), "impact"),
+  remove: async (id, confirmName) => unwrap(await API.delete(S(id), { data: { confirmName } })),
 };
 
 // ---------------------------------------------------------------------------
-// Subjects  (/setup/:setupId/subjects)
+// Official schedule join  (/setup/:id/official)
+// ---------------------------------------------------------------------------
+
+export const officialApi = {
+  status: async (id) => unwrap(await API.get(`${S(id)}/official`)),
+  listJoinable: async (id) => asList(unwrap(await API.get(`${S(id)}/official/schedules`)), "schedules"),
+  previewJoin: async (id, body) => pick(unwrap(await API.post(`${S(id)}/official/join-preview`, body)), "preview"),
+  join: async (id, body) => unwrap(await API.post(`${S(id)}/official/join`, body)),
+  leave: async (id, body = {}) => unwrap(await API.post(`${S(id)}/official/leave`, body)),
+};
+
+// ---------------------------------------------------------------------------
+// Subjects  (/setup/:id/subjects)
 // ---------------------------------------------------------------------------
 
 export const subjectsApi = {
-  list: async (setupId) =>
-    asList(unwrap(await API.get(`${SETUP_BASE}/${setupId}/subjects`)), "subjects"),
-  create: async (setupId, body) =>
-    unwrap(await API.post(`${SETUP_BASE}/${setupId}/subjects`, body)),
-  update: async (setupId, id, body) =>
-    unwrap(await API.patch(`${SETUP_BASE}/${setupId}/subjects/${id}`, body)),
-  remove: async (setupId, id) =>
-    unwrap(await API.delete(`${SETUP_BASE}/${setupId}/subjects/${id}`)),
+  list: async (id, query) => unwrap(await API.get(`${S(id)}/subjects`, { params: query })), // { subjects, pagination }
+  create: async (id, body) => unwrap(await API.post(`${S(id)}/subjects`, body)),
+  update: async (id, subjectId, body) => unwrap(await API.patch(`${S(id)}/subjects/${subjectId}`, body)),
+  archive: async (id, subjectId) => unwrap(await API.patch(`${S(id)}/subjects/${subjectId}/archive`)),
+  restore: async (id, subjectId) => unwrap(await API.patch(`${S(id)}/subjects/${subjectId}/restore`)),
+  deleteImpact: async (id, subjectId) => pick(unwrap(await API.get(`${S(id)}/subjects/${subjectId}/delete-impact`)), "impact"),
+  remove: async (id, subjectId, confirmName) =>
+    unwrap(await API.delete(`${S(id)}/subjects/${subjectId}`, { data: { confirmName } })),
 };
 
 // ---------------------------------------------------------------------------
-// Calendar events  (/setup/:setupId/calendar-events)
+// Weekly rules  (/setup/:id/rules)
+// ---------------------------------------------------------------------------
+
+export const rulesApi = {
+  list: async (id, query) => asList(unwrap(await API.get(`${S(id)}/rules`, { params: query })), "rules"),
+  create: async (id, body) => unwrap(await API.post(`${S(id)}/rules`, body)), // { rule, generated, cancelledByEvents, warnings }
+  update: async (id, ruleId, body) => unwrap(await API.patch(`${S(id)}/rules/${ruleId}`, body)),
+  deleteImpact: async (id, ruleId) => pick(unwrap(await API.get(`${S(id)}/rules/${ruleId}/delete-impact`)), "impact"),
+  remove: async (id, ruleId, confirm = false) => unwrap(await API.delete(`${S(id)}/rules/${ruleId}`, { data: { confirm } })),
+};
+
+// ---------------------------------------------------------------------------
+// Occurrences + attendance marking  (/setup/:id/occurrences)
+// ---------------------------------------------------------------------------
+
+export const occurrencesApi = {
+  today: async (id, date) => unwrap(await API.get(`${S(id)}/occurrences/today`, { params: date ? { date } : {} })),
+  week: async (id, date, weekStart = 1) =>
+    unwrap(await API.get(`${S(id)}/occurrences/week`, { params: { ...(date ? { date } : {}), weekStart } })),
+  mark: async (id, occurrenceId, status, overrideCancellation = false) =>
+    unwrap(await API.patch(`${S(id)}/occurrences/${occurrenceId}/status`, { status, overrideCancellation })),
+  clear: async (id, occurrenceId) => unwrap(await API.delete(`${S(id)}/occurrences/${occurrenceId}/status`)),
+};
+
+// ---------------------------------------------------------------------------
+// Attendance analytics + ERP match
+// ---------------------------------------------------------------------------
+
+export const attendanceApi = {
+  overview: async (id, includeArchived = false) =>
+    unwrap(await API.get(`${S(id)}/attendance`, { params: { includeArchived } })),
+  bunk: async (id, query) => unwrap(await API.get(`${S(id)}/attendance/bunk`, { params: query })),
+};
+
+export const extraApi = {
+  matchCollege: async (id, subjectId, body) => unwrap(await API.post(`${S(id)}/extra-classes/${subjectId}/match`, body)),
+  set: async (id, subjectId, body) => unwrap(await API.put(`${S(id)}/extra-classes/${subjectId}`, body)),
+};
+
+// ---------------------------------------------------------------------------
+// Calendar events  (/setup/:id/calendar-events)
 // ---------------------------------------------------------------------------
 
 export const eventsApi = {
-  list: async (setupId, params) =>
-    asList(
-      unwrap(await API.get(`${SETUP_BASE}/${setupId}/calendar-events`, { params })),
-      "events",
-      "calendarEvents"
-    ),
-  create: async (setupId, body) =>
-    unwrap(await API.post(`${SETUP_BASE}/${setupId}/calendar-events`, body)),
-  update: async (setupId, id, body) =>
-    unwrap(await API.patch(`${SETUP_BASE}/${setupId}/calendar-events/${id}`, body)),
-  confirm: async (setupId, id) =>
-    unwrap(await API.patch(`${SETUP_BASE}/${setupId}/calendar-events/${id}/confirm`)),
-  remove: async (setupId, id) =>
-    unwrap(await API.delete(`${SETUP_BASE}/${setupId}/calendar-events/${id}`)),
+  list: async (id, params) => asList(unwrap(await API.get(`${S(id)}/calendar-events`, { params })), "events"),
+  create: async (id, body) => unwrap(await API.post(`${S(id)}/calendar-events`, body)),
+  update: async (id, eventId, body) => unwrap(await API.patch(`${S(id)}/calendar-events/${eventId}`, body)),
+  confirm: async (id, eventId) => unwrap(await API.post(`${S(id)}/calendar-events/${eventId}/confirm`)),
+  remove: async (id, eventId) => unwrap(await API.delete(`${S(id)}/calendar-events/${eventId}`)),
 };
 
 // ---------------------------------------------------------------------------
@@ -92,7 +129,6 @@ export const eventsApi = {
 // ---------------------------------------------------------------------------
 
 export const profileApi = {
-  // multipart so the optional avatar upload (multer) also works
   update: async (fields, avatarFile) => {
     const fd = new FormData();
     Object.entries(fields).forEach(([k, v]) => v !== undefined && fd.append(k, v));

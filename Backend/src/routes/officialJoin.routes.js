@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { verifyJWT } from '../middlewares/auth.middleware.js';
-import { loadSetup } from '../middlewares/setup.middleware.js';
+import { loadOwnedSetup } from '../middlewares/setup.middleware.js';
 import {
   validateJoinPreviewBody,
   validateJoinBody,
@@ -11,7 +11,7 @@ import { status, schedules, preview, join, leave } from '../controllers/official
 const router = Router({ mergeParams: true }); // so :setupId from the mount path is visible
 
 // Student side: the caller's own setup only
-router.use(verifyJWT, loadSetup);
+router.use(verifyJWT, loadOwnedSetup);
 
 router.get('/', status);
 router.get('/schedules', schedules);

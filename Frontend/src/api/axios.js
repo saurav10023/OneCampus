@@ -107,9 +107,9 @@ API.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // No token means nobody was logged in (a wrong password on /login
+    // No cached user means nobody was logged in (a wrong password on /login
     // also lands here). Nothing to refresh or expire.
-    if (!localStorage.getItem("accessToken")) {
+    if (!localStorage.getItem("user")) {
       return Promise.reject(error);
     }
 
@@ -160,15 +160,14 @@ API.interceptors.response.use(
 
 const AUTH_BASE = "/api/v1/users";
 
-// Login. Pass whatever your loginUser controller expects,
-// e.g. { email, password } or { username, password }.
+// Login. Body: { identifier, password }  (identifier = username or 10-digit mobile)
+// Response: { user, accountRestored }. The accessToken lives in an httpOnly cookie.
 export const loginUser = async (credentials) => {
   const res = await API.post(`${AUTH_BASE}/login`, credentials);
 
-  // Expected shape: { data: { user, accessToken } }
-  const { user, accessToken } = res.data.data;
+  const { user } = res.data.data;
 
-  setSession({ user, accessToken });
+  setSession({ user });
 
   return user;
 };
@@ -201,9 +200,9 @@ export const fetchCurrentUser = async () => {
 };
 
 // Change password
-export const changePassword = async ({ oldPassword, newPassword }) => {
+export const changePassword = async ({ currentPassword, newPassword }) => {
   const res = await API.patch(`${AUTH_BASE}/me/password`, {
-    oldPassword,
+    currentPassword,
     newPassword,
   });
 

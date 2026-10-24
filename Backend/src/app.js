@@ -34,34 +34,39 @@ import scheduleSubjectRoutes from './routes/scheduleSubject.routes.js';
 import scheduleRuleRoutes from './routes/scheduleRule.routes.js';
 import scheduItemRoutes from './routes/scheduleItem.routes.js'
 import scheduleActionRoutes from './routes/scheduleAction.routes.js'
+import officialJoinRoutes from './routes/officialJoin.routes.js'
+
 app.use("/api/v1/setup/:setupId/calendar-events", calendarEventRoutes);
 app.use("/api/v1/setup/:setupId/extra-classes", extraClassRoutes);
 app.use("/api/v1/setup/:setupId/attendance", attendanceRoutes);
 app.use("/api/v1/setup/:setupId/occurrences", occurrenceRoutes);
+app.use("/api/v1/setup/:setupId/official", officialJoinRoutes);
+app.use("/api/v1/setup/:setupId/subjects",subjectRoutes);
+app.use("/api/v1/setup/:setupId/rules", recurringRuleRoutes);
+
 app.use('/api/v1/schedule-roles', scheduleRoleRoutes);
 app.use('/api/v1/official-schedules/:scheduleId/subjects', scheduleSubjectRoutes);
 app.use('/api/v1/official-schedules/:scheduleId/rules', scheduleRuleRoutes);
 app.use('/api/v1/official-schedules/:scheduleId/items', scheduItemRoutes);
+app.use('/api/v1/official-schedules/:scheduleId/actions', scheduleActionRoutes);
 app.use('/api/v1/official-schedules', officialScheduleRoutes);
-   app.use('/api/v1/official-schedules/:scheduleId/actions', scheduleActionRoutes);
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/setup",  (req, res, next)=>{console.log("setup MOUNT HIT", req.method, req.originalUrl);
+    next();} ,setupRoutes);
 // TODO: uncomment once the login middleware is added inside calendarEvent.routes.js
 // import {calendarEventRoutes }from "./routes/calendarEvent.routes.js";
 
 
 
-app.use("/api/v1/users", userRoutes);
+
 
 
 
 // app.use("/api/v1/setup/:setupId/subjects", subjectRoutes);
 
-app.use(
-    "/api/v1/setup/:setupId/subjects",subjectRoutes
-);
-app.use("/api/v1/setup/:setupId/rules", recurringRuleRoutes);
 
-app.use("/api/v1/setup",  (req, res, next)=>{console.log("setup MOUNT HIT", req.method, req.originalUrl);
-    next();} ,setupRoutes);
+
+
 
 // Calendar events live under a setup: /api/v1/setup/:setupId/calendar-events
 // app.use("/api/v1/setup/:setupId/calendar-events", calendarEventRoutes);

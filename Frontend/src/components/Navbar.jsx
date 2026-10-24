@@ -13,15 +13,17 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
+  BarChart3,
   CalendarDays,
   ChevronRight,
-  Compass,
   GraduationCap,
   Home,
+  Layers,
   LayoutDashboard,
   LogIn,
   LogOut,
   Sparkles,
+  User,
   UserPlus,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -31,9 +33,10 @@ import { useAuth } from "../context/AuthContext";
 // auth: true  -> shown only when logged in
 const NAV = [
   { to: "/", label: "Home", hint: "Back to the start", icon: Home, end: true },
-  { to: "/dashboard", label: "Dashboard", hint: "Attendance at a glance", icon: LayoutDashboard, auth: true },
-  { to: "/setups", label: "Timetable", hint: "Your semester setups", icon: CalendarDays, auth: true },
-  { to: "/shared", label: "Discover", hint: "Copy a classmate's setup", icon: Compass, auth: true },
+  { to: "/dashboard", label: "Today", hint: "Mark today's classes", icon: LayoutDashboard, auth: true },
+  { to: "/timetable", label: "Timetable", hint: "Weekly classes", icon: CalendarDays, auth: true },
+  { to: "/attendance", label: "Attendance", hint: "Percentages and bunk calculator", icon: BarChart3, auth: true },
+  { to: "/setups", label: "Setups", hint: "Subjects, calendar, official sync", icon: Layers, auth: true },
 ];
 
 const SCROLL_RANGE = 90; // px of scrolling over which the bar morphs
@@ -278,6 +281,14 @@ const Navbar = () => {
               </div>
               <div className="h-px bg-gradient-to-r from-transparent via-[color:var(--oc-ink)]/15 to-transparent" />
               <div className="p-1.5">
+                <Link
+                  to="/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="oc-focus flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[14px] text-[color:var(--oc-ink)] hover:bg-white/70 transition-colors"
+                >
+                  <User className="w-4 h-4" />
+                  Your account
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="oc-focus w-full flex items-center gap-2.5 text-left px-3 py-2.5 rounded-xl text-[14px] text-[#D1435B] hover:bg-white/70 transition-colors"
@@ -484,14 +495,31 @@ const Navbar = () => {
                     </>
                   )}
 
-                  {/* Logged-in avatar chip (desktop) */}
+                  {/* Logged-in profile button: name chip on desktop, avatar on mobile */}
                   {!authLoading && user && (
-                    <span className="hidden md:flex items-center gap-2 h-10 pl-1 pr-3.5 rounded-full bg-white/40 border border-white/70 shadow-[inset_0_1px_0_#fff]">
-                      <Avatar name={displayName} size="w-8 h-8" text="text-[12px]" />
-                      <span className="text-[13px] font-medium text-[color:var(--oc-ink)] max-w-[110px] truncate">
-                        {displayName.split(" ")[0]}
-                      </span>
-                    </span>
+                    <>
+                      <Link
+                        to="/profile"
+                        aria-label="Your profile"
+                        className={`oc-focus hidden md:flex items-center gap-2 h-10 pl-1 pr-3.5 rounded-full border transition-colors ${
+                          location.pathname === "/profile"
+                            ? "bg-white/85 border-white shadow-[inset_0_1px_0_#fff,0_8px_20px_-12px_rgba(22,24,39,0.4)]"
+                            : "bg-white/40 border-white/70 shadow-[inset_0_1px_0_#fff] hover:bg-white/70"
+                        }`}
+                      >
+                        <Avatar name={displayName} size="w-8 h-8" text="text-[12px]" />
+                        <span className="text-[13px] font-medium text-[color:var(--oc-ink)] max-w-[110px] truncate">
+                          {displayName.split(" ")[0]}
+                        </span>
+                      </Link>
+                      <Link
+                        to="/profile"
+                        aria-label="Your profile"
+                        className="oc-focus md:hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/40 border border-white/70 shadow-[inset_0_1px_0_#fff]"
+                      >
+                        <Avatar name={displayName} size="w-8 h-8" text="text-[12px]" />
+                      </Link>
+                    </>
                   )}
 
                   {/* MENU button */}

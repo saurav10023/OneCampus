@@ -19,7 +19,6 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
   const [impact, setImpact] = useState(null);
   const [impactError, setImpactError] = useState("");
   const [confirmName, setConfirmName] = useState("");
-  const [alsoUnpublish, setAlsoUnpublish] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
@@ -40,8 +39,7 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
     setSaved(null);
     try {
       const data = await setupsApi.update(setup._id, body);
-      const updated = pick(data, "setup");
-      onUpdated({ ...setup, ...updated });
+      onUpdated({ ...setup, ...pick(data, "setup") });
       setSaved(data);
     } catch (e) {
       setError(errMsg(e, "Could not save changes"));
@@ -54,7 +52,7 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
     setDeleting(true);
     setDeleteError("");
     try {
-      await setupsApi.remove(setup._id, { confirmName, alsoUnpublish });
+      await setupsApi.remove(setup._id, confirmName);
       await refreshUser();
       navigate("/setups", { replace: true });
     } catch (e) {
@@ -63,10 +61,7 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
     }
   };
 
-  // Show only simple values from the delete-impact preview
-  const impactRows = impact
-    ? Object.entries(impact).filter(([, v]) => ["number", "boolean"].includes(typeof v))
-    : [];
+  const impactRows = impact ? Object.entries(impact).filter(([, v]) => ["number", "boolean"].includes(typeof v)) : [];
 
   return (
     <div className="space-y-6">
@@ -88,9 +83,7 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
           <AlertTriangle className="w-5 h-5" />
           <h2 className="text-[17px] font-semibold">Delete this setup</h2>
         </div>
-        <p className="text-[13.5px] text-[#6A6F85] mb-4">
-          This permanently removes the setup and everything inside it. It cannot be undone.
-        </p>
+        <p className="text-[13.5px] text-[#6A6F85] mb-4">This permanently removes the setup and everything inside it. It cannot be undone.</p>
 
         <Alert type="error" className="mb-3">{impactError}</Alert>
 
@@ -106,18 +99,7 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
         )}
 
         <div className="space-y-4 max-w-md">
-          <Field
-            label="Type the setup name to confirm"
-            value={confirmName}
-            onChange={(e) => setConfirmName(e.target.value)}
-            placeholder={setup.name}
-          />
-          <label className="flex items-start gap-2.5 text-[13.5px] text-[#161827]">
-            <input type="checkbox" checked={alsoUnpublish} onChange={(e) => setAlsoUnpublish(e.target.checked)} className="mt-0.5 w-4 h-4 accent-indigo-600" />
-            <span>
-              Also unpublish it if it is shared. Copies other students already made are not affected.
-            </span>
-          </label>
+          <Field label="Type the setup name to confirm" value={confirmName} onChange={(e) => setConfirmName(e.target.value)} placeholder={setup.name} />
           <Alert type="error">{deleteError}</Alert>
           <Button variant="danger" loading={deleting} disabled={confirmName !== setup.name} onClick={remove}>
             Delete setup permanently

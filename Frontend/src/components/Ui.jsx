@@ -167,3 +167,63 @@ export const fmtDate = (d) =>
   d
     ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
     : "—";
+
+export const ProgressBar = ({ value = 0, target }) => {
+  const v = Math.max(0, Math.min(100, Number(value) || 0));
+  const ok = target == null || v >= Number(target);
+  return (
+    <div className="relative h-2.5 rounded-full bg-[#161827]/10">
+      <div
+        className={cx(
+          "h-full rounded-full transition-all duration-700",
+          ok ? "bg-gradient-to-r from-emerald-400 to-emerald-500" : "bg-gradient-to-r from-amber-400 to-rose-500"
+        )}
+        style={{ width: `${v}%` }}
+      />
+      {target != null && (
+        <span className="absolute -top-[3px] -bottom-[3px] w-0.5 rounded bg-[#161827]/60" style={{ left: `${Math.min(100, Number(target))}%` }} />
+      )}
+    </div>
+  );
+};
+
+const isPrim = (v) => ["string", "number", "boolean"].includes(typeof v);
+const prettyKey = (k) => k.replace(/([A-Z])/g, " $1").replace(/[_.]/g, " ").replace(/^./, (c) => c.toUpperCase());
+const showVal = (v) => (typeof v === "boolean" ? (v ? "Yes" : "No") : String(v));
+const itemLabel = (it) => it?.name || it?.title || it?.label || it?.subjectName || it?.code;
+
+// Generic read-only view of an API object (used where reply shapes are loose).
+export const Summary = ({ data }) => {
+  if (!data || typeof data !== "object") return null;
+  const rows = [];
+  Object.entries(data).forEach(([k, v]) => {
+    if (k.startsWith("_") || k === "__v") return;
+    if (isPrim(v)) rows.push({ k: prettyKey(k), v: showVal(v) });
+    else if (Array.isArray(v)) {
+      const labels = v.map(itemLabel).filter(Boolean).slice(0, 12);
+      rows.push({ k: prettyKey(k), v: `${v.length}`, chips: labels });
+    } else if (v && typeof v === "object") {
+      Object.entries(v).forEach(([ck, cv]) => {
+        if (isPrim(cv) && !ck.startsWith("_")) rows.push({ k: `${prettyKey(k)} · ${prettyKey(ck)}`, v: showVal(cv) });
+      });
+    }
+  });
+  if (!rows.length) return null;
+  return (
+    <dl className="grid sm:grid-cols-2 gap-2">
+      {rows.map((r, i) => (
+        <div key={i} className="rounded-2xl bg-white/60 border border-white/80 px-3.5 py-2.5">
+          <dt className="text-[11.5px] uppercase tracking-[0.1em] text-[#6A6F85]">{r.k}</dt>
+          <dd className="text-[14.5px] font-semibold text-[#161827] mt-0.5 break-words">{r.v}</dd>
+          {r.chips?.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {r.chips.map((c, i2) => (
+                <Badge key={i2}>{c}</Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </dl>
+  );
+};

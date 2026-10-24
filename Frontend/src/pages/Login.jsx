@@ -5,15 +5,6 @@ import { useAuth } from "../context/AuthContext";
 import { Alert, Button, Card, Field } from "../components/ui";
 import { errMsg } from "../api/endpoints";
 
-// Your backend accepts a username OR a mobile number, plus a password.
-// One input is used: all digits (optionally starting with +) is sent as
-// mobileNumber, anything else as username. Rename the keys here if your
-// controller expects different field names.
-const MOBILE_KEY = "mobileNumber";
-const USERNAME_KEY = "username";
-
-const looksLikeMobile = (v) => /^\+?[\d\s-]{7,15}$/.test(v);
-
 const Login = () => {
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -34,11 +25,8 @@ const Login = () => {
     setError("");
     setLoading(true);
     try {
-      const id = identifier.trim();
-      const body = looksLikeMobile(id)
-        ? { [MOBILE_KEY]: id.replace(/[\s-]/g, "") }
-        : { [USERNAME_KEY]: id };
-      await login({ ...body, password });
+      // The backend detects a 10-digit mobile vs a username from `identifier`.
+      await login({ identifier: identifier.trim(), password });
       navigate(from, { replace: true });
     } catch (err) {
       setError(errMsg(err, "Could not log in"));

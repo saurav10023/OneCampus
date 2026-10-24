@@ -1,12 +1,16 @@
 import { Routes, Route } from "react-router-dom";
 import Layout from "./Layout";
 import ScrollToTop from "./ScrollToTop";
-import ProtectedRoute from "./components/protectedRoute";
+import ProtectedRoute from "./components/ProtectedRoute";
+import ActiveSetupRoute from "./components/ActiveSetupRoute";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
+import Timetable from "./pages/Timetable";
+import Attendance from "./pages/Attendance";
 import Setups from "./pages/Setups";
 import SetupDetail from "./pages/SetupDetail";
 import Profile from "./pages/Profile";
@@ -22,12 +26,19 @@ const App = () => (
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* private */}
+        {/* logged in */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/onboarding/setup" element={<Onboarding />} />
           <Route path="/setups" element={<Setups />} />
           <Route path="/setups/:setupId" element={<SetupDetail />} />
           <Route path="/profile" element={<Profile />} />
+
+          {/* logged in AND has an active setup (otherwise -> onboarding) */}
+          <Route element={<ActiveSetupRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/timetable" element={<Timetable />} />
+            <Route path="/attendance" element={<Attendance />} />
+          </Route>
         </Route>
 
         <Route path="*" element={<NotFound />} />

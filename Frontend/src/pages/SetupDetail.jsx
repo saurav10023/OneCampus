@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, CalendarRange, Settings } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarRange, Link2, Settings } from "lucide-react";
 import { setupsApi, errMsg } from "../api/endpoints";
 import { Alert, Badge, Card, PageSpinner, cx, fmtDate } from "../components/Ui";
 import SubjectsTab from "./setup/SubjectsTab";
 import CalendarTab from "./setup/CalendarTab";
 import SettingsTab from "./setup/SettingsTab";
+import OfficialJoin from "../components/OfficialJoin";
 
 const TABS = [
   { key: "subjects", label: "Subjects", icon: BookOpen },
   { key: "calendar", label: "Calendar", icon: CalendarRange },
+  { key: "official", label: "Official schedule", icon: Link2 },
   { key: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -63,11 +65,10 @@ const SetupDetail = () => {
           <div className="flex flex-wrap gap-2">
             <Badge tone={readOnly ? "amber" : "green"}>{readOnly ? "Archived" : "Active"}</Badge>
             <Badge>{fmtDate(setup.startDate)} → {fmtDate(setup.endDate)}</Badge>
+            {setup.targetPercentage != null && <Badge tone="brand">Target {setup.targetPercentage}%</Badge>}
           </div>
         </div>
-        {readOnly && (
-          <Alert type="warning" className="mt-4">This setup is archived and read-only.</Alert>
-        )}
+        {readOnly && <Alert type="warning" className="mt-4">This setup is archived and read-only.</Alert>}
       </Card>
 
       <div className="flex gap-1.5 p-1.5 rounded-full bg-white/45 border border-white/70 w-fit mb-6 max-w-full overflow-x-auto">
@@ -77,9 +78,7 @@ const SetupDetail = () => {
             onClick={() => setTab(key)}
             className={cx(
               "flex items-center gap-2 h-9 px-4 rounded-full text-[13.5px] font-medium transition whitespace-nowrap",
-              tab === key
-                ? "text-white bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/25"
-                : "text-[#161827]/70 hover:bg-white/70"
+              tab === key ? "text-white bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/25" : "text-[#161827]/70 hover:bg-white/70"
             )}
           >
             <Icon className="w-4 h-4" />{label}
@@ -89,6 +88,7 @@ const SetupDetail = () => {
 
       {tab === "subjects" && <SubjectsTab setupId={setupId} readOnly={readOnly} />}
       {tab === "calendar" && <CalendarTab setupId={setupId} readOnly={readOnly} />}
+      {tab === "official" && <OfficialJoin setupId={setupId} readOnly={readOnly} />}
       {tab === "settings" && <SettingsTab setup={setup} onUpdated={setSetup} readOnly={readOnly} />}
     </div>
   );

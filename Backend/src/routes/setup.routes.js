@@ -15,6 +15,7 @@ import {
   setActiveSetup,
   getSetupDeleteImpact,
   deleteSetup,
+  getActiveSetup,
 } from '../controllers/setup.controller.js';
 import { publishSetup } from '../controllers/sharedPublication.controller.js';
 
@@ -23,7 +24,7 @@ const router = Router();
 router.use(verifyJWT);
 
 router.route('/').post(validateCreateSetup, createSetup).get(getMySetups);
-
+router.get('/active', getActiveSetup);
 router
   .route('/:setupId')
   .get(loadOwnedSetup, getSetupById)

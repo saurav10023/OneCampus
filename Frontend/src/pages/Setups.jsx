@@ -157,7 +157,7 @@ const Setups = () => {
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="New setup">
         {createError && <Alert type="error" className="mb-4">{createError}</Alert>}
-        <SetupForm submitLabel="Create setup" loading={creating} onSubmit={create} />
+        <SetupForm submitLabel="Create setup" loading={creating} allowArchivePrevious onSubmit={create} />
       </Modal>
     </div>
   );
