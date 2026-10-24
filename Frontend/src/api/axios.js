@@ -3,16 +3,17 @@ import axios from "axios";
 // ---------------------------------------------------------------------------
 // Base URL
 //
-// Production (Vercel): always same-origin, so vercel.json forwards /api/* to Render and the
-// cookie belongs to the Vercel domain. A leftover VITE_API_URL cannot break this.
-// Development: VITE_API_URL (e.g. http://localhost:10000), or "" if you use a Vite proxy.
+// VITE_API_URL is the backend address, for example https://onecampus-0s7c.onrender.com
+// (no trailing slash, no /api/v1). In local development use http://localhost:10000.
+// Login does not depend on cookies: the token from the login response is stored and sent
+// in the Authorization header, so it works across Vercel and Render in every browser.
 // ---------------------------------------------------------------------------
 
-const BASE_URL = import.meta.env.PROD ? "" : import.meta.env.VITE_API_URL ?? "";
+const BASE_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
 
 const API = axios.create({
   baseURL: BASE_URL,
-  withCredentials: true,
+  withCredentials: true, // the cookie is only a fallback
   timeout: 60000, // a Render free-tier cold start can take close to a minute
 });
 
@@ -65,8 +66,7 @@ const getStoredUser = () => {
 };
 
 // ---------------------------------------------------------------------------
-// Request interceptor: attach the access token if one is stored.
-// With cookie-only login there is none, and the httpOnly cookie is used instead.
+// Request interceptor: attach the access token
 // ---------------------------------------------------------------------------
 
 API.interceptors.request.use(
@@ -79,23 +79,9 @@ API.interceptors.request.use(
 );
 
 // ---------------------------------------------------------------------------
-// Optional token refresh (OFF until the backend has a refresh endpoint)
+// Session expiry. Sent once, even if several requests fail together.
 // ---------------------------------------------------------------------------
 
-const REFRESH_ENDPOINT = null; // e.g. "/api/v1/users/refresh-token"
-
-let isRefreshing = false;
-let refreshPromise = null;
-
-const performRefresh = async () => {
-  const res = await axios.post(`${BASE_URL}${REFRESH_ENDPOINT}`, {}, { withCredentials: true });
-  const newAccessToken = res.data.data?.accessToken;
-  if (!newAccessToken) throw new Error("Refresh did not return an access token");
-  storage.set("accessToken", newAccessToken);
-  return newAccessToken;
-};
-
-// Tell the app the session is over. Sent once, even if several requests fail together.
 let expiring = false;
 const expireSession = () => {
   if (expiring) return;
@@ -109,15 +95,14 @@ const expireSession = () => {
 
 // ---------------------------------------------------------------------------
 // Response interceptor: only a real 401 ends the session.
-// Network errors, timeouts, 5xx and cold starts never log the user out.
+// Network errors, timeouts, 404 and 5xx (including a Render cold start) never log the user out.
 // ---------------------------------------------------------------------------
 
-const AUTH_PATHS = ["/login", "/register", "/logout", "/refresh"];
+const AUTH_PATHS = ["/login", "/register", "/logout"];
 
 API.interceptors.response.use(
   (response) => response,
-
-  async (error) => {
+  (error) => {
     const originalRequest = error.config;
 
     if (!originalRequest || error.response?.status !== 401) {
@@ -127,33 +112,12 @@ API.interceptors.response.use(
     // Nobody was logged in (for example a wrong password on /login)
     if (!storage.get("user")) return Promise.reject(error);
 
-    // Auth calls failing must not trigger a refresh or an expiry
+    // A failed login, register or logout must not end the session
     const url = originalRequest.url || "";
     if (AUTH_PATHS.some((p) => url.includes(p))) return Promise.reject(error);
 
-    // No refresh endpoint: the session is over
-    if (!REFRESH_ENDPOINT) {
-      expireSession();
-      return Promise.reject(error);
-    }
-
-    if (originalRequest._retry) return Promise.reject(error);
-    originalRequest._retry = true;
-
-    try {
-      if (!isRefreshing) {
-        isRefreshing = true;
-        refreshPromise = performRefresh().finally(() => {
-          isRefreshing = false;
-          refreshPromise = null;
-        });
-      }
-      await refreshPromise;
-      return API(originalRequest);
-    } catch (refreshError) {
-      expireSession();
-      return Promise.reject(refreshError);
-    }
+    expireSession();
+    return Promise.reject(error);
   }
 );
 
@@ -163,11 +127,11 @@ API.interceptors.response.use(
 
 const AUTH_BASE = "/api/v1/users";
 
-// Body: { identifier, password }. The token is in an httpOnly cookie;
-// if the backend also returns accessToken, it is stored and sent as a Bearer header.
+// Body: { identifier, password } (identifier = username or 10-digit mobile)
 export const loginUser = async (credentials) => {
   const res = await API.post(`${AUTH_BASE}/login`, credentials);
   const { user, accessToken } = res.data.data;
+  clearSession(); // never mix a previous account's token with this login
   setSession({ user, accessToken });
   return user;
 };
@@ -192,8 +156,11 @@ export const fetchCurrentUser = async () => {
   return user;
 };
 
+// The server returns a fresh token, because the old one stops working after a password change
 export const changePassword = async ({ currentPassword, newPassword }) => {
   const res = await API.patch(`${AUTH_BASE}/me/password`, { currentPassword, newPassword });
+  const { accessToken } = res.data.data ?? {};
+  if (accessToken) storage.set("accessToken", accessToken);
   return res.data.data;
 };
 

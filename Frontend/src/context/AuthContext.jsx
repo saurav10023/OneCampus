@@ -23,9 +23,15 @@ export const AuthProvider = ({ children }) => {
     try {
       const current = await fetchCurrentUser();
       setUser(current || null);
-    } catch {
-      // A dead session is handled by the axios interceptor.
-      setUser(null);
+    } catch (error) {
+      // Only a rejected session ends the login. Network errors, timeouts, 404 and 5xx
+      // (a Render cold start, for example) keep the cached user.
+      if (error?.response?.status === 401) {
+        clearSession();
+        setUser(null);
+      } else {
+        console.error("Could not refresh user:", error?.response?.status ?? error?.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -42,7 +48,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
 
-    // Fired by api/axios.js when the token is rejected.
+    // Fired by api/axios.js when the server answers 401 to a logged-in request.
     window.addEventListener("auth:session-expired", clearUser);
 
     return () => {

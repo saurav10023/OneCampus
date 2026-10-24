@@ -1,4 +1,5 @@
 // controllers/user.controller.js
+import bcrypt from "bcrypt";
 import { User, normalizeMobile } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -14,11 +15,16 @@ import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Used for both setting and clearing, so clearCookie always matches.
+const isProduction = process.env.NODE_ENV === "production";
+
+// The cookie is now only a fallback. The frontend sends the token in the Authorization header
+// (the login response returns it). Used for both setting and clearing, so clearCookie matches.
+// sameSite "none" needs secure, which only works over https, so local development uses "lax".
 const baseCookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "none"
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    path: "/"
 };
 
 // maxAge is kept out of baseCookieOptions on purpose: Express 4's clearCookie
@@ -123,28 +129,18 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 // ---- LOGIN ----
-// Drop-in replacement for loginUser in controllers/user.controller.js.
-//
-// Needs in that file (add any that are missing):
-//   import bcrypt from "bcrypt";
-//   and the helpers it already has: asyncHandler, ApiError, ApiResponse, User, normalizeMobile,
-//   isString, loginCookieOptions, ACCOUNT_DELETION_GRACE_DAYS, DAY_MS
-//
-// Body it accepts (JSON, Content-Type: application/json), any ONE of these with the password:
+// Body (JSON), any ONE of these with the password:
 //   { "identifier": "student_a" | "9876543210" | "+91 98765 43210", "password": "..." }
 //   { "username": "student_a", "password": "..." }
 //   { "mobile": "9876543210", "password": "..." }
 //
-// What makes it safe:
-//   - Only strings are accepted, so {"$ne": null} style injection can never reach the query.
+// Safety:
+//   - Only strings are accepted, so {"$ne": null} style injection never reaches the query.
 //   - Inputs have length limits, so nobody can make the server hash a huge password.
 //   - Unknown account, wrong password and over-long input all return the same 401, and the
-//     unknown-account path does the same amount of hashing work, so response time does not
-//     reveal which accounts exist.
+//     unknown-account path does the same hashing work, so timing does not reveal accounts.
 //   - Account status (inactive, deleted) is revealed only after the password is correct.
-//   - Every check runs before anything is saved, so a refused login never changes the account.
 //   - The password is never logged or returned.
-//   - An empty or non-JSON body gets its own clear message instead of "Password is required".
 
 const MAX_IDENTIFIER_LENGTH = 50;
 const MAX_PASSWORD_LENGTH = 128;
@@ -156,7 +152,6 @@ const getDummyHash = () => {
     return dummyHashPromise;
 };
 
-// --- helper start (pure: easy to test on its own)
 // Turns the three possible fields into one safe query, or throws.
 const resolveLoginQuery = ({ identifier, mobile, username }) => {
     const candidates = [
@@ -175,7 +170,7 @@ const resolveLoginQuery = ({ identifier, mobile, username }) => {
 
     const [field, value] = picked;
 
-    // Objects and arrays (for example {"$ne": null}) are refused here, before any query exists
+    // Objects and arrays (for example {"$ne": null}) are refused before any query exists
     if (!isString(value)) {
         throw new ApiError(400, "Username or mobile number must be text");
     }
@@ -199,7 +194,6 @@ const resolveLoginQuery = ({ identifier, mobile, username }) => {
     }
     return { username: trimmed.toLowerCase() };
 };
-// --- helper end
 
 const loginUser = asyncHandler(async (req, res) => {
     const body = req.body;
@@ -264,13 +258,14 @@ const loginUser = asyncHandler(async (req, res) => {
     const accessToken = user.generateAccessToken();
     const loggedInUser = await User.findById(user._id).select("-password");
 
+    // The token goes in the body (the frontend sends it as a Bearer header) and in the cookie
     return res
         .status(200)
         .cookie("accessToken", accessToken, loginCookieOptions)
         .json(
             new ApiResponse(
                 200,
-                { user: loggedInUser, accountRestored },
+                { user: loggedInUser, accountRestored, accessToken },
                 accountRestored
                     ? "Account restored and logged in successfully"
                     : "Logged in successfully"
@@ -278,10 +273,8 @@ const loginUser = asyncHandler(async (req, res) => {
         );
 });
 
-
-
 // ---- LOGOUT ----
-// Clears this device's cookie only. Other devices stay logged in.
+// Clears this device's cookie only. The frontend deletes its stored token. Other devices stay logged in.
 const logoutUser = asyncHandler(async (req, res) => {
     return res
         .status(200)
@@ -370,6 +363,7 @@ const updateCurrentUser = asyncHandler(async (req, res) => {
         if (localFile) fs.promises.unlink(localFile).catch(() => {});
     }
 });
+
 // ---- CHANGE PASSWORD ----
 const changePassword = asyncHandler(async (req, res) => {
     const { currentPassword, newPassword } = req.body || {};
@@ -409,7 +403,7 @@ const changePassword = asyncHandler(async (req, res) => {
     return res
         .status(200)
         .cookie("accessToken", accessToken, loginCookieOptions)
-        .json(new ApiResponse(200, {}, "Password changed successfully"));
+        .json(new ApiResponse(200, { accessToken }, "Password changed successfully"));
 });
 
 // ---- REQUEST ACCOUNT DELETION (own account) ----
@@ -508,7 +502,7 @@ const manageUserRole = asyncHandler(async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
         target._id,
         { role: newRole },
-        { new: true }
+        { returnDocument: "after" }
     ).select("-password");
 
     return res
