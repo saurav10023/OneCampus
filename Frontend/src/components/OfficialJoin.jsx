@@ -9,6 +9,10 @@ const titleOf = (s) =>
 
 // Join / leave a CR-published official schedule.
 //   onJoined: called after a successful join (e.g. to continue onboarding)
+//
+// Joining cancels and locks the classes the schedule cancels, so the server
+// requires `confirm: true`. The student must preview the effect and tick the
+// confirmation box before the Join button works.
 const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -18,6 +22,7 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
   const [selected, setSelected] = useState(null);
   const [groups, setGroups] = useState([]);
   const [preview, setPreview] = useState(null);
+  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState("");
   const [result, setResult] = useState(null);
 
@@ -42,12 +47,15 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
     setSelected(s);
     setGroups([]);
     setPreview(null);
+    setConfirmed(false);
     setResult(null);
     setError("");
   };
 
   const toggleGroup = (key) => {
+    // changing groups changes the outcome, so the preview and confirmation are reset
     setPreview(null);
+    setConfirmed(false);
     setGroups((g) => (g.includes(key) ? g.filter((x) => x !== key) : [...g, key]));
   };
 
@@ -56,6 +64,7 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
   const doPreview = async () => {
     setBusy("preview");
     setError("");
+    setConfirmed(false);
     try {
       setPreview(await officialApi.previewJoin(setupId, body()));
     } catch (e) {
@@ -66,11 +75,14 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
   };
 
   const doJoin = async () => {
+    if (!preview || !confirmed) return;
     setBusy("join");
     setError("");
     try {
-      const data = await officialApi.join(setupId, body());
+      const data = await officialApi.join(setupId, { ...body(), confirm: true });
       setResult(data);
+      setPreview(null);
+      setConfirmed(false);
       await load();
       onJoined?.(data);
     } catch (e) {
@@ -88,6 +100,7 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
       await officialApi.leave(setupId, {});
       setSelected(null);
       setPreview(null);
+      setConfirmed(false);
       await load();
     } catch (e) {
       setError(errMsg(e, "Could not leave the schedule"));
@@ -159,9 +172,9 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
                 <div>
                   <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6A6F85] mb-2">Your lab batch / elective group</p>
                   <div className="flex flex-wrap gap-2">
-                    {selected.groups.map((g) => (
+                    {selected.groups.map((g, i) => (
                       <button
-                        key={g.key}
+                        key={g.key || i}
                         type="button"
                         onClick={() => toggleGroup(g.key)}
                         className={cx(
@@ -185,9 +198,28 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-3">
-                <Button variant="glass" loading={busy === "preview"} onClick={doPreview} disabled={readOnly}>Preview</Button>
-                <Button loading={busy === "join"} onClick={doJoin} disabled={readOnly}>Join this schedule</Button>
+              {preview && (
+                <label className="flex items-start gap-3 rounded-2xl bg-amber-500/10 border border-amber-300/60 p-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={confirmed}
+                    onChange={(e) => setConfirmed(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-indigo-600"
+                  />
+                  <span className="text-[13.5px] text-[#161827]">
+                    I understand that joining cancels and locks the classes this schedule cancels (holidays, mass bunks and single-class cancellations).
+                  </span>
+                </label>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button variant="glass" loading={busy === "preview"} onClick={doPreview} disabled={readOnly}>
+                  {preview ? "Refresh preview" : "Preview"}
+                </Button>
+                <Button loading={busy === "join"} onClick={doJoin} disabled={readOnly || !preview || !confirmed}>
+                  Join this schedule
+                </Button>
+                {!preview && <span className="text-[12.5px] text-[#6A6F85]">Preview first to see what changes.</span>}
               </div>
             </Card>
           )}

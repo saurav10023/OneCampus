@@ -74,8 +74,6 @@ occurrenceStatusSchema.pre('validate', function (next) {
     // A holiday, mass bunk or class cancel row with no cause could never be undone
     this.invalidate('causeId', `Source ${this.source} needs a cause`);
   }
-
-  next();
 });
 
 // One current status per user and occurrence

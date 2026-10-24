@@ -146,8 +146,6 @@ calendarEventSchema.pre('validate', function (next) {
   if (isOfficial && !this.confirmedAt) {
     this.invalidate('confirmedAt', 'An official event must be confirmed');
   }
-
-  next();
 });
 
 // Range queries: list by date window, find events covering a day

@@ -22,7 +22,6 @@ extraClassAdjustmentSchema.pre('validate', function (next) {
   if (this.attendedCount + this.missedCount > this.totalCount) {
     this.invalidate('totalCount', 'attendedCount + missedCount cannot exceed totalCount');
   }
-  next();
 });
 
 const ExtraClassAdjustment = mongoose.model(
