@@ -1,5 +1,5 @@
-import OfficialSchedule from '../models/Official/OfficialSchedule.model.js';
-import ScheduleAction from '../models/Official/ScheduleAction.model.js';
+import OfficialSchedule from '../models/Official/officialSchedule.model.js';
+import ScheduleAction from '../models/Official/scheduleAction.model.js';
 import ApiError from '../utils/ApiError.js';
 
 

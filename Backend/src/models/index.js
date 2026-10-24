@@ -22,8 +22,13 @@ import ScheduleItem from './Official/scheduleItem.model.js';
 import ScheduleAction from './Official/scheduleAction.model.js';
 import ScheduleRole from './Official/scheduleRole.model.js';
 
-// TODO: add the models whose paths I have not seen, so they are loaded and indexed too:
-//   User, ExtraClassAdjustment, ImportJob (referenced by CalendarEvent), and any others.
+// Loaded for their side effect only (registering the model and its indexes), so this file does not
+// depend on how they export.
+import './user.model.js';
+import './Attendance/extraClassAdjustment.model.js';
+
+// CalendarEvent refers to an 'ImportJob' model. No such model file is in the project yet; add it
+// here when the image import is built.
 
 export {
   Setup,

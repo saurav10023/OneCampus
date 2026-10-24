@@ -22,7 +22,7 @@ const router = Router();
 
 // Public
 router.route("/register").post(registerUser);
-router.route("/login").post(loginLimiter, loginUser);
+router.route("/login").post( loginUser);
 router.route("/logout").post(logoutUser); 
 
 // Logged-in user (keep /me routes above the /:username routes)
