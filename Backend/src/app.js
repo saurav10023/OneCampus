@@ -32,14 +32,18 @@ import scheduleRoleRoutes from './routes/scheduleRole.routes.js';
 import officialScheduleRoutes from './routes/officialSchedule.routes.js'
 import scheduleSubjectRoutes from './routes/scheduleSubject.routes.js';
 import scheduleRuleRoutes from './routes/scheduleRule.routes.js';
+import scheduItemRoutes from './routes/scheduleItem.routes.js'
+import scheduleActionRoutes from './routes/scheduleAction.routes.js'
 app.use("/api/v1/setup/:setupId/calendar-events", calendarEventRoutes);
 app.use("/api/v1/setup/:setupId/extra-classes", extraClassRoutes);
 app.use("/api/v1/setup/:setupId/attendance", attendanceRoutes);
 app.use("/api/v1/setup/:setupId/occurrences", occurrenceRoutes);
 app.use('/api/v1/schedule-roles', scheduleRoleRoutes);
-app.use('/api/v1/official-shedule' , officialScheduleRoutes);
 app.use('/api/v1/official-schedules/:scheduleId/subjects', scheduleSubjectRoutes);
 app.use('/api/v1/official-schedules/:scheduleId/rules', scheduleRuleRoutes);
+app.use('/api/v1/official-schedules/:scheduleId/items', scheduItemRoutes);
+app.use('/api/v1/official-schedules', officialScheduleRoutes);
+   app.use('/api/v1/official-schedules/:scheduleId/actions', scheduleActionRoutes);
 // TODO: uncomment once the login middleware is added inside calendarEvent.routes.js
 // import {calendarEventRoutes }from "./routes/calendarEvent.routes.js";
 

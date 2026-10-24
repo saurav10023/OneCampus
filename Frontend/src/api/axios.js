@@ -1,4 +1,3 @@
-
 import axios from "axios";
 
 const API = axios.create({
@@ -10,9 +9,9 @@ const API = axios.create({
 // Local storage helpers
 // ---------------------------------------------------------------------------
 
-const setSession = ({ admin, accessToken } = {}) => {
-  if (admin) {
-    localStorage.setItem("user", JSON.stringify(admin));
+const setSession = ({ user, accessToken } = {}) => {
+  if (user) {
+    localStorage.setItem("user", JSON.stringify(user));
   }
 
   if (accessToken) {
@@ -40,7 +39,7 @@ const getStoredUser = () => {
 };
 
 // ---------------------------------------------------------------------------
-// Request interceptor
+// Request interceptor: attach the access token
 // ---------------------------------------------------------------------------
 
 API.interceptors.request.use(
@@ -57,30 +56,41 @@ API.interceptors.request.use(
 );
 
 // ---------------------------------------------------------------------------
-// Shared refresh state
+// Optional token refresh
+//
+// Your user routes do not have a refresh-token endpoint yet, so this is OFF.
+// When you add one (e.g. POST /api/v1/users/refresh-token), set
+// REFRESH_ENDPOINT below and the interceptor will start using it.
 // ---------------------------------------------------------------------------
+
+const REFRESH_ENDPOINT = null; // e.g. "/api/v1/users/refresh-token"
 
 let isRefreshing = false;
 let refreshPromise = null;
 
 const performRefresh = async () => {
   const res = await axios.post(
-    `${import.meta.env.VITE_API_URL}/api/v1/admin/refresh-token`,
+    `${import.meta.env.VITE_API_URL}${REFRESH_ENDPOINT}`,
     {},
-    {
-      withCredentials: true,
-    }
+    { withCredentials: true }
   );
 
   const newAccessToken = res.data.data?.accessToken;
 
   if (!newAccessToken) {
-    throw new Error("Refresh token did not return an access token");
+    throw new Error("Refresh did not return an access token");
   }
 
   localStorage.setItem("accessToken", newAccessToken);
 
   return newAccessToken;
+};
+
+// Tell the app the session is over. AuthContext listens for this and
+// ProtectedRoute then sends the user to /login.
+const expireSession = () => {
+  clearSession();
+  window.dispatchEvent(new Event("auth:session-expired"));
 };
 
 // ---------------------------------------------------------------------------
@@ -93,26 +103,25 @@ API.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (!originalRequest) {
+    if (!originalRequest || error.response?.status !== 401) {
       return Promise.reject(error);
     }
 
-    // Only handle 401 responses.
-    if (error.response?.status !== 401) {
+    // No token means nobody was logged in (a wrong password on /login
+    // also lands here). Nothing to refresh or expire.
+    if (!localStorage.getItem("accessToken")) {
       return Promise.reject(error);
     }
 
-    // ---------------------------------------------------------
-    // IMPORTANT:
-    // If there is no access token, there is no admin session.
-    //
-    // This is NORMAL for a normal visitor.
-    // Do NOT try refresh and do NOT redirect to login.
-    // ---------------------------------------------------------
+    // Never try to refresh because login/logout/refresh themselves failed.
+    const url = originalRequest.url || "";
+    if (url.includes("/login") || url.includes("/logout") || url.includes("/refresh")) {
+      return Promise.reject(error);
+    }
 
-    const accessToken = localStorage.getItem("accessToken");
-
-    if (!accessToken) {
+    // No refresh endpoint configured: the session is simply over.
+    if (!REFRESH_ENDPOINT) {
+      expireSession();
       return Promise.reject(error);
     }
 
@@ -124,10 +133,7 @@ API.interceptors.response.use(
     originalRequest._retry = true;
 
     try {
-      // -------------------------------------------------------
       // If another request is already refreshing, wait for it.
-      // -------------------------------------------------------
-
       if (!isRefreshing) {
         isRefreshing = true;
 
@@ -139,66 +145,43 @@ API.interceptors.response.use(
 
       await refreshPromise;
 
-      // Retry original request with the new access token.
+      // The request interceptor re-reads the new token on retry.
       return API(originalRequest);
     } catch (refreshError) {
-      // -------------------------------------------------------
-      // The existing admin session is genuinely expired.
-      //
-      // Clear the local admin session.
-      //
-      // DO NOT navigate to /login here.
-      // AdminRouteGuard will handle /admin/*.
-      // Normal pages remain accessible.
-      // -------------------------------------------------------
-
-      clearSession();
-
+      expireSession();
       return Promise.reject(refreshError);
     }
   }
 );
 
 // ---------------------------------------------------------------------------
-// Admin authentication endpoints
+// Auth endpoints  (backend: /api/v1/users)
 // ---------------------------------------------------------------------------
 
-const AUTH_BASE = "/api/v1/admin";
+const AUTH_BASE = "/api/v1/users";
 
-// Login
-export const loginAdmin = async ({ mobileNumber, password }) => {
-  const res = await API.post(`${AUTH_BASE}/login`, {
-    mobileNumber,
-    password,
-  });
+// Login. Pass whatever your loginUser controller expects,
+// e.g. { email, password } or { username, password }.
+export const loginUser = async (credentials) => {
+  const res = await API.post(`${AUTH_BASE}/login`, credentials);
 
-  const { admin, accessToken } = res.data.data;
+  // Expected shape: { data: { user, accessToken } }
+  const { user, accessToken } = res.data.data;
 
-  setSession({
-    admin,
-    accessToken,
-  });
+  setSession({ user, accessToken });
 
-  return admin;
+  return user;
 };
 
-// Register another admin/staff member
-export const registerAdmin = async ({
-  mobileNumber,
-  username,
-  password,
-}) => {
-  const res = await API.post(`${AUTH_BASE}/register`, {
-    mobileNumber,
-    username,
-    password,
-  });
+// Register a new student account
+export const registerUser = async (payload) => {
+  const res = await API.post(`${AUTH_BASE}/register`, payload);
 
   return res.data.data;
 };
 
 // Logout
-export const logoutAdmin = async () => {
+export const logoutUser = async () => {
   try {
     await API.post(`${AUTH_BASE}/logout`);
   } finally {
@@ -206,27 +189,31 @@ export const logoutAdmin = async () => {
   }
 };
 
-// Get currently logged-in admin
-export const fetchCurrentAdmin = async () => {
-  const res = await API.get(`${AUTH_BASE}/current-admin`);
+// Get the currently logged-in user
+export const fetchCurrentUser = async () => {
+  const res = await API.get(`${AUTH_BASE}/me`);
 
-  const admin = res.data.data;
+  const user = res.data.data;
 
-  setSession({
-    admin,
+  setSession({ user });
+
+  return user;
+};
+
+// Change password
+export const changePassword = async ({ oldPassword, newPassword }) => {
+  const res = await API.patch(`${AUTH_BASE}/me/password`, {
+    oldPassword,
+    newPassword,
   });
 
-  return admin;
+  return res.data.data;
 };
 
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
-export {
-  getStoredUser,
-  clearSession,
-};
+export { getStoredUser, clearSession };
 
 export default API;
-

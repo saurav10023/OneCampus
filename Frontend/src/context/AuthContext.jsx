@@ -1,84 +1,66 @@
-
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
-  loginAdmin,
-  logoutAdmin,
-  fetchCurrentAdmin,
+  loginUser,
+  logoutUser,
+  fetchCurrentUser,
   getStoredUser,
   clearSession,
+  registerUser,
 } from "../api/axios";
 
-export const AuthContext = createContext();
+export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-  const cached = getStoredUser();
-
-  if (cached) {
-    setUser(cached);
-    refreshUser();
-  } else {
-    // No admin logged in is NORMAL.
-    // Do not redirect.
-    setLoading(false);
-  }
-
-  const handleSessionExpired = () => {
-    clearUser();
-  };
-
-  window.addEventListener(
-    "auth:session-expired",
-    handleSessionExpired
-  );
-
-  return () => {
-    window.removeEventListener(
-      "auth:session-expired",
-      handleSessionExpired
-    );
-  };
-}, []);
-
-  const refreshUser = async () => {
-  try {
-    const admin = await fetchCurrentAdmin();
-
-    if (admin) {
-      setUser(admin);
-    } else {
-      setUser(null);
-    }
-  } catch (error) {
-    // No admin session is NOT an error for normal visitors.
-    setUser(null);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const login = async ({ mobileNumber, password }) => {
-    const admin = await loginAdmin({
-      mobileNumber,
-      password,
-    });
-
-    setUser(admin);
-
-    return admin;
-  };
-
-  const clearUser = () => {
+  const clearUser = useCallback(() => {
     clearSession();
     setUser(null);
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const current = await fetchCurrentUser();
+      setUser(current || null);
+    } catch {
+      // A dead session is handled by the axios interceptor.
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const cached = getStoredUser();
+
+    if (cached) {
+      // Show the cached user instantly, then confirm with the server.
+      setUser(cached);
+      refreshUser();
+    } else {
+      setLoading(false);
+    }
+
+    // Fired by api/axios.js when the token is rejected.
+    window.addEventListener("auth:session-expired", clearUser);
+
+    return () => {
+      window.removeEventListener("auth:session-expired", clearUser);
+    };
+  }, [refreshUser, clearUser]);
+
+  const login = async (credentials) => {
+    const loggedIn = await loginUser(credentials);
+    setUser(loggedIn);
+    return loggedIn;
   };
+
+  const register = async (payload) => registerUser(payload);
 
   const logout = async () => {
     try {
-      await logoutAdmin();
+      await logoutUser();
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
@@ -90,7 +72,9 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider
       value={{
         user,
+        isAuthenticated: Boolean(user),
         login,
+        register,
         logout,
         setUser,
         refreshUser,
@@ -102,5 +86,12 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
 
+  if (!ctx) {
+    throw new Error("useAuth must be used inside <AuthProvider>");
+  }
+
+  return ctx;
+};

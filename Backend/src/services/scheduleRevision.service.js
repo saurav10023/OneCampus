@@ -1,7 +1,6 @@
+import ApiError from '../utils/ApiError.js';
 import OfficialSchedule from '../models/Official/officialSchedule.model.js';
 import ScheduleAction from '../models/Official/scheduleAction.model.js';
-import ApiError from '../utils/ApiError.js';
-
 
 // Takes the next revision number. One atomic increment, so two CR edits can never share one.
 const allocateRevision = async (scheduleId) => {
