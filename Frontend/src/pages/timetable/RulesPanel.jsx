@@ -23,6 +23,12 @@ const blank = (setup) => ({
   effectiveFrom: "",
 });
 
+// The server answers 409 for several reasons (overlap, archived subject, 150-rule limit,
+// archived setup). Only an overlap can be confirmed, and the server says so by asking for confirmOverlap.
+const isOverlapConflict = (e) =>
+  e?.response?.status === 409 &&
+  (e.response.data?.errors || []).some((x) => /confirmOverlap/i.test(String(x)));
+
 const RulesPanel = ({ setup, onChanged }) => {
   const setupId = setup._id;
   const readOnly = setup.status === "archived";
@@ -37,7 +43,7 @@ const RulesPanel = ({ setup, onChanged }) => {
   const [form, setForm] = useState(() => blank(setup));
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
-  const [overlap, setOverlap] = useState(null); // warning strings when a 409 asks to confirm
+  const [overlap, setOverlap] = useState(null); // list of clashing classes when the server asks to confirm
 
   const load = useCallback(async () => {
     try {
@@ -121,10 +127,13 @@ const RulesPanel = ({ setup, onChanged }) => {
       await load();
       onChanged?.();
     } catch (e) {
-      if (e?.response?.status === 409 && !confirmOverlap) {
-        const list = e.response.data?.errors;
-        setOverlap(Array.isArray(list) && list.length ? list : [e.response.data?.message || "This class overlaps another one."]);
+      if (!confirmOverlap && isOverlapConflict(e)) {
+        // Show the clashing classes, but leave out the "send confirmOverlap" instruction line.
+        const lines = (e.response.data.errors || []).filter((x) => !/confirmOverlap/i.test(String(x)));
+        setOverlap(lines.length ? lines : [e.response.data?.message || "This class overlaps another one."]);
       } else {
+        // Any other 409 (archived subject, 150 rules limit, archived setup) is a normal error.
+        setOverlap(null);
         setFormError(errMsg(e, "Could not save the class"));
       }
     } finally {
@@ -174,7 +183,7 @@ const RulesPanel = ({ setup, onChanged }) => {
       <Alert type="error">{error}</Alert>
       <Warnings data={result} />
       {subjects.length === 0 && !readOnly && (
-        <Alert type="warning">Add at least one subject (Setups → open your setup → Subjects) before creating weekly classes.</Alert>
+        <Alert type="warning">Add at least one subject (Setups &gt; open your setup &gt; Subjects) before creating weekly classes.</Alert>
       )}
 
       {rules.length === 0 ? (
@@ -195,9 +204,9 @@ const RulesPanel = ({ setup, onChanged }) => {
                       {r.isActive === false && <Badge tone="amber">Off</Badge>}
                     </div>
                     <p className="text-[13px] text-[#6A6F85] mt-1">
-                      {r.startTime}–{r.endTime}
-                      {r.room && ` · ${r.room}`}
-                      {r.professor && ` · ${r.professor}`}
+                      {r.startTime}-{r.endTime}
+                      {r.room && ` - ${r.room}`}
+                      {r.professor && ` - ${r.professor}`}
                     </p>
                   </div>
                   {!readOnly && (
@@ -218,6 +227,13 @@ const RulesPanel = ({ setup, onChanged }) => {
         <form onSubmit={(e) => { e.preventDefault(); submit(false); }} className="space-y-4">
           <Alert type="error">{formError}</Alert>
 
+          {editing !== "new" && editing?.origin === "official" && (
+            <Alert type="info">
+              This class comes from your CR&apos;s schedule. Changing the subject, day, time, dates, type or group makes it your own copy,
+              and CR updates to it will stop. Changing only the room or professor keeps it linked.
+            </Alert>
+          )}
+
           {overlap && (
             <Alert type="warning" className="space-y-2">
               {overlap.map((w, i) => <p key={i}>{w}</p>)}
@@ -226,7 +242,7 @@ const RulesPanel = ({ setup, onChanged }) => {
           )}
 
           <Field as="select" label="Subject" value={form.subjectId} onChange={set("subjectId")} required>
-            <option value="">Choose a subject…</option>
+            <option value="">Choose a subject...</option>
             {subjects.map((s) => <option key={s._id} value={s._id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>)}
           </Field>
 

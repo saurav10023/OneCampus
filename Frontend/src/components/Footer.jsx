@@ -1,118 +1,222 @@
 // src/components/Footer.jsx
-// "Liquid glass" footer: soft colour blobs sit behind a frosted, specular
-// glass panel (backdrop-blur + saturate + inner highlights). Links and
-// contact rows are small glass chips of their own.
+// OneCampus liquid-glass footer.
+//
+// - Floating glass panel that matches the Navbar.
+// - Responsive: stacked brand + 2-column links on phones, 4 columns on tablets,
+//   brand + 3 columns on laptops. Bottom bar wraps cleanly on every width.
+// - Auth-aware: only shows links the visitor can actually use.
+// - Edit the CONFIG block below (email, socials, legal pages).
 
 import { Link } from "react-router-dom";
-import { MapPin, MessageCircle, Mail, Phone } from "lucide-react";
-import logo from "../assets/logo.PNG";
-import { useCategories } from "../hooks/useCategories";
-import { SITE, whatsappLink } from "../lib/site";
+import { ArrowUp, ArrowUpRight, GraduationCap, Mail } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
-// reusable glass utility strings
-const glassChip =
-  "rounded-full border border-white/70 bg-white/35 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-200 hover:bg-white/70 hover:-translate-y-0.5";
-const glassRow =
-  "flex items-center gap-3 rounded-2xl border border-white/60 bg-white/30 backdrop-blur-md px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition-colors hover:bg-white/55";
-const heading = "text-[11px] font-medium uppercase tracking-[0.2em] text-ink/70 mb-4";
+/* ---------- CONFIG ---------- */
+
+const CONTACT_EMAIL = "support@onecampus.app"; // change to your real address
+
+// Only entries with an href are shown. Add your real profile links.
+const SOCIALS = [
+  { label: "GitHub", href: "" },
+  { label: "Instagram", href: "" },
+  { label: "LinkedIn", href: "" },
+];
+
+// Set to true once you have /privacy and /terms pages (otherwise the links 404).
+const LEGAL_PAGES_READY = false;
+
+/* ---------- link columns ---------- */
+
+// auth: true  -> logged-in only      guest: true -> logged-out only
+const COLUMNS = [
+  {
+    title: "Product",
+    links: [
+      { to: "/", label: "Home" },
+      { to: "/dashboard", label: "Today", auth: true },
+      { to: "/timetable", label: "Timetable", auth: true },
+      { to: "/attendance", label: "Attendance", auth: true },
+      { to: "/setups", label: "Setups", auth: true },
+      { to: "/register", label: "Get started", guest: true },
+    ],
+  },
+  {
+    title: "For class reps",
+    links: [
+      { to: "/cr-studio", label: "CR Studio", auth: true },
+      { to: "/cr-studio", label: "Request CR role", auth: true },
+      { to: "/login", label: "Log in to publish", guest: true },
+    ],
+  },
+  {
+    title: "Account",
+    links: [
+      { to: "/profile", label: "Your profile", auth: true },
+      { to: "/login", label: "Log in", guest: true },
+      { to: "/register", label: "Create account", guest: true },
+    ],
+  },
+];
+
+const supportLinks = [
+  { href: `mailto:${CONTACT_EMAIL}`, label: "Contact us" },
+  { href: `mailto:${CONTACT_EMAIL}?subject=OneCampus%20bug%20report`, label: "Report a problem" },
+  ...(LEGAL_PAGES_READY
+    ? [
+        { to: "/privacy", label: "Privacy" },
+        { to: "/terms", label: "Terms" },
+      ]
+    : []),
+];
+
+/* ---------- small pieces ---------- */
+
+const linkCls =
+  "group relative inline-flex w-fit items-center text-[14px] text-[#161827]/70 hover:text-[#161827] transition-colors " +
+  "rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50";
+
+const Underline = () => (
+  <span
+    aria-hidden
+    className="absolute -bottom-0.5 left-0 h-px w-full origin-left scale-x-0 bg-gradient-to-r from-[#4F46E5] to-[#0EA5E9] transition-transform duration-300 group-hover:scale-x-100 motion-reduce:transition-none"
+  />
+);
+
+const FooterLink = ({ to, href, children }) =>
+  to ? (
+    <Link to={to} className={linkCls}>
+      {children}
+      <Underline />
+    </Link>
+  ) : (
+    <a href={href} className={linkCls}>
+      {children}
+      <Underline />
+    </a>
+  );
+
+const Column = ({ title, children }) => (
+  <nav aria-label={title}>
+    <h3 className="text-[11.5px] font-semibold uppercase tracking-[0.18em] text-[#6A6F85] mb-4">{title}</h3>
+    <ul className="flex flex-col gap-2.5">{children}</ul>
+  </nav>
+);
+
+/* ---------- footer ---------- */
 
 const Footer = () => {
-  const { categories } = useCategories();
+  const { user, loading } = useAuth();
+
+  const columns = COLUMNS.map((c) => ({
+    ...c,
+    links: c.links.filter((l) => (l.auth ? user : l.guest ? !user && !loading : true)),
+  })).filter((c) => c.links.length > 0);
+
+  const socials = SOCIALS.filter((s) => s.href);
+  const year = new Date().getFullYear();
+
+  const toTop = () => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  };
 
   return (
-    <footer className="relative overflow-hidden bg-gradient-to-b from-paper via-[#EADFC9] to-[#DACBAC] pt-20 pb-6">
-      {/* colour the glass can refract */}
-      <div aria-hidden className="pointer-events-none absolute -left-24 top-8 h-80 w-80 rounded-full bg-moss/40 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute right-[-6rem] top-24 h-96 w-96 rounded-full bg-clay/45 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute left-1/3 bottom-[-6rem] h-72 w-96 rounded-full bg-[#C9B48A]/60 blur-3xl" />
+    <footer className="relative z-10 mt-16 px-3 sm:px-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div
+        className="relative mx-auto max-w-7xl overflow-hidden rounded-[28px] sm:rounded-[36px] border border-white/80
+          bg-white/50 backdrop-blur-2xl backdrop-saturate-[1.6]
+          shadow-[inset_0_1px_0_#fff,inset_0_0_30px_rgba(255,255,255,0.3),0_28px_60px_-30px_rgba(30,32,70,0.4)]"
+      >
+        {/* liquid highlights */}
+        <span aria-hidden className="pointer-events-none absolute inset-0">
+          <span className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-white/70 to-transparent" />
+          <span className="absolute -left-16 -top-16 w-72 h-56 rounded-full bg-white/60 blur-3xl" />
+          <span className="absolute -right-10 -bottom-20 w-80 h-56 rounded-full bg-[#B9C8FF]/40 blur-3xl" />
+        </span>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 md:px-10">
-        {/* main glass panel */}
-        <div className="relative overflow-hidden rounded-[36px] border border-white/60 bg-white/30 backdrop-blur-2xl backdrop-saturate-[1.6] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(255,255,255,0.25),0_30px_80px_-30px_rgba(42,37,31,0.5)]">
-          {/* specular sheen + top edge highlight */}
-          <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/55 via-transparent to-white/10" />
-          <div aria-hidden className="pointer-events-none absolute -top-px left-12 right-12 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+        <div className="relative px-6 pt-10 pb-6 sm:px-10 sm:pt-12 lg:px-14">
+          <div className="grid gap-10 grid-cols-2 md:grid-cols-4 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+            {/* brand */}
+            <div className="col-span-2 md:col-span-4 lg:col-span-1 max-w-sm">
+              <Link
+                to="/"
+                aria-label="OneCampus home"
+                className="inline-flex items-center gap-3 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
+              >
+                <span className="w-11 h-11 rounded-full bg-gradient-to-br from-[#4F46E5] to-[#0EA5E9] shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_8px_18px_-8px_rgba(79,70,229,0.7)] flex items-center justify-center">
+                  <GraduationCap className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
+                </span>
+                <span className="text-[22px] font-semibold tracking-tight text-[#161827] leading-none">
+                  One<span className="bg-gradient-to-r from-[#4F46E5] to-[#0EA5E9] bg-clip-text text-transparent">Campus</span>
+                </span>
+              </Link>
 
-          <div className="relative p-7 sm:p-12">
-            <div className="grid gap-12 md:grid-cols-[1.3fr_1fr_1.2fr]">
-              {/* Brand */}
-              <div className="max-w-sm">
-                <Link to="/" className="inline-flex items-center gap-3">
-                  <span className="w-12 h-12 rounded-full bg-white/90 ring-1 ring-white overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
-                    <img src={logo} alt="Galaxy Furniture" className="w-full h-full object-cover" />
-                  </span>
-                  <span className="font-serif text-[26px] font-semibold tracking-[0.02em] leading-none text-ink">
-                    GALAXY <span className="text-clay italic font-medium">Furniture</span>
-                  </span>
-                </Link>
-                <p className="mt-5 text-[14.5px] leading-relaxed text-ink/70">
-                  Sofas, beds and finishing pieces with real dimensions, real materials and honest
-                  prices — made to sit well in everyday rooms.
-                </p>
-                <a
-                  href={whatsappLink()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-6 inline-flex items-center gap-2 rounded-full bg-moss text-paper text-[14px] font-medium px-6 py-3 shadow-[0_14px_30px_-14px_rgba(57,58,34,0.8)] transition-all hover:bg-moss-dark hover:-translate-y-0.5"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Chat on WhatsApp
-                </a>
-              </div>
-
-              {/* Shop chips */}
-              <nav aria-label="Shop">
-                <h4 className={heading}>Shop</h4>
-                <div className="flex flex-wrap gap-2.5">
-                  <Link to="/shop" className={`${glassChip} px-4 py-2 text-[13.5px] font-medium text-ink`}>
-                    All pieces
-                  </Link>
-                  {categories.slice(0, 8).map((c) => (
-                    <Link
-                      key={c._id || c.slug}
-                      to={`/shop?category=${c.slug}`}
-                      className={`${glassChip} px-4 py-2 text-[13.5px] text-ink/80 hover:text-ink`}
-                    >
-                      {c.name}
-                    </Link>
-                  ))}
-                </div>
-              </nav>
-
-              {/* Visit */}
-              <div>
-                <h4 className={heading}>Visit the showroom</h4>
-                <div className="space-y-2.5 text-[14px] text-ink/80">
-                  <a href={SITE.mapsHref} target="_blank" rel="noopener noreferrer" className={`${glassRow} items-start`}>
-                    <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-moss" />
-                    <span>
-                      {SITE.address.map((l) => (
-                        <span key={l} className="block">{l}</span>
-                      ))}
-                    </span>
-                  </a>
-                  <a href={SITE.phoneHref} className={glassRow}>
-                    <Phone className="w-4 h-4 shrink-0 text-moss" />
-                    {SITE.phone}
-                  </a>
-                  <a href={`mailto:${SITE.email}`} className={glassRow}>
-                    <Mail className="w-4 h-4 shrink-0 text-moss" />
-                    <span className="break-all">{SITE.email}</span>
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* bottom bar */}
-            <div className="mt-12 pt-6 border-t border-white/60 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <p className="text-[12.5px] text-ink/60">
-                © {new Date().getFullYear()} Galaxy Furniture. All rights reserved.
+              <p className="text-[14px] leading-relaxed text-[#6A6F85] mt-4">
+                Timetables, attendance and academic calendars for your class, in one clean place. Your CR publishes, everyone stays in sync.
               </p>
-              <div className="flex items-center gap-5 text-[12.5px] text-ink/60">
-                <Link to="/contact" className="hover:text-moss transition-colors">Contact</Link>
-                <Link to="/login" className="hover:text-moss transition-colors">Staff login</Link>
+
+              <div className="flex flex-wrap items-center gap-2 mt-5">
+                <a
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  className="inline-flex items-center gap-2 h-10 px-4 rounded-full text-[13px] font-medium text-[#161827] bg-white/60 border border-white/80 shadow-[inset_0_1px_0_#fff] hover:bg-white/90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
+                >
+                  <Mail className="w-4 h-4" />
+                  {CONTACT_EMAIL}
+                </a>
+                {socials.map(({ label, href }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full text-[13px] font-medium text-[#161827]/80 bg-white/60 border border-white/80 shadow-[inset_0_1px_0_#fff] hover:bg-white/90 hover:text-[#161827] hover:-translate-y-0.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
+                  >
+                    {label}
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </a>
+                ))}
               </div>
             </div>
+
+            {/* link columns */}
+            {columns.map((c) => (
+              <Column key={c.title} title={c.title}>
+                {c.links.map((l) => (
+                  <li key={`${c.title}-${l.label}`}>
+                    <FooterLink to={l.to}>{l.label}</FooterLink>
+                  </li>
+                ))}
+              </Column>
+            ))}
+
+            <Column title="Support">
+              {supportLinks.map((l) => (
+                <li key={l.label}>
+                  <FooterLink to={l.to} href={l.href}>
+                    {l.label}
+                  </FooterLink>
+                </li>
+              ))}
+            </Column>
+          </div>
+
+          {/* divider */}
+          <div className="h-px mt-10 bg-gradient-to-r from-transparent via-[#161827]/15 to-transparent" />
+
+          {/* bottom bar */}
+          <div className="flex flex-col-reverse items-center gap-4 pt-5 sm:flex-row sm:justify-between">
+            <p className="text-[12.5px] text-[#6A6F85] text-center sm:text-left">
+              &copy; {year} OneCampus. Built for students, by students.
+            </p>
+
+            <button
+              type="button"
+              onClick={toTop}
+              className="inline-flex items-center gap-2 h-9 px-4 rounded-full text-[12.5px] font-medium text-[#161827]/80 bg-white/60 border border-white/80 shadow-[inset_0_1px_0_#fff] hover:bg-white/90 hover:text-[#161827] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
+            >
+              <ArrowUp className="w-3.5 h-3.5" />
+              Back to top
+            </button>
           </div>
         </div>
       </div>

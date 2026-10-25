@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { BookOpen, Plus, Search } from "lucide-react";
 import { officialSchedulesApi, errMsg } from "../../api/endpoints";
-import { askNote, isWithdrawn } from "../../lib/prompt";
-import { Alert, Badge, Button, Card, EmptyState, Field, Modal, PageSpinner } from "../../components/Ui";
+import { isWithdrawn } from "../../lib/prompt";
+import { Alert, Badge, Button, Card, EmptyState, Field, PageSpinner, cx } from "../../components/Ui";
+import { FormModal, RowActions, focusFirstInvalid, shortOf, useNoteDialog } from "../../components/FormKit";
 
 const api = officialSchedulesApi.subjects;
-
-// Works whether the backend returns `_id` or `id`
-const idOf = (x) => x?._id || x?.id;
+const idOf = (x) => x?._id || x?.id; // works whether the backend returns `_id` or `id`
+const blank = { name: "", code: "", note: "" };
 
 const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
   const [list, setList] = useState([]);
@@ -15,13 +15,18 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
   const [error, setError] = useState("");
 
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: "", code: "", note: "" });
+  const [form, setForm] = useState(blank);
+  const [initial, setInitial] = useState("");
+  const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [ask, noteDialog] = useNoteDialog();
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     try {
       setList(await api.list(scheduleId));
+      setError("");
     } catch (e) {
       setError(errMsg(e, "Could not load subjects"));
     } finally {
@@ -33,14 +38,43 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
     load();
   }, [load]);
 
+  const dirty = Boolean(editing) && JSON.stringify(form) !== initial;
+
   const open = (s) => {
+    const f = s ? { name: s.name || "", code: s.code || "", note: "" } : blank;
     setEditing(s || "new");
-    setForm({ name: s?.name || "", code: s?.code || "", note: "" });
+    setForm(f);
+    setInitial(JSON.stringify(f));
+    setErrors({});
     setFormError("");
+  };
+
+  const setField = (k) => (e) => {
+    const v = e.target.value;
+    setForm((f) => ({ ...f, [k]: v }));
+    setErrors((x) => ({ ...x, [k]: undefined }));
+  };
+
+  const validate = () => {
+    const errs = {};
+    const name = form.name.trim();
+    const code = form.code.trim();
+    if (!name) errs.name = "Enter the subject name.";
+    else if (name.length > 80) errs.name = "Keep the name under 80 characters.";
+    if (code) {
+      const clash = list.some((s) => !isWithdrawn(s) && idOf(s) !== idOf(editing) && (s.code || "").toLowerCase() === code.toLowerCase());
+      if (clash) errs.code = "Another subject already uses this code.";
+    }
+    return errs;
   };
 
   const save = async (e) => {
     e.preventDefault();
+    if (saving) return;
+    const errs = validate();
+    setErrors(errs);
+    if (Object.keys(errs).length) return focusFirstInvalid();
+
     setSaving(true);
     setFormError("");
     const body = { name: form.name.trim(), code: form.code.trim() };
@@ -58,69 +92,102 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
     }
   };
 
-  const toggle = async (s) => {
+  const toggle = (s) => {
     const withdrawn = isWithdrawn(s);
-    const note = askNote(withdrawn ? "Restore this subject. Note (optional)" : "Withdraw this subject from the schedule. Note (optional)");
-    if (note === null) return;
-    try {
-      if (withdrawn) await api.restore(scheduleId, idOf(s), note);
-      else await api.withdraw(scheduleId, idOf(s), note);
-      await load();
-      onChanged?.();
-    } catch (err) {
-      setError(errMsg(err, "Could not update the subject"));
-    }
+    ask({
+      title: withdrawn ? "Restore subject" : "Withdraw subject",
+      message: withdrawn ? `"${s.name}" will be part of the schedule again.` : `"${s.name}" will be removed from the schedule. You can restore it later.`,
+      confirmLabel: withdrawn ? "Restore" : "Withdraw",
+      tone: withdrawn ? "primary" : "danger",
+      run: async (note) => {
+        if (withdrawn) await api.restore(scheduleId, idOf(s), note);
+        else await api.withdraw(scheduleId, idOf(s), note);
+        await load();
+        onChanged?.();
+      },
+    });
   };
 
+  const sorted = useMemo(() => [...list].sort((a, b) => Number(isWithdrawn(a)) - Number(isWithdrawn(b)) || (a.name || "").localeCompare(b.name || "")), [list]);
+
   if (loading) return <PageSpinner />;
+
+  const q = query.trim().toLowerCase();
+  const filtered = q ? sorted.filter((s) => `${s.name} ${s.code || ""}`.toLowerCase().includes(q)) : sorted;
+
+  const addBtn = <Button onClick={() => open(null)}><Plus className="w-4 h-4" />Add subject</Button>;
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[14px] text-[#6A6F85]">{list.length} subject{list.length === 1 ? "" : "s"}</p>
-        {!readOnly && <Button size="sm" onClick={() => open(null)}><Plus className="w-4 h-4" />Add subject</Button>}
+        {!readOnly && list.length > 0 && <Button size="sm" onClick={() => open(null)}><Plus className="w-4 h-4" /><span>Add<span className="hidden sm:inline"> subject</span></span></Button>}
       </div>
 
       <Alert type="error">{error}</Alert>
 
+      {list.length > 6 && (
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-[#6A6F85]" aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search subjects"
+            aria-label="Search subjects"
+            className="w-full h-11 pl-10 pr-4 rounded-2xl bg-white/65 border border-white/80 shadow-[inset_0_1px_0_#fff] text-[16px] sm:text-[14px] text-[#161827] placeholder:text-[#6A6F85]/70 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+          />
+        </div>
+      )}
+
       {list.length === 0 ? (
-        <EmptyState icon={BookOpen} title="No official subjects yet" text="Add the subjects for your section. Weekly classes are attached to them." action={!readOnly && <Button onClick={() => open(null)}><Plus className="w-4 h-4" />Add subject</Button>} />
+        <EmptyState icon={BookOpen} title="No official subjects yet" text="Add the subjects for your section. Weekly classes are attached to them." action={!readOnly && addBtn} />
+      ) : filtered.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-[#161827]/15 px-4 py-6 text-center text-[13.5px] text-[#6A6F85]">No subject matches “{query}”.</p>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {list.map((s) => {
+        <div className="grid sm:grid-cols-2 gap-3">
+          {filtered.map((s) => {
             const w = isWithdrawn(s);
             return (
-              <Card key={idOf(s)} className={`p-5 flex items-center justify-between gap-3 ${w ? "opacity-60" : ""}`}>
-                <div className="min-w-0">
-                  <p className="text-[15.5px] font-semibold text-[#161827] truncate">{s.name}</p>
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {s.code && <Badge tone="brand">{s.code}</Badge>}
-                    {w && <Badge tone="amber">Withdrawn</Badge>}
-                  </div>
+              <Card key={idOf(s)} className={cx("p-3.5 sm:p-4 flex items-center gap-3", w && "opacity-60")}>
+                <span
+                  aria-hidden="true"
+                  className={cx(
+                    "w-12 h-12 rounded-2xl shrink-0 flex items-center justify-center text-[12px] font-semibold tracking-wide",
+                    w ? "bg-[#161827]/8 text-[#6A6F85]" : "bg-gradient-to-br from-[#5B52EE]/15 to-[#2B8DE0]/15 text-indigo-700"
+                  )}
+                >
+                  {shortOf(s.name, s.code).slice(0, 5)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-semibold text-[#161827] truncate">{s.name}</p>
+                  <p className="text-[12.5px] text-[#6A6F85] mt-0.5 truncate">
+                    {s.code ? `Code ${s.code}` : "No code"}
+                  </p>
+                  {w && <div className="mt-1"><Badge tone="amber">Withdrawn</Badge></div>}
                 </div>
-                {!readOnly && (
-                  <div className="flex gap-0.5 shrink-0">
-                    {!w && <button onClick={() => open(s)} aria-label="Edit" className="w-9 h-9 rounded-full flex items-center justify-center text-[#161827]/70 hover:bg-white/80"><Pencil className="w-4 h-4" /></button>}
-                    <button onClick={() => toggle(s)} aria-label={w ? "Restore" : "Withdraw"} title={w ? "Restore" : "Withdraw"} className={`w-9 h-9 rounded-full flex items-center justify-center ${w ? "text-[#161827]/70 hover:bg-white/80" : "text-rose-600 hover:bg-rose-50"}`}>
-                      {w ? <RotateCcw className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
-                    </button>
-                  </div>
-                )}
+                {!readOnly && <RowActions withdrawn={w} onEdit={() => open(s)} onToggle={() => toggle(s)} />}
               </Card>
             );
           })}
         </div>
       )}
 
-      <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title={editing === "new" ? "Add official subject" : "Edit subject"}>
-        <form onSubmit={save} className="space-y-4">
-          <Alert type="error">{formError}</Alert>
-          <Field label="Subject name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Operating Systems" required />
-          <Field label="Code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="CS301" />
-          <Field label="Note for the history (optional)" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-          <Button type="submit" loading={saving}>{editing === "new" ? "Add subject" : "Save changes"}</Button>
-        </form>
-      </Modal>
+      <FormModal
+        open={Boolean(editing)}
+        onClose={() => setEditing(null)}
+        title={editing === "new" ? "Add subject" : "Edit subject"}
+        onSubmit={save}
+        submitLabel={editing === "new" ? "Add subject" : "Save changes"}
+        saving={saving}
+        dirty={dirty}
+        error={formError}
+      >
+        <Field label="Subject name" value={form.name} onChange={setField("name")} error={errors.name} placeholder="Operating Systems" maxLength={80} autoFocus autoCapitalize="words" enterKeyHint="next" />
+        <Field label="Code (optional)" value={form.code} onChange={setField("code")} error={errors.code} placeholder="CS301" maxLength={20} autoCapitalize="characters" enterKeyHint="next" />
+        <Field label="Note for the history (optional)" value={form.note} onChange={setField("note")} maxLength={200} enterKeyHint="done" />
+      </FormModal>
+      {noteDialog}
     </div>
   );
 };

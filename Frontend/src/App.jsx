@@ -17,6 +17,7 @@ import Profile from "./pages/Profile";
 import CRStudio from "./pages/CRStudio";
 import CRSchedule from "./pages/CRSchedule";
 import NotFound from "./pages/NotFound";
+import Official from "./pages/Official";
 
 const App = () => (
   <>
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/timetable" element={<Timetable />} />
             <Route path="/attendance" element={<Attendance />} />
+            <Route path="/official" element={<Official/>}/>
           </Route>
         </Route>
 

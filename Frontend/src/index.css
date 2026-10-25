@@ -1,39 +1,22 @@
 /* Fonts must be imported BEFORE tailwind, otherwise the browser ignores the
    @import and falls back to system fonts. */
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
-/* ---- Contemporary Japandi design tokens ---------------------------------
-   Use as: bg-paper, bg-linen, bg-card, border-line, text-ink, text-stone,
-   bg-moss, text-clay ... */
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
-
-  --color-paper: #F4EFE6;      /* page background */
-  --color-linen: #EBE3D3;      /* image wells, soft sections */
-  --color-card: #FFFDF9;       /* raised surfaces */
-  --color-line: #E2D8C6;       /* hairlines / borders */
-  --color-ink: #2A251F;        /* primary text */
-  --color-stone: #6F665A;      /* secondary text */
-  --color-moss: #4A4A2C;       /* primary action (olive) */
-  --color-moss-dark: #393A22;
-  --color-clay: #A67C52;       /* warm wood accent */
 }
 
 html { scroll-behavior: smooth; }
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-paper);
-  color: var(--color-ink);
+  background-color: #F4F6FF;
+  color: #161827;
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: #4A4A2C; color: #F4EFE6; }
-
-.font-display { font-family: var(--font-serif); }
+::selection { background: #4F46E5; color: #ffffff; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

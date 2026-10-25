@@ -1,6 +1,6 @@
 import { Outlet } from "react-router-dom";
 import Navbar from "./components/Navbar";
-// import Footer from "./components/Footer";
+import Footer from "./components/Footer";
 
 // Soft gradient + blurred colour blobs so the glass surfaces have something to refract.
 const Layout = () => (
@@ -15,7 +15,7 @@ const Layout = () => (
     <main className="relative z-10 flex-1">
       <Outlet />
     </main>
-    {/* <Footer /> */}
+    <Footer></Footer>
   </div>
 );
 

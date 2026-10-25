@@ -8,10 +8,12 @@ export const card =
   "rounded-3xl bg-white/55 backdrop-blur-xl backdrop-saturate-150 border border-white/80 " +
   "shadow-[inset_0_1px_0_#fff,0_24px_48px_-28px_rgba(30,32,70,0.35)]";
 
+// text-[16px] on phones stops iOS Safari zooming in on focus; min-w-0 stops date/time inputs overflowing grids.
 const inputCls =
   "w-full h-11 px-4 rounded-2xl bg-white/65 border border-white/80 shadow-[inset_0_1px_0_#fff] " +
-  "text-[14px] text-[#161827] placeholder:text-[#6A6F85]/70 transition " +
-  "focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:bg-white/85 disabled:opacity-60";
+  "text-[16px] sm:text-[14px] min-w-0 text-[#161827] placeholder:text-[#6A6F85]/70 transition " +
+  "focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:bg-white/85 disabled:opacity-60 " +
+  "aria-[invalid=true]:border-[#F3B8C2] aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-rose-400/30";
 
 export const Card = ({ className, children, ...rest }) => (
   <div className={cx(card, className)} {...rest}>
@@ -37,9 +39,8 @@ const variants = {
 
 const sizes = { sm: "h-9 px-4 text-[13px]", md: "h-11 px-5 text-[14px]" };
 
-// FIX: `disabled` is taken out of `rest` and applied LAST. Before, `{...rest}` came after
-// `disabled={loading || rest.disabled}` and overwrote it, so a button with `disabled={undefined}`
-// or `disabled={false}` stayed clickable while `loading` was true (double submit).
+// `disabled` is taken out of `rest` and applied LAST so a button can never stay clickable
+// while `loading` is true (prevents double submit).
 export const Button = ({
   variant = "primary",
   size = "md",
@@ -63,20 +64,28 @@ export const Button = ({
 );
 
 export const Spinner = ({ className = "w-6 h-6" }) => (
-  <span className={cx("inline-block rounded-full border-2 border-current/25 border-t-current animate-spin", className)} />
+  <span
+    aria-hidden="true"
+    className={cx("inline-block rounded-full border-2 border-current/25 border-t-current animate-spin", className)}
+  />
 );
 
-export const Field = ({ label, hint, as: Tag = "input", className, children, ...props }) => (
-  <label className="block">
+// `error` shows a message under the field and marks it invalid for screen readers.
+export const Field = ({ label, hint, error, as: Tag = "input", className, children, ...props }) => (
+  <label className="block min-w-0">
     {label && (
       <span className="block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6A6F85] mb-1.5 px-1">
         {label}
       </span>
     )}
-    <Tag {...props} className={cx(inputCls, className)}>
+    <Tag {...props} aria-invalid={error ? true : undefined} className={cx(inputCls, className)}>
       {children}
     </Tag>
-    {hint && <span className="block text-[12px] text-[#6A6F85] mt-1 px-1">{hint}</span>}
+    {error ? (
+      <span className="block text-[12.5px] text-[#A32A42] mt-1 px-1">{error}</span>
+    ) : (
+      hint && <span className="block text-[12.5px] text-[#6A6F85] mt-1 px-1">{hint}</span>
+    )}
   </label>
 );
 
@@ -87,9 +96,13 @@ const alertStyles = {
   info: "bg-[#EAF0FF]/80 border-[#C3D2FA] text-[#2F3FA3]",
 };
 
+// Errors interrupt screen readers; everything else is announced politely.
 export const Alert = ({ type = "info", children, className }) =>
   children ? (
-    <div className={cx("rounded-2xl border px-4 py-3 text-[13.5px] leading-snug", alertStyles[type], className)} role="alert">
+    <div
+      className={cx("rounded-2xl border px-4 py-3 text-[13.5px] leading-snug", alertStyles[type], className)}
+      role={type === "error" ? "alert" : "status"}
+    >
       {children}
     </div>
   ) : null;
@@ -140,16 +153,25 @@ export const EmptyState = ({ icon: Icon, title, text, action }) => (
       </span>
     )}
     <h3 className="text-[17px] font-semibold text-[#161827]">{title}</h3>
-    {text && <p className="text-[14px] text-[#6A6F85] mt-1.5 max-w-sm mx-auto">{text}</p>}
+    {text && <p className="text-[14px] leading-relaxed text-[#6A6F85] mt-1.5 max-w-md mx-auto">{text}</p>}
     {action && <div className="mt-5">{action}</div>}
   </Card>
 );
 
-// FIX: proper dialog semantics, focus moves into the dialog when it opens and returns to the
-// element that opened it, Escape closes it, and the page behind does not scroll.
-export const Modal = ({ open, onClose, title, children }) => {
+// Dialog: bottom sheet on phones, centred on larger screens.
+// Header and footer stay visible; only the middle scrolls, so the submit button is always reachable.
+// Focus moves into the dialog on open and returns to the opener, Escape closes it, page behind does not scroll.
+// `onClose` is kept in a ref so a parent re-render with a new function does not re-run the
+// effect (which would reset focus and scroll-lock while the user is typing).
+// `footer` and `size` ("lg" | "xl") are optional, so older usages keep working.
+export const Modal = ({ open, onClose, title, children, footer, size = "lg" }) => {
   const dialogRef = useRef(null);
+  const closeRef = useRef(onClose);
   const titleId = useId();
+
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return undefined;
@@ -159,24 +181,24 @@ export const Modal = ({ open, onClose, title, children }) => {
     document.body.style.overflow = "hidden";
 
     const onKey = (e) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") closeRef.current?.();
     };
     document.addEventListener("keydown", onKey);
 
-    // focus the dialog itself so keyboard and screen-reader users start inside it
-    dialogRef.current?.focus();
+    // focus the dialog only if a field with autoFocus has not already taken focus inside it
+    if (!dialogRef.current?.contains(document.activeElement)) dialogRef.current?.focus();
 
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-[#161827]/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
         ref={dialogRef}
@@ -184,32 +206,42 @@ export const Modal = ({ open, onClose, title, children }) => {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={cx(card, "relative w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 bg-white/80 focus:outline-none")}
+        className={cx(
+          card,
+          "relative w-full flex flex-col max-h-[92dvh] sm:max-h-[90vh] rounded-b-none sm:rounded-3xl bg-white/90 focus:outline-none",
+          size === "xl" ? "sm:max-w-2xl" : "sm:max-w-lg"
+        )}
       >
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between gap-3 px-5 sm:px-6 pt-5 pb-3 shrink-0">
           <h2 id={titleId} className="text-[18px] font-semibold text-[#161827]">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="w-9 h-9 rounded-full flex items-center justify-center text-[#161827]/70 hover:bg-white/80"
+            className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-[#161827]/70 hover:bg-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-        {children}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-6 pb-5">{children}</div>
+        {footer && (
+          <div className="shrink-0 border-t border-white/80 bg-white/80 px-5 sm:px-6 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-b-3xl">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
 export const PageSpinner = () => (
-  <div className="min-h-[40vh] flex items-center justify-center text-indigo-600">
+  <div className="min-h-[40vh] flex items-center justify-center text-indigo-600" role="status">
     <Spinner className="w-8 h-8" />
+    <span className="sr-only">Loading...</span>
   </div>
 );
 
-// ASCII fallback "-" (the old file had a broken multi-byte dash here)
+// ASCII fallback "-" when there is no date
 export const fmtDate = (d) =>
   d
     ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
@@ -219,7 +251,13 @@ export const ProgressBar = ({ value = 0, target }) => {
   const v = Math.max(0, Math.min(100, Number(value) || 0));
   const ok = target == null || v >= Number(target);
   return (
-    <div className="relative h-2.5 rounded-full bg-[#161827]/10">
+    <div
+      className="relative h-2.5 rounded-full bg-[#161827]/10"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(v)}
+    >
       <div
         className={cx(
           "h-full rounded-full transition-all duration-700",
@@ -238,17 +276,18 @@ const isPrim = (v) => ["string", "number", "boolean"].includes(typeof v);
 const prettyKey = (k) => k.replace(/([A-Z])/g, " $1").replace(/[_.]/g, " ").replace(/^./, (c) => c.toUpperCase());
 const showVal = (v) => (typeof v === "boolean" ? (v ? "Yes" : "No") : String(v));
 const itemLabel = (it) => it?.name || it?.title || it?.label || it?.subjectName || it?.code;
+const MAX_CHIPS = 12;
 
 // Generic read-only view of an API object (used where reply shapes are loose).
 export const Summary = ({ data }) => {
   if (!data || typeof data !== "object") return null;
   const rows = [];
   Object.entries(data).forEach(([k, v]) => {
-    if (k.startsWith("_") || k === "__v") return;
+    if (k.startsWith("_") || k === "__v" || k === "warnings") return;
     if (isPrim(v)) rows.push({ k: prettyKey(k), v: showVal(v) });
     else if (Array.isArray(v)) {
-      const labels = v.map(itemLabel).filter(Boolean).slice(0, 12);
-      rows.push({ k: prettyKey(k), v: `${v.length}`, chips: labels });
+      const labels = v.map(itemLabel).filter(Boolean);
+      rows.push({ k: prettyKey(k), v: `${v.length}`, chips: labels.slice(0, MAX_CHIPS), more: Math.max(0, labels.length - MAX_CHIPS) });
     } else if (v && typeof v === "object") {
       Object.entries(v).forEach(([ck, cv]) => {
         if (isPrim(cv) && !ck.startsWith("_")) rows.push({ k: `${prettyKey(k)} - ${prettyKey(ck)}`, v: showVal(cv) });
@@ -267,6 +306,7 @@ export const Summary = ({ data }) => {
               {r.chips.map((c, i2) => (
                 <Badge key={i2}>{c}</Badge>
               ))}
+              {r.more > 0 && <Badge tone="brand">+{r.more} more</Badge>}
             </div>
           )}
         </div>
