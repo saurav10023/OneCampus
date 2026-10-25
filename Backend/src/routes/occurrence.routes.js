@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { verifyJWT } from '../middlewares/auth.middleware.js';
 import { loadOwnedSetup } from '../middlewares/setup.middleware.js';
+import { syncOnRead } from '../middlewares/syncOnRead.middleware.js';
 import {
   validateListQuery,
   validateMarkBody,
@@ -28,7 +29,10 @@ import {
 
 const router = Router({ mergeParams: true }); // so :setupId from the mount path is visible
 
-router.use(verifyJWT, loadOwnedSetup);
+// Bring a joined setup up to date before any read. Writes skip it, so marking a class is never delayed.
+router.use(verifyJWT, loadOwnedSetup, (req, res, next) =>
+  req.method === 'GET' ? syncOnRead(req, res, next) : next()
+);
 
 // Fixed paths first, so "today", "week" and "status" are never read as an :occurrenceId
 router.get('/today', validateDayQuery, getDay);

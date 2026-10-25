@@ -21,7 +21,7 @@ import ScheduleRule from './Official/scheduleRule.model.js';
 import ScheduleItem from './Official/scheduleItem.model.js';
 import ScheduleAction from './Official/scheduleAction.model.js';
 import ScheduleRole from './Official/scheduleRole.model.js';
-
+import SetupOfficialUpdate from './Official/setupOfficialUpdate.model.js';
 // Loaded for their side effect only (registering the model and its indexes), so this file does not
 // depend on how they export.
 import './user.model.js';
@@ -43,4 +43,5 @@ export {
   ScheduleItem,
   ScheduleAction,
   ScheduleRole,
+  SetupOfficialUpdate
 };

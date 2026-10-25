@@ -35,12 +35,19 @@ import scheduleRuleRoutes from './routes/scheduleRule.routes.js';
 import scheduItemRoutes from './routes/scheduleItem.routes.js'
 import scheduleActionRoutes from './routes/scheduleAction.routes.js'
 import officialJoinRoutes from './routes/officialJoin.routes.js'
+// with the other imports
+import officialSyncRoutes from './routes/officialSync.routes.js';
+import officialUpdateRoutes from './routes/officialUpdate.routes.js';
+
+// right after the officialJoinRoutes line
+app.use("/api/v1/setup/:setupId/official", officialJoinRoutes);
+app.use("/api/v1/setup/:setupId/official", officialSyncRoutes);
+app.use("/api/v1/setup/:setupId/official", officialUpdateRoutes);
 
 app.use("/api/v1/setup/:setupId/calendar-events", calendarEventRoutes);
 app.use("/api/v1/setup/:setupId/extra-classes", extraClassRoutes);
 app.use("/api/v1/setup/:setupId/attendance", attendanceRoutes);
 app.use("/api/v1/setup/:setupId/occurrences", occurrenceRoutes);
-app.use("/api/v1/setup/:setupId/official", officialJoinRoutes);
 app.use("/api/v1/setup/:setupId/subjects",subjectRoutes);
 app.use("/api/v1/setup/:setupId/rules", recurringRuleRoutes);
 

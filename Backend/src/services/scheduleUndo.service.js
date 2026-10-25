@@ -19,7 +19,7 @@ import {
 import { allocateRevision, recordAction } from './scheduleRevision.service.js';
 import { loadActiveRoles } from './scheduleRole.service.js';
 import { loadEditableSchedule, countAttachedStudents } from './officialSchedule.service.js';
-import { checkRefs } from './scheduleItem.Service.js';
+import { checkRefs } from './scheduleItem.service.js';
 import { ACTION_OP, ACTION_TARGET, ITEM_STATUS, SCHEDULE_STATUS } from '../utils/constants.js';
 
 // Undo, redo and admin revert. All three are one move: put a record back to what an earlier action

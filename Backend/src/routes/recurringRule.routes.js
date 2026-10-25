@@ -16,12 +16,16 @@ import {
   deleteRule,
 } from '../controllers/recurringRule.controller.js';
 import { loadOwnedSetup } from '../middlewares/setup.middleware.js';
+import { syncOnRead } from '../middlewares/syncOnRead.middleware.js';
 
 // mergeParams so :setupId from the parent path is visible to loadOwnedSetup
 const router = Router({ mergeParams: true });
 
 // Every request is the owner's own: the setup is loaded and checked before any handler runs
-router.use(verifyJWT, loadOwnedSetup);
+// Bring a joined setup up to date before any read. Writes skip it, so marking a class is never delayed.
+router.use(verifyJWT, loadOwnedSetup, (req, res, next) =>
+  req.method === 'GET' ? syncOnRead(req, res, next) : next()
+);
 
 router.route('/').get(listRules).post(createRule);
 

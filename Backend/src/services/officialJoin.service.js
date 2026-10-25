@@ -552,4 +552,4 @@ const leaveSchedule = async ({ setup }) => {
   };
 };
 
-export { listJoinableSchedules, getOfficialStatus, previewJoin, joinSchedule, leaveSchedule };
+export { listJoinableSchedules, getOfficialStatus, previewJoin, joinSchedule, leaveSchedule,ensureOfficialEvent,clipToSetup, };

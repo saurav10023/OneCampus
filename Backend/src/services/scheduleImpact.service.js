@@ -20,7 +20,8 @@ import { ATTENDANCE_STATUS, ITEM_STATUS } from '../utils/constants.js';
 // Only kinds that cancel classes (holiday, break, exam, mass bunk, class cancel) reach any class. A quiz,
 // an event and a last working day reach students but cancel nothing, so they report 0 classes.
 
-// A student's own marks. The sync leaves these alone (skipMarked), so they show what will NOT change.
+// A student's own marks. An official cancellation still takes these classes: the sync remembers the
+// mark and gives it back if the item is withdrawn. They are counted so the CR knows how many marks are held.
 const STUDENT_MARKS = [ATTENDANCE_STATUS.PRESENT, ATTENDANCE_STATUS.ABSENT, ATTENDANCE_STATUS.EXCUSED];
 // Classes that are already held and are skipped
 const ALREADY_HELD = [ATTENDANCE_STATUS.CANCELLED, ATTENDANCE_STATUS.NOT_COUNTED];
@@ -145,7 +146,7 @@ const previewImpact = async ({ user, scheduleId, input }) => {
     markedClasses: row?.marked ?? 0,
     alreadyHeldClasses: row?.held ?? 0,
     note: row
-      ? 'Marked classes keep the student\'s own mark: the automatic sync never overwrites it. Classes already cancelled or not counted are skipped.'
+      ? 'Classes a student already marked are cancelled too; their mark is remembered and comes back if this item is withdrawn. Classes already cancelled or not counted are skipped.'
       : 'No class of any attached student matches.',
   };
 };

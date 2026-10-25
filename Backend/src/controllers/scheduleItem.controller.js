@@ -8,7 +8,7 @@ import {
   updateItem,
   withdrawItem,
   restoreItem,
-} from '../services/scheduleItem.Service.js';
+} from '../services/scheduleItem.service.js';
 
 // All handlers read :scheduleId (and :itemId) from the mount path. The service checks the caller's
 // ScheduleRole for that schedule, so nothing here trusts the request for permission.

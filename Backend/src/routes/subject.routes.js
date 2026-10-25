@@ -25,10 +25,14 @@ import {
   mergeSubject,
   previewMerge,
 } from '../controllers/subject.controller.js';
+import { syncOnRead } from '../middlewares/syncOnRead.middleware.js';
 
 const router = Router({ mergeParams: true }); // so :setupId from the mount path is visible
 
-router.use(verifyJWT, loadOwnedSetup);
+// Bring a joined setup up to date before any read. Writes skip it, so marking a class is never delayed.
+router.use(verifyJWT, loadOwnedSetup, (req, res, next) =>
+  req.method === 'GET' ? syncOnRead(req, res, next) : next()
+);
 
 // Fixed paths first, so "bulk" and "check" are never read as a :subjectId
 router.route('/').get(validateListQuery, listSubjects).post(validateCreateSubject, createSubject);
