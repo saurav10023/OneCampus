@@ -13,6 +13,9 @@ import {
   deleteRuleWithChildren,
 } from '../services/recurringRule.service.js';
 import { hideOfficialRule } from '../services/officialOverride.service.js';
+import { nowInZone, fromDateText } from '../utils/dateWindow.js';
+
+const todayInSetup = (setup) => fromDateText(nowInZone(setup.timezone).date);
 
 // Only these fields can come from the client. setupId comes from the route (req.setup);
 // ruleVersion, origin, detachedFromOfficial and the official link fields are set by the server
@@ -141,10 +144,10 @@ const normalizeRuleInput = (input) => {
 };
 // --- pure helpers end
 
-const todayUtc = () => {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-};
+// const todayUtc = () => {
+//   const now = new Date();
+//   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+// };
 
 const assertWritable = (setup) => {
   if (setup.status === 'archived') throw new ApiError(409, 'Archived setups are read-only');
@@ -312,8 +315,10 @@ const updateRule = asyncHandler(async (req, res) => {
   const body = req.body ?? {};
   assertBoolean('confirmOverlap', body.confirmOverlap);
 
+  // const effectiveFrom =
+  //   body.effectiveFrom === undefined ? todayUtc() : toDateOnly(body.effectiveFrom);
   const effectiveFrom =
-    body.effectiveFrom === undefined ? todayUtc() : toDateOnly(body.effectiveFrom);
+  body.effectiveFrom === undefined ? todayInSetup(setup) : toDateOnly(body.effectiveFrom);
   if (!effectiveFrom) throw new ApiError(400, 'effectiveFrom must be a date like 2026-10-22');
 
   const changes = normalizeRuleInput(pick(body, EDIT_FIELDS));

@@ -155,10 +155,104 @@ const getSetupById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { setup: req.setup }, 'Setup fetched successfully'));
 });
 
+// const updateSetup = asyncHandler(async (req, res) => {
+//   const setup = req.setup;
+
+//   // Archived setups are read-only (open decision in the blueprint; revisit if needed)
+//   if (setup.status === 'archived') {
+//     throw new ApiError(409, 'Archived setups are read-only');
+//   }
+
+//   const { startDate, endDate, leaveOfficial, ...rest } = req.body;
+//   if (leaveOfficial !== undefined && typeof leaveOfficial !== 'boolean') {
+//     throw new ApiError(400, 'leaveOfficial must be true or false');
+//   }
+//   const oldStart = setup.startDate;
+//   const oldEnd = setup.endDate;
+
+//   // Check the final range up front, before anything touches occurrences
+//   if ((startDate ?? oldStart) > (endDate ?? oldEnd)) {
+//     throw new ApiError(400, 'startDate must be on or before endDate');
+//   }
+
+//   // Name, scope, target and timezone first, through save() so scopeKey is recomputed.
+//   // Doing this before the date changes means a refusal (joined setup, duplicate scope)
+//   // stops the request before any class is touched.
+//   try {
+//     await updateSetupDetails(setup, rest, { leaveOfficial: leaveOfficial === true });
+//   } catch (err) {
+//     if (err?.code === 11000) throw duplicateScopeError();
+//     throw err;
+//   }
+
+//   const warnings = [];
+//   const userId = req.user._id;
+
+//   if (startDate && startDate.getTime() !== oldStart.getTime()) {
+//     const { affected, restored, eventCancellation } = await applyStartDateChange(
+//       setup,
+//       startDate,
+//       oldStart,
+//       userId
+//     );
+//     setup.startDate = startDate;
+
+//     if (startDate > oldStart && affected) {
+//       warnings.push(
+//         `${affected} class(es) before ${formatDateOnly(startDate)} are now "Not Counted" ` +
+//           'and excluded from your attendance percentage.'
+//       );
+//     }
+//     if (startDate < oldStart && affected) {
+//       warnings.push(
+//         `${affected} new class(es) from ${formatDateOnly(startDate)} were added as ` +
+//           '"Not Counted" so they do not change your attendance percentage.'
+//       );
+//     }
+//     if (restored) {
+//       warnings.push(`${restored} previously uncounted class(es) were restored.`);
+//     }
+//     pushEventCancellationWarning(warnings, eventCancellation);
+//   }
+
+//   if (endDate && endDate.getTime() !== oldEnd.getTime()) {
+//     const { affected, restored, eventCancellation } = await applyEndDateChange(
+//       setup,
+//       endDate,
+//       oldEnd,
+//       userId
+//     );
+//     setup.endDate = endDate;
+
+//     if (endDate > oldEnd && affected) {
+//       warnings.push(
+//         `${affected} new class(es) up to ${formatDateOnly(endDate)} were added as ` +
+//           '"Absent". Update them as you attend, or your attendance percentage will drop.'
+//       );
+//     }
+//     if (endDate < oldEnd && affected) {
+//       warnings.push(
+//         `${affected} class(es) after ${formatDateOnly(endDate)} are now "Not Counted" ` +
+//           'and excluded from your attendance percentage.'
+//       );
+//     }
+//     if (restored) {
+//       warnings.push(`${restored} previously uncounted class(es) were restored.`);
+//     }
+//     pushEventCancellationWarning(warnings, eventCancellation);
+//   }
+
+//   await setup.save();
+
+//   return res
+//     .status(200)
+//     .json(new ApiResponse(200, { setup, warnings }, 'Setup updated successfully'));
+// });
+
+
 const updateSetup = asyncHandler(async (req, res) => {
   const setup = req.setup;
 
-  // Archived setups are read-only (open decision in the blueprint; revisit if needed)
   if (setup.status === 'archived') {
     throw new ApiError(409, 'Archived setups are read-only');
   }
@@ -170,14 +264,11 @@ const updateSetup = asyncHandler(async (req, res) => {
   const oldStart = setup.startDate;
   const oldEnd = setup.endDate;
 
-  // Check the final range up front, before anything touches occurrences
   if ((startDate ?? oldStart) > (endDate ?? oldEnd)) {
     throw new ApiError(400, 'startDate must be on or before endDate');
   }
 
-  // Name, scope, target and timezone first, through save() so scopeKey is recomputed.
-  // Doing this before the date changes means a refusal (joined setup, duplicate scope)
-  // stops the request before any class is touched.
+  // Name, scope, target and timezone first, through save() so scopeKey is recomputed
   try {
     await updateSetupDetails(setup, rest, { leaveOfficial: leaveOfficial === true });
   } catch (err) {
@@ -195,7 +286,9 @@ const updateSetup = asyncHandler(async (req, res) => {
       oldStart,
       userId
     );
+    // Saved right away, so a failure in the end-date step cannot leave classes and dates out of step
     setup.startDate = startDate;
+    await Setup.updateOne({ _id: setup._id }, { $set: { startDate } });
 
     if (startDate > oldStart && affected) {
       warnings.push(
@@ -223,6 +316,7 @@ const updateSetup = asyncHandler(async (req, res) => {
       userId
     );
     setup.endDate = endDate;
+    await Setup.updateOne({ _id: setup._id }, { $set: { endDate } });
 
     if (endDate > oldEnd && affected) {
       warnings.push(
@@ -248,7 +342,6 @@ const updateSetup = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, { setup, warnings }, 'Setup updated successfully'));
 });
-
 const archiveSetup = asyncHandler(async (req, res) => {
   const setup = req.setup;
 
@@ -292,31 +385,65 @@ const getSetupDeleteImpact = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { impact }, 'Delete impact fetched successfully'));
 });
 
+// const deleteSetup = asyncHandler(async (req, res) => {
+//   const setup = req.setup;
+
+//   // Typed confirmation guards against accidental permanent deletion
+//   if (req.body?.confirmName !== setup.name) {
+//     throw new ApiError(400, 'Confirmation failed', [
+//       'confirmName must exactly match the setup name',
+//     ]);
+//   }
+
+//   // Sharing stays (lifecycle §2), so alsoUnpublish and the publication check stay too
+//   const { alsoUnpublish } = req.body;
+//   if (alsoUnpublish !== undefined && typeof alsoUnpublish !== 'boolean') {
+//     throw new ApiError(400, 'alsoUnpublish must be true or false');
+//   }
+
+//   // A live publication needs an explicit decision, never a silent default
+//   const publication = await SharedPublication.findOne({
+//     sourceSetupId: setup._id,
+//     status: 'published',
+//   }).select('title adoptionCount');
+
+//   if (publication && alsoUnpublish === undefined) {
+//     throw new ApiError(409, 'This setup is published. Choose what happens to the publication.', [
+//       `alsoUnpublish: true takes "${publication.title}" down. Its ${publication.adoptionCount} adopter(s) keep their copies.`,
+//       'alsoUnpublish: false keeps it listed, but it can no longer receive new versions.',
+//     ]);
+//   }
+
+//   const summary = await deleteSetupWithChildren(setup, req.user._id, {
+//     alsoUnpublish: alsoUnpublish === true,
+//   });
+
+//   return res
+//     .status(200)
+//     .json(new ApiResponse(200, { summary }, 'Setup and all its data deleted permanently'));
+// });
 const deleteSetup = asyncHandler(async (req, res) => {
   const setup = req.setup;
 
-  // Typed confirmation guards against accidental permanent deletion
   if (req.body?.confirmName !== setup.name) {
     throw new ApiError(400, 'Confirmation failed', [
       'confirmName must exactly match the setup name',
     ]);
   }
 
-  // Sharing stays (lifecycle §2), so alsoUnpublish and the publication check stay too
   const { alsoUnpublish } = req.body;
   if (alsoUnpublish !== undefined && typeof alsoUnpublish !== 'boolean') {
     throw new ApiError(400, 'alsoUnpublish must be true or false');
   }
 
-  // A live publication needs an explicit decision, never a silent default
   const publication = await SharedPublication.findOne({
     sourceSetupId: setup._id,
     status: 'published',
-  }).select('title adoptionCount');
+  }).select('title usedByCount');
 
   if (publication && alsoUnpublish === undefined) {
     throw new ApiError(409, 'This setup is published. Choose what happens to the publication.', [
-      `alsoUnpublish: true takes "${publication.title}" down. Its ${publication.adoptionCount} adopter(s) keep their copies.`,
+      `alsoUnpublish: true takes "${publication.title}" down. Its ${publication.usedByCount} user(s) keep their copies.`,
       'alsoUnpublish: false keeps it listed, but it can no longer receive new versions.',
     ]);
   }

@@ -8,6 +8,8 @@ import CalendarEvent from '../models/Calendar/calendarEvent.model.js';
 import ExtraClassAdjustment from '../models/Attendance/extraClassAdjustment.model.js';
 import SharedPublication from '../models/Sharing/sharedPublication.model.js';
 import SetupCopy from '../models/Sharing/setupCopy.model.js';
+import SetupOfficialUpdate from '../models/Official/setupOfficialUpdate.model.js';
+import { leaveSchedule } from './officialJoin.service.js';
 import {
   ATTENDANCE_STATUS,
   CAUSE_TYPE,
@@ -183,6 +185,29 @@ const isScopeChanging = (setup, picked) =>
     (field) => picked[field] !== undefined && String(picked[field]).trim() !== setup[field]
   );
 
+// const updateSetupDetails = async (setup, changes = {}, { leaveOfficial = false } = {}) => {
+//   const picked = pickUpdatableFields(changes);
+//   if (!Object.keys(picked).length) return setup;
+
+//   if (setup.officialScheduleId && isScopeChanging(setup, picked)) {
+//     if (!leaveOfficial) {
+//       throw new ApiError(
+//         409,
+//         'This setup follows an official schedule. Send leaveOfficial: true to change its scope.'
+//       );
+//     }
+//     // TODO (lifecycle Section 4): call officialJoin.service leave() here, then continue.
+//     // Not reachable before then, because nothing can join a schedule yet.
+//     throw new ApiError(501, 'Leaving an official schedule is not built yet');
+//   }
+
+//   setup.set(picked);
+//   await setup.save();
+//   return setup;
+// };
+
+// What deleting would destroy, so the UI can show a meaningful confirmation
+
 const updateSetupDetails = async (setup, changes = {}, { leaveOfficial = false } = {}) => {
   const picked = pickUpdatableFields(changes);
   if (!Object.keys(picked).length) return setup;
@@ -194,9 +219,8 @@ const updateSetupDetails = async (setup, changes = {}, { leaveOfficial = false }
         'This setup follows an official schedule. Send leaveOfficial: true to change its scope.'
       );
     }
-    // TODO (lifecycle Section 4): call officialJoin.service leave() here, then continue.
-    // Not reachable before then, because nothing can join a schedule yet.
-    throw new ApiError(501, 'Leaving an official schedule is not built yet');
+    // Clears the official link and keeps all the content, then the scope change goes ahead
+    await leaveSchedule({ setup });
   }
 
   setup.set(picked);
@@ -204,7 +228,6 @@ const updateSetupDetails = async (setup, changes = {}, { leaveOfficial = false }
   return setup;
 };
 
-// What deleting would destroy, so the UI can show a meaningful confirmation
 const getDeleteImpact = async (setup, userId) => {
   const occurrenceIds = await Occurrence.distinct('_id', { setupId: setup._id });
 
@@ -251,6 +274,25 @@ const getDeleteImpact = async (setup, userId) => {
 // Deletes the setup's own data only. Also used to roll back a half-finished adoption.
 // Official collections hold no student data, so nothing there needs cleaning.
 // (Lifecycle Section 7: also delete the setup's MassBunk records here.)
+// const purgeSetupData = async (setupId) => {
+//   const occurrenceIds = await Occurrence.distinct('_id', { setupId });
+
+//   // By occurrence and by setup, so no status row is ever left behind
+//   await OccurrenceStatus.deleteMany({
+//     $or: [{ occurrenceId: { $in: occurrenceIds } }, { setupId }],
+//   });
+//   await Promise.all([
+//     Occurrence.deleteMany({ setupId }),
+//     RecurringRule.deleteMany({ setupId }),
+//     Subject.deleteMany({ setupId }),
+//     CalendarEvent.deleteMany({ setupId }),
+//     ExtraClassAdjustment.deleteMany({ setupId }),
+//   ]);
+
+//   // Last, so a failure above leaves the setup in place and the delete retryable
+//   await Setup.deleteOne({ _id: setupId });
+// };
+
 const purgeSetupData = async (setupId) => {
   const occurrenceIds = await Occurrence.distinct('_id', { setupId });
 
@@ -264,6 +306,7 @@ const purgeSetupData = async (setupId) => {
     Subject.deleteMany({ setupId }),
     CalendarEvent.deleteMany({ setupId }),
     ExtraClassAdjustment.deleteMany({ setupId }),
+    SetupOfficialUpdate.deleteMany({ setupId }),
   ]);
 
   // Last, so a failure above leaves the setup in place and the delete retryable

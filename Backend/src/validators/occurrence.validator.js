@@ -179,14 +179,14 @@ const readClassType = (value, errors) => {
   return value;
 };
 
-// "" and null both mean the whole section
+// "" and null both mean the whole section. Lower-cased to match the official schedule's groups.
 const readGroup = (value, errors) => {
   if (value === null) return null;
   if (typeof value !== 'string') {
     errors.push('group must be text or null');
     return undefined;
   }
-  const text = value.trim();
+  const text = value.trim().toLowerCase();
   if (text.length > 40) {
     errors.push('group can be at most 40 characters');
     return undefined;

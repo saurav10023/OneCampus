@@ -29,7 +29,7 @@ import {
   SCHEDULE_STATUS,
   STATUS_SOURCE,
 } from '../utils/constants.js';
-
+import SetupOfficialUpdate from '../models/Official/setupOfficialUpdate.model.js';
 // The student side of an official schedule: find it, preview joining it, join, leave.
 //
 // A join copies the CR's schedule into the student's own setup. The CR's records are never
@@ -509,6 +509,49 @@ const joinSchedule = async ({ user, setup, input }) => {
 // classes they cancelled can be marked again. Cancellations by a mass bunk or class cancel become
 // the student's own cancellations. Every step is repeatable, and the link goes last.
 // Also called when the student changes the scope of a joined setup (updateSetupDetails).
+// const leaveSchedule = async ({ setup }) => {
+//   if (setup.status === 'archived') throw new ApiError(409, 'Archived setups are read-only');
+//   if (!setup.officialScheduleId) throw new ApiError(409, 'This setup is not following an official schedule');
+//   const setupId = setup._id;
+
+//   const events = await CalendarEvent.updateMany(
+//     { setupId, source: 'official' },
+//     {
+//       $set: { source: 'manual', followOfficial: false },
+//       $unset: { officialRef: 1, officialRevisionSeen: 1, officialWithdrawn: 1, lastAutoUpdate: 1 },
+//     }
+//   );
+//   const cancels = await OccurrenceStatus.updateMany(
+//     { setupId, causeType: { $in: [CAUSE_TYPE.MASS_BUNK, CAUSE_TYPE.CLASS_CANCEL] } },
+//     { $set: { causeType: null, causeId: null, source: STATUS_SOURCE.USER } }
+//   );
+//   const rules = await RecurringRule.updateMany(
+//     { setupId, origin: ORIGIN.OFFICIAL },
+//     { $set: { origin: ORIGIN.MANUAL, officialRuleId: null, officialRevisionSeen: null, detachedFromOfficial: false } }
+//   );
+//   const subjects = await Subject.updateMany(
+//     { setupId, origin: ORIGIN.OFFICIAL },
+//     { $set: { origin: ORIGIN.MANUAL, officialRevisionSeen: 0, officialDetached: false }, $unset: { officialKey: 1 } }
+//   );
+
+//   setup.set({
+//     officialScheduleId: null,
+//     joinedOfficialAt: null,
+//     officialGroups: [],
+//     lastSyncedContentRevision: 0,
+//     officialOptOuts: [],
+//   });
+//   await setup.save();
+
+//   return {
+//     left: true,
+//     eventsNowYours: events.modifiedCount,
+//     cancellationsNowYours: cancels.modifiedCount,
+//     classesNowYours: rules.modifiedCount,
+//     subjectsNowYours: subjects.modifiedCount,
+//   };
+// };
+
 const leaveSchedule = async ({ setup }) => {
   if (setup.status === 'archived') throw new ApiError(409, 'Archived setups are read-only');
   if (!setup.officialScheduleId) throw new ApiError(409, 'This setup is not following an official schedule');
@@ -533,6 +576,8 @@ const leaveSchedule = async ({ setup }) => {
     { setupId, origin: ORIGIN.OFFICIAL },
     { $set: { origin: ORIGIN.MANUAL, officialRevisionSeen: 0, officialDetached: false }, $unset: { officialKey: 1 } }
   );
+  // Waiting official changes no longer mean anything once the link is gone
+  await SetupOfficialUpdate.deleteMany({ setupId, status: 'pending' });
 
   setup.set({
     officialScheduleId: null,

@@ -1,5 +1,5 @@
 // Small shared UI kit in the OneCampus liquid-glass style.
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
 
 export const cx = (...a) => a.filter(Boolean).join(" ");
@@ -37,8 +37,26 @@ const variants = {
 
 const sizes = { sm: "h-9 px-4 text-[13px]", md: "h-11 px-5 text-[14px]" };
 
-export const Button = ({ variant = "primary", size = "md", loading, children, className, ...rest }) => (
-  <button className={cx(btnBase, variants[variant], sizes[size], className)} disabled={loading || rest.disabled} {...rest}>
+// FIX: `disabled` is taken out of `rest` and applied LAST. Before, `{...rest}` came after
+// `disabled={loading || rest.disabled}` and overwrote it, so a button with `disabled={undefined}`
+// or `disabled={false}` stayed clickable while `loading` was true (double submit).
+export const Button = ({
+  variant = "primary",
+  size = "md",
+  loading = false,
+  disabled = false,
+  type = "button",
+  children,
+  className,
+  ...rest
+}) => (
+  <button
+    type={type}
+    className={cx(btnBase, variants[variant], sizes[size], className)}
+    {...rest}
+    disabled={Boolean(loading || disabled)}
+    aria-busy={loading || undefined}
+  >
     {loading && <Spinner className="w-4 h-4" />}
     {children}
   </button>
@@ -127,23 +145,51 @@ export const EmptyState = ({ icon: Icon, title, text, action }) => (
   </Card>
 );
 
+// FIX: proper dialog semantics, focus moves into the dialog when it opens and returns to the
+// element that opened it, Escape closes it, and the page behind does not scroll.
 export const Modal = ({ open, onClose, title, children }) => {
+  const dialogRef = useRef(null);
+  const titleId = useId();
+
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => e.key === "Escape" && onClose();
+
+    const previouslyFocused = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+
+    // focus the dialog itself so keyboard and screen-reader users start inside it
+    dialogRef.current?.focus();
+
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[#161827]/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={cx(card, "relative w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 bg-white/80")}>
+      <div className="absolute inset-0 bg-[#161827]/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={cx(card, "relative w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 bg-white/80 focus:outline-none")}
+      >
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-[18px] font-semibold text-[#161827]">{title}</h2>
+          <h2 id={titleId} className="text-[18px] font-semibold text-[#161827]">{title}</h2>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close"
             className="w-9 h-9 rounded-full flex items-center justify-center text-[#161827]/70 hover:bg-white/80"
@@ -163,10 +209,11 @@ export const PageSpinner = () => (
   </div>
 );
 
+// ASCII fallback "-" (the old file had a broken multi-byte dash here)
 export const fmtDate = (d) =>
   d
     ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
-    : "—";
+    : "-";
 
 export const ProgressBar = ({ value = 0, target }) => {
   const v = Math.max(0, Math.min(100, Number(value) || 0));
@@ -204,7 +251,7 @@ export const Summary = ({ data }) => {
       rows.push({ k: prettyKey(k), v: `${v.length}`, chips: labels });
     } else if (v && typeof v === "object") {
       Object.entries(v).forEach(([ck, cv]) => {
-        if (isPrim(cv) && !ck.startsWith("_")) rows.push({ k: `${prettyKey(k)} · ${prettyKey(ck)}`, v: showVal(cv) });
+        if (isPrim(cv) && !ck.startsWith("_")) rows.push({ k: `${prettyKey(k)} - ${prettyKey(ck)}`, v: showVal(cv) });
       });
     }
   });

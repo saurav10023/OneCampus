@@ -5,6 +5,9 @@ import Setup from '../models/TimeTable/setup.model.js';
 import SharedPublication from '../models/Sharing/sharedPublication.model.js';
 import SetupCopy from '../models/Sharing/setupCopy.model.js';
 import { buildSnapshot } from '../services/sharing.service.js';
+import { normalizeScopePart } from '../utils/scopeKey.js';
+
+const collegeKeyOf = (user) => (user.college ? normalizeScopePart(user.college) : null);
 
 const SORT_OPTIONS = {
   rank: { rankScore: -1, ratingAverage: -1, usedByCount: -1 },
@@ -25,7 +28,6 @@ const publishSetup = asyncHandler(async (req, res) => {
   if (setup.status !== 'active') {
     throw new ApiError(409, 'Only active setups can be published');
   }
-  // Edited copies stay private, so a shared setup never turns into a new listing
   if (setup.sourcePublicationId) {
     throw new ApiError(409, 'A setup copied from a shared setup cannot be published');
   }
@@ -33,10 +35,9 @@ const publishSetup = asyncHandler(async (req, res) => {
     throw new ApiError(409, 'This setup is already published. Refresh the listing instead');
   }
 
-  const collegeId = req.body.collegeId ?? (req.user.collegeId && String(req.user.collegeId));
-  if (!collegeId) {
-    throw new ApiError(400, 'collegeId is required to publish');
-  }
+  // Always taken from the profile, never from the request, so nobody can publish into another college
+  const collegeId = collegeKeyOf(req.user);
+  if (!collegeId) throw new ApiError(400, 'Your profile has no college, so you cannot publish');
 
   const snapshot = await buildSnapshot(setup);
   if (!snapshot.subjects.length || !snapshot.recurringRules.length) {
@@ -63,14 +64,12 @@ const publishSetup = asyncHandler(async (req, res) => {
 
   await Setup.updateOne({ _id: setup._id }, { $set: { publishedAs: publication._id } });
 
-  // The snapshot is large and the client already has the setup
   publication.snapshot = undefined;
 
   return res
     .status(201)
     .json(new ApiResponse(201, { publication }, 'Setup published successfully'));
 });
-
 // Re-reads the publisher's setup. Only affects people who copy it from now on
 const refreshPublication = asyncHandler(async (req, res) => {
   const publication = await SharedPublication.findOne({
@@ -114,10 +113,10 @@ const listPublications = asyncHandler(async (req, res) => {
   const { q, branch, semesterLabel, academicYear, collegeId, sort, page, limit } =
     req.validatedQuery;
 
-  // Students only see their own college unless they explicitly ask otherwise
+  // Students see their own college unless they ask for another one
   const filter = {
     status: 'published',
-    collegeId: collegeId ?? (req.user.collegeId && String(req.user.collegeId)),
+    collegeId: collegeId ?? collegeKeyOf(req.user),
   };
   if (!filter.collegeId) delete filter.collegeId;
   if (branch) filter.branch = branch;

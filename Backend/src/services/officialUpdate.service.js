@@ -20,6 +20,7 @@ import {
   markBefore,
   hasOptOut,
 } from '../utils/officialUpdateRules.js';
+import { nowInZone, fromDateText } from '../utils/dateWindow.js';
 import {
   findOverlaps,
   syncRuleOccurrences,
@@ -151,7 +152,7 @@ const applyRuleChange = async ({ setup, userId, update, confirmOverlap }) => {
 
   let sync = null;
   if (SCHEDULE_FIELDS.some((f) => rule.isModified(f))) {
-    const today = todayUtc();
+    const today = fromDateText(nowInZone(setup.timezone).date);
     const boundary = today > previous.effectiveStartDate ? today : previous.effectiveStartDate;
     sync = await syncRuleOccurrences({ setupId: setup._id, userId, desired: rule.toObject(), previous, boundary });
     if (boundary > previous.effectiveStartDate) warnings.push(`Classes before ${formatDateOnly(boundary)} were not changed.`);

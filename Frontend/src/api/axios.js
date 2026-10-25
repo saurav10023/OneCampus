@@ -5,11 +5,17 @@ import axios from "axios";
 //
 // VITE_API_URL is the backend address, for example https://onecampus-0s7c.onrender.com
 // (no trailing slash, no /api/v1). In local development use http://localhost:10000.
+// Vite bakes this value in at BUILD time, so after changing it on Vercel you must redeploy.
 // Login does not depend on cookies: the token from the login response is stored and sent
 // in the Authorization header, so it works across Vercel and Render in every browser.
 // ---------------------------------------------------------------------------
 
 const BASE_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
+
+if (!BASE_URL && import.meta.env.PROD) {
+  // eslint-disable-next-line no-console
+  console.error("[api] VITE_API_URL is empty. Set it in the Vercel project settings and redeploy.");
+}
 
 const API = axios.create({
   baseURL: BASE_URL,
@@ -83,9 +89,13 @@ API.interceptors.request.use(
 // ---------------------------------------------------------------------------
 
 let expiring = false;
-const expireSession = () => {
+const expireSession = (reason) => {
   if (expiring) return;
   expiring = true;
+  // This line names the request that ended the session, so a "login screen reappears"
+  // problem can be traced in the browser console (F12 -> Console).
+  // eslint-disable-next-line no-console
+  console.warn("[auth] session ended by a 401:", reason);
   clearSession();
   window.dispatchEvent(new Event("auth:session-expired"));
   setTimeout(() => {
@@ -116,7 +126,7 @@ API.interceptors.response.use(
     const url = originalRequest.url || "";
     if (AUTH_PATHS.some((p) => url.includes(p))) return Promise.reject(error);
 
-    expireSession();
+    expireSession(`${(originalRequest.method || "get").toUpperCase()} ${url} -> ${error.response?.data?.message || "no message"}`);
     return Promise.reject(error);
   }
 );
@@ -130,10 +140,10 @@ const AUTH_BASE = "/api/v1/users";
 // Body: { identifier, password } (identifier = username or 10-digit mobile)
 export const loginUser = async (credentials) => {
   const res = await API.post(`${AUTH_BASE}/login`, credentials);
-  const { user, accessToken } = res.data.data;
+  const { user, accessToken, accountRestored } = res.data.data;
   clearSession(); // never mix a previous account's token with this login
   setSession({ user, accessToken });
-  return user;
+  return { user, accountRestored: Boolean(accountRestored) };
 };
 
 export const registerUser = async (payload) => {

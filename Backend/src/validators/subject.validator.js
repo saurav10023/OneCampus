@@ -117,59 +117,33 @@ const validateUpdateSubject = (req, _res, next) => {
 // };
 
 const validateBulkCreateSubjects = (req, _res, next) => {
-  console.log("FULL REQUEST BODY:", JSON.stringify(req.body, null, 2));
-
   const list = req.body?.subjects;
-
-  console.log("SUBJECTS ARRAY:", list);
-
   if (!Array.isArray(list) || !list.length) {
     throw new ApiError(400, 'subjects must be a non-empty array');
   }
+  if (list.length > MAX_BULK) {
+    throw new ApiError(400, `You can add at most ${MAX_BULK} subjects at a time`);
+  }
 
   const errors = [];
-
-  const cleaned = list.map((item, i) => {
-    console.log(`SUBJECT ${i}:`, item);
-    console.log(`SUBJECT ${i} NAME:`, item?.name);
-
-    return cleanSubject(
-      item,
-      { partial: false },
-      errors,
-      `subjects[${i}]: `
-    );
-  });
+  const cleaned = list.map((item, i) => cleanSubject(item, { partial: false }, errors, `subjects[${i}]: `));
 
   const seenNames = new Map();
   const seenCodes = new Map();
-
   cleaned.forEach((s, i) => {
     if (s.name) {
       const key = toNameKey(s.name);
-
-      if (seenNames.has(key)) {
-        errors.push(`subjects[${i}]: name repeats subjects[${seenNames.get(key)}]`);
-      } else {
-        seenNames.set(key, i);
-      }
+      if (seenNames.has(key)) errors.push(`subjects[${i}]: name repeats subjects[${seenNames.get(key)}]`);
+      else seenNames.set(key, i);
     }
-
     if (s.code) {
-      if (seenCodes.has(s.code)) {
-        errors.push(`subjects[${i}]: code repeats subjects[${seenCodes.get(s.code)}]`);
-      } else {
-        seenCodes.set(s.code, i);
-      }
+      if (seenCodes.has(s.code)) errors.push(`subjects[${i}]: code repeats subjects[${seenCodes.get(s.code)}]`);
+      else seenCodes.set(s.code, i);
     }
   });
 
-  if (errors.length) {
-    throw new ApiError(400, 'Validation failed', errors);
-  }
-
+  if (errors.length) throw new ApiError(400, 'Validation failed', errors);
   req.body = { subjects: cleaned };
-
   next();
 };
 

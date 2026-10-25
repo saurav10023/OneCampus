@@ -69,7 +69,7 @@ const recurringRuleSchema = new Schema(
       trim: true,
       maxlength: [40, 'group can be at most 40 characters'],
       default: null,
-      set: (value) => (typeof value === 'string' && value.trim() ? value.trim() : null),
+      set: (value) => (typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : null),
     },
     
     // Double periods count as more than one class

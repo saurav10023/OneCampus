@@ -10,6 +10,9 @@ import SetupCopy from '../models/Sharing/setupCopy.model.js';
 import { createSetupFromSnapshot, applyRatingDelta } from '../services/sharing.service.js';
 import { purgeSetupData } from '../services/setup.service.js';
 import { ATTENDANCE_STATUS, MIN_RECORDED_CLASSES_TO_RATE } from '../utils/constants.js';
+import { normalizeScopePart } from '../utils/scopeKey.js';
+
+const collegeKeyOf = (user) => (user.college ? normalizeScopePart(user.college) : null);
 
 const copyPublication = asyncHandler(async (req, res) => {
   const userId = req.user._id;
@@ -20,15 +23,14 @@ const copyPublication = asyncHandler(async (req, res) => {
   }).select('+snapshot');
   if (!publication) throw new ApiError(404, 'Publication not found');
 
-  // "Used by" counts other students only
   if (String(publication.publisherId) === String(userId)) {
     throw new ApiError(400, 'You cannot copy your own setup');
   }
-  if (req.user.collegeId && String(req.user.collegeId) !== publication.collegeId) {
+  const myCollege = collegeKeyOf(req.user);
+  if (myCollege && myCollege !== publication.collegeId) {
     throw new ApiError(403, 'This setup belongs to a different college');
   }
 
-  // Claim the record first: the unique index rejects a second copy before any work is done
   const localSetupId = new mongoose.Types.ObjectId();
   let copy;
   try {
@@ -52,13 +54,11 @@ const copyPublication = asyncHandler(async (req, res) => {
       publicationId: publication._id,
     });
 
-    // Only when they have none; copying must not silently switch their current setup
     await User.updateOne(
       { _id: userId, activeSetupId: null },
       { $set: { activeSetupId: setup._id } }
     );
 
-    // Counter last, so a rollback never has to undo it
     await SharedPublication.updateOne(
       { _id: publication._id },
       { $inc: { usedByCount: 1 }, $set: { lastCopiedAt: new Date() } }
@@ -68,7 +68,6 @@ const copyPublication = asyncHandler(async (req, res) => {
       .status(201)
       .json(new ApiResponse(201, { setup }, 'Setup copied. It is yours to edit'));
   } catch (error) {
-    // Compensating cleanup: no half-built copy and no record left behind
     await purgeSetupData(localSetupId);
     await SetupCopy.deleteOne({ _id: copy._id });
     await User.updateOne(

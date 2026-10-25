@@ -59,6 +59,12 @@ const toApiError = (error) => {
     return error;
 };
 
+const MAX_PASSWORD_BYTES = 72; // bcrypt ignores everything after this
+const assertPasswordSize = (password) => {
+    if (Buffer.byteLength(password, "utf8") > MAX_PASSWORD_BYTES) {
+        throw new ApiError(400, `Password can be at most ${MAX_PASSWORD_BYTES} bytes`);
+    }
+};
 // ---- REGISTER ----
 // Public. Role/status fields are never read from the body.
 const registerUser = asyncHandler(async (req, res) => {
@@ -84,6 +90,7 @@ const registerUser = asyncHandler(async (req, res) => {
     }
     if (!isString(password) || !password) {
         throw new ApiError(400, "password is required");
+        assertPasswordSize(password);
     }
 
     for (const [key, value] of Object.entries({ college, rollNo, email, avatar })) {
@@ -371,22 +378,16 @@ const changePassword = asyncHandler(async (req, res) => {
     if (!isString(currentPassword) || !currentPassword || !isString(newPassword) || !newPassword) {
         throw new ApiError(400, "Current password and new password are required");
     }
-
     if (newPassword.length < 8) {
         throw new ApiError(400, "New password must be at least 8 characters");
     }
+    assertPasswordSize(newPassword);
 
     const user = await User.findById(req.user._id).select("+password");
-
-    if (!user) {
-        throw new ApiError(404, "User not found");
-    }
+    if (!user) throw new ApiError(404, "User not found");
 
     const isPasswordValid = await user.isPasswordCorrect(currentPassword);
-
-    if (!isPasswordValid) {
-        throw new ApiError(400, "Current password is incorrect");
-    }
+    if (!isPasswordValid) throw new ApiError(400, "Current password is incorrect");
 
     user.password = newPassword; // hashed by the pre-save hook
     user.passwordChangedAt = new Date(); // verifyJWT rejects tokens issued before this
@@ -397,7 +398,6 @@ const changePassword = asyncHandler(async (req, res) => {
         throw toApiError(error);
     }
 
-    // All other devices are now logged out; keep this one logged in with a fresh token.
     const accessToken = user.generateAccessToken();
 
     return res
@@ -405,7 +405,6 @@ const changePassword = asyncHandler(async (req, res) => {
         .cookie("accessToken", accessToken, loginCookieOptions)
         .json(new ApiResponse(200, { accessToken }, "Password changed successfully"));
 });
-
 // ---- REQUEST ACCOUNT DELETION (own account) ----
 const requestAccountDeletion = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(req.user._id, {

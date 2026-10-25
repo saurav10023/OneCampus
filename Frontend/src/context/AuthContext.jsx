@@ -56,10 +56,35 @@ export const AuthProvider = ({ children }) => {
     };
   }, [refreshUser, clearUser]);
 
+  // Returns the user. `lastLoginRestored` is true when logging in cancelled a pending deletion.
+  const [lastLoginRestored, setLastLoginRestored] = useState(false);
+
   const login = async (credentials) => {
-    const loggedIn = await loginUser(credentials);
-    setUser(loggedIn);
-    return loggedIn;
+    const { user: loggedIn, accountRestored } = await loginUser(credentials);
+    setLastLoginRestored(accountRestored);
+
+    // Confirm the server accepts the token it just issued BEFORE entering the app.
+    // Without this check a server that rejects the token (wrong auth setup) shows up as the
+    // login page flashing back a second later, with no explanation.
+    try {
+      const confirmed = await fetchCurrentUser();
+      const finalUser = confirmed || loggedIn;
+      setUser(finalUser);
+      return finalUser;
+    } catch (error) {
+      if (error?.response?.status === 401) {
+        clearSession();
+        setUser(null);
+        throw new Error(
+          "You logged in, but the server rejected your session token. " +
+            "This is a server setup problem (token not read from the Authorization header, " +
+            "or ACCESS_TOKEN_SECRET differs). Please tell the developer."
+        );
+      }
+      // Network hiccup or a 5xx: the login itself worked, so keep the user signed in.
+      setUser(loggedIn);
+      return loggedIn;
+    }
   };
 
   const register = async (payload) => registerUser(payload);
@@ -80,6 +105,7 @@ export const AuthProvider = ({ children }) => {
         user,
         isAuthenticated: Boolean(user),
         login,
+        lastLoginRestored,
         register,
         logout,
         setUser,

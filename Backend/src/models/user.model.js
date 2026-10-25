@@ -36,8 +36,8 @@ const userSchema = new Schema(
             lowercase: true,
             unique: true,
             match: [
-                /^[a-z0-9_.]{3,20}$/,
-                "Username must be 3-20 characters: letters, numbers, underscores and periods only"
+                /^(?!\d+$)[a-z0-9_.]{3,20}$/,
+                "Username must be 3-20 characters: letters, numbers, underscores and periods only, not only digits"
             ]
         },
         mobile: {
@@ -96,6 +96,7 @@ const userSchema = new Schema(
             default: "",
             match: [/^https?:\/\/\S+$/, "Avatar must be a valid http(s) URL"]
         },
+        avatarPublicId: { type: String, default: "", select: false },
 
         // ---- Setup pointer ----
         // The setup the app opens by default. A convenience pointer only: the setup itself is the
@@ -159,6 +160,7 @@ userSchema.set("toJSON", {
         delete ret.password;
         delete ret.passwordChangedAt;
         delete ret.__v;
+        delete ret.avatarPublicId;
         return ret;
     }
 });

@@ -29,6 +29,8 @@ import './Attendance/extraClassAdjustment.model.js';
 
 // CalendarEvent refers to an 'ImportJob' model. No such model file is in the project yet; add it
 // here when the image import is built.
+import './Sharing/sharedPublication.model.js';
+import './Sharing/setupCopy.model.js';
 
 export {
   Setup,

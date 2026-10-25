@@ -2,17 +2,17 @@ import mongoose from 'mongoose';
 import Setup from '../models/TimeTable/setup.model.js';
 import Subject from '../models/TimeTable/subject.model.js';
 import RecurringRule from '../models/TimeTable/recurringRule.model.js';
-import Holiday from '../models/holiday.model.js';
+import CalendarEvent from '../models/Calendar/calendarEvent.model.js';
 import SharedPublication from '../models/Sharing/sharedPublication.model.js';
 import { generateOccurrences } from './occurrence.service.js';
 
-// Safe to publish: structure only, never attendance statuses or user data
+// Structure only, never attendance or user data
 const buildSnapshot = async (setup) => {
-  const [subjects, rules, holidays] = await Promise.all([
+  const [subjects, rules, events] = await Promise.all([
     Subject.find({ setupId: setup._id }).sort({ name: 1 }),
     RecurringRule.find({ setupId: setup._id, isActive: true }),
-    // Unconfirmed holidays are drafts the publisher never reviewed
-    Holiday.find({ setupId: setup._id, confirmedAt: { $ne: null } }),
+    // The student's own confirmed events only (official events come from the schedule)
+    CalendarEvent.find({ setupId: setup._id, confirmedAt: { $ne: null }, source: 'manual' }),
   ]);
 
   return {
@@ -26,12 +26,7 @@ const buildSnapshot = async (setup) => {
       endDate: setup.endDate,
       timezone: setup.timezone,
     },
-    // key links rules to subjects without exposing the publisher's real ids
-    subjects: subjects.map((s) => ({
-      key: String(s._id),
-      name: s.name,
-      code: s.code ?? null,
-    })),
+    subjects: subjects.map((s) => ({ key: String(s._id), name: s.name, code: s.code ?? null })),
     recurringRules: rules.map((r) => ({
       subjectKey: String(r.subjectId),
       weekday: r.weekday,
@@ -42,24 +37,24 @@ const buildSnapshot = async (setup) => {
       professor: r.professor ?? null,
       room: r.room ?? null,
       classType: r.classType ?? null,
+      group: r.group ?? null,
       attendanceUnits: r.attendanceUnits,
     })),
-    holidays: holidays.map((h) => ({
-      name: h.name,
-      startDate: h.startDate,
-      endDate: h.endDate,
+    // kept under the old key "holidays" so older publications still load
+    holidays: events.map((e) => ({
+      name: e.title,
+      type: e.type,
+      affectsClasses: e.affectsClasses,
+      startDate: e.startDate,
+      endDate: e.endDate,
+      startTime: e.startTime ?? null,
+      endTime: e.endTime ?? null,
     })),
   };
 };
 
-// Creates the adopter's independent copy. Attendance statuses are never copied
-const createSetupFromSnapshot = async ({
-  snapshot,
-  ownerId,
-  setupId,
-  publicationId,
-  versionNumber,
-}) => {
+// Creates the copy. Attendance statuses are never copied
+const createSetupFromSnapshot = async ({ snapshot, ownerId, setupId, publicationId, versionNumber }) => {
   const setup = await Setup.create({
     _id: setupId,
     ownerId,
@@ -83,24 +78,29 @@ const createSetupFromSnapshot = async ({
     professor: rule.professor ?? undefined,
     room: rule.room ?? undefined,
     classType: rule.classType ?? undefined,
+    group: rule.group ?? null,
   }));
   if (rules.length) await RecurringRule.insertMany(rules);
 
-  // Left unconfirmed so the adopter reviews them before any class is cancelled
-  const holidays = snapshot.holidays.map((h) => ({
-    ...h,
+  // Drafts (confirmedAt null): they cancel nothing until the student reviews and confirms them
+  const events = (snapshot.holidays ?? []).map((h) => ({
     setupId,
-    source: 'shared_setup',
+    title: h.name,
+    type: h.type ?? 'holiday',
+    affectsClasses: h.affectsClasses ?? true,
+    startDate: h.startDate,
+    endDate: h.endDate,
+    startTime: h.startTime ?? undefined,
+    endTime: h.endTime ?? undefined,
+    source: 'manual',
     confirmedAt: null,
   }));
-  if (holidays.length) await Holiday.insertMany(holidays);
+  if (events.length) await CalendarEvent.insertMany(events);
 
   await generateOccurrences(setupId, setup.startDate, setup.endDate);
-
   return setup;
 };
 
-// Atomic rating update; the average is recomputed in the same database operation
 const applyRatingDelta = (publicationId, ratingSumDelta, ratingCountDelta) =>
   SharedPublication.updateOne({ _id: publicationId }, [
     {
@@ -112,11 +112,7 @@ const applyRatingDelta = (publicationId, ratingSumDelta, ratingCountDelta) =>
     {
       $set: {
         ratingAverage: {
-          $cond: [
-            { $gt: ['$ratingCount', 0] },
-            { $divide: ['$ratingSum', '$ratingCount'] },
-            0,
-          ],
+          $cond: [{ $gt: ['$ratingCount', 0] }, { $divide: ['$ratingSum', '$ratingCount'] }, 0],
         },
       },
     },
