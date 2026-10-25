@@ -9,32 +9,51 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ---------- CORS ----------
-// CORS_ORIGIN is a comma-separated list. Each entry is an exact origin, or a pattern where
-// * matches one hostname part (letters, digits and dashes). Example value on Render:
-//   https://one-campus.vercel.app,https://one-campus-*-sauravsonu216-3147s-projects.vercel.app,http://localhost:5173
-// Vercel gives every deployment its own preview URL, so the pattern covers those previews
-// without opening the API to every *.vercel.app site.
+// Two sources of allowed origins:
+//  1. BUILT_IN_ORIGINS below. They work even if the CORS_ORIGIN variable on Render is missing or
+//     wrong. They are tied to this Vercel account's team slug (sauravsonu216-3147s-projects), so
+//     nobody else can create a matching *.vercel.app address.
+//  2. CORS_ORIGIN (optional): a comma-separated list of extra origins. An entry can be an exact
+//     origin or a pattern where * matches one hostname part (letters, digits and dashes).
+// Vercel gives every deployment its own preview URL, which is why a pattern is needed.
+const BUILT_IN_ORIGINS = [
+  'https://one-campus.vercel.app', // production alias
+  /^https:\/\/one-campus(-[a-z0-9]+)*-sauravsonu216-3147s-projects\.vercel\.app$/i, // previews and team alias
+  'http://localhost:5173', // Vite dev server
+  'http://localhost:3000',
+];
+
 const escapeRegex = (s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
 
-const originRules = (process.env.CORS_ORIGIN ?? '')
+const envRules = (process.env.CORS_ORIGIN ?? '')
   .split(',')
-  .map((s) => s.trim().replace(/\/+$/, ''))
+  .map((s) => s.trim().replace(/^["']|["']$/g, '').replace(/\/+$/, ''))
   .filter(Boolean)
   .map((rule) =>
     rule.includes('*')
-      ? new RegExp(`^${escapeRegex(rule).replace(/\\\*/g, '[a-z0-9-]+').replace(/\*/g, '[a-z0-9-]+')}$`, 'i')
+      ? new RegExp(`^${escapeRegex(rule).replace(/\*/g, '[a-z0-9-]+')}$`, 'i')
       : rule.toLowerCase()
   );
+
+const originRules = [...BUILT_IN_ORIGINS.map((r) => (typeof r === 'string' ? r.toLowerCase() : r)), ...envRules];
 
 const isAllowedOrigin = (origin) =>
   originRules.some((rule) =>
     typeof rule === 'string' ? rule === origin.toLowerCase() : rule.test(origin)
   );
 
+console.log('[cors] extra origins from CORS_ORIGIN:', process.env.CORS_ORIGIN || '(not set)');
+
 app.use(
   cors({
-    // No Origin header (curl, server-to-server, same-origin) is allowed through
-    origin: (origin, cb) => cb(null, !origin || isAllowedOrigin(origin)),
+    // No Origin header (curl, server-to-server, same-origin) is allowed through.
+    // NOTE: when this returns false the cors package does NOT answer the preflight at all; the
+    // request falls through to Express, which replies "200 DELETE, POST" with no CORS headers.
+    origin: (origin, cb) => {
+      const ok = !origin || isAllowedOrigin(origin);
+      if (!ok) console.warn('[cors] blocked origin:', origin);
+      cb(null, ok);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
