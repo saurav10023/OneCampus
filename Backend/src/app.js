@@ -8,16 +8,37 @@ const app = express();
 // Behind Render / Nginx, so rate limiting sees the real client IP
 app.set('trust proxy', 1);
 
-const allowedOrigins = (process.env.CORS_ORIGIN ?? '')
+// ---------- CORS ----------
+// CORS_ORIGIN is a comma-separated list. Each entry is an exact origin, or a pattern where
+// * matches one hostname part (letters, digits and dashes). Example value on Render:
+//   https://one-campus.vercel.app,https://one-campus-*-sauravsonu216-3147s-projects.vercel.app,http://localhost:5173
+// Vercel gives every deployment its own preview URL, so the pattern covers those previews
+// without opening the API to every *.vercel.app site.
+const escapeRegex = (s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+
+const originRules = (process.env.CORS_ORIGIN ?? '')
   .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
+  .map((s) => s.trim().replace(/\/+$/, ''))
+  .filter(Boolean)
+  .map((rule) =>
+    rule.includes('*')
+      ? new RegExp(`^${escapeRegex(rule).replace(/\\\*/g, '[a-z0-9-]+').replace(/\*/g, '[a-z0-9-]+')}$`, 'i')
+      : rule.toLowerCase()
+  );
+
+const isAllowedOrigin = (origin) =>
+  originRules.some((rule) =>
+    typeof rule === 'string' ? rule === origin.toLowerCase() : rule.test(origin)
+  );
 
 app.use(
   cors({
-    origin: (origin, cb) => cb(null, !origin || allowedOrigins.includes(origin)),
+    // No Origin header (curl, server-to-server, same-origin) is allowed through
+    origin: (origin, cb) => cb(null, !origin || isAllowedOrigin(origin)),
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400, // browsers cache the preflight answer for a day
   })
 );
 
@@ -25,6 +46,9 @@ app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 app.use(express.static('public'));
 app.use(cookieParser());
+
+// Cheap route for uptime pings (keeps a free Render instance awake) and quick "is it up" checks
+app.get('/health', (req, res) => res.status(200).json({ ok: true }));
 
 // ---------- route imports ----------
 import userRoutes from './routes/user.routes.js';
