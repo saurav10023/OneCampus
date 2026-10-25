@@ -30,6 +30,18 @@ const css = `
 .lg-hot { background: #fff !important; border-color: #6366f1 !important; box-shadow: 0 0 0 3px rgba(99,102,241,.12) !important; }
 .lg-on { background: #4F46E5 !important; border-color: #4F46E5 !important; color: #fff; }
 @media (prefers-reduced-motion: reduce) { .hm-rise, .animate-pulse { animation: none; } .lg-pill { transition: none; } }
+
+/* Responsive guardrails: prevent grid/flex children and long text from widening the page. */
+.hm, .hm * { box-sizing: border-box; }
+.hm { width: 100%; min-width: 0; }
+.hm :where(section, header, footer, main, article, ul, li, div) { min-width: 0; }
+.hm :where(h1, h2, h3, p, a, button, span) { overflow-wrap: anywhere; }
+.hm svg, .hm img { max-width: 100%; }
+.hm .lg, .hm .lg-in { min-width: 0; max-width: 100%; }
+@media (max-width: 379px) {
+  .hm .lg { border-radius: 14px; }
+  .hm .lg-in { border-radius: 10px; }
+}
 `;
 
 const Card = ({ className, ...p }) => <div className={cx("lg", className)} {...p} />;
@@ -232,7 +244,7 @@ const Title = ({ children, right }) => (
 
 const MarkBtn = ({ on, kind, label, onClick, disabled, children }) => (
   <button type="button" aria-pressed={on} aria-label={label} title={label} disabled={disabled} onClick={onClick}
-    className={cx("h-11 sm:h-10 w-full sm:w-10 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-medium border transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50",
+    className={cx("min-h-11 h-auto min-w-0 w-full sm:w-10 rounded-full flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 py-2 sm:p-0 text-[12px] sm:text-[13px] font-medium border transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50",
       on ? { p: "bg-emerald-500 border-emerald-500 text-white", a: "bg-rose-500 border-rose-500 text-white", e: "bg-indigo-500 border-indigo-500 text-white" }[kind] : "lg-pill text-[#161827]/70")}>
     {children}
   </button>
@@ -256,7 +268,7 @@ const ClassRow = ({ c, next, onPick }) => {
         {locked ? (
           <Badge tone={cancelled ? "red" : "amber"}>{cancelled ? "Cancelled by CR" : "Not counted"}</Badge>
         ) : (
-          <div className="grid grid-cols-3 sm:flex gap-1.5">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-3 sm:flex gap-1.5 min-w-0">
             <MarkBtn on={c.status === "present"} kind="p" label={`Mark ${c.name} present`} onClick={() => onPick(c, "present")}><Check className="w-4 h-4" aria-hidden="true" /><span className="sm:hidden">Present</span></MarkBtn>
             <MarkBtn on={c.status === "absent"} kind="a" label={`Mark ${c.name} absent`} onClick={() => onPick(c, "absent")}><X className="w-4 h-4" aria-hidden="true" /><span className="sm:hidden">Absent</span></MarkBtn>
             <MarkBtn on={c.status === "excused"} kind="e" label={`Mark ${c.name} excused`} onClick={() => onPick(c, "excused")}><Minus className="w-4 h-4" aria-hidden="true" /><span className="sm:hidden">Excused</span></MarkBtn>
@@ -272,7 +284,7 @@ const TodayCard = ({ today, note, onMark, demo }) => {
   const pick = (c, s) => (c.lock === "cancelled_by_cause" ? setAsk({ c, s }) : onMark(c, s));
   const nextId = today.nextClass?.id;
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="p-4 min-[380px]:p-5 sm:p-6">
       <Title right={demo ? <Badge tone="brand">Sample day</Badge> : <Badge tone="brand">{today.classes.length} {today.classes.length === 1 ? "class" : "classes"}</Badge>}>Today</Title>
 
       {today.events?.map((e) => (
@@ -286,7 +298,7 @@ const TodayCard = ({ today, note, onMark, demo }) => {
       {ask && (
         <div role="alertdialog" aria-label="Mark a cancelled class" className="sticky top-2 z-10 mb-3 rounded-2xl border border-indigo-200 bg-white px-3.5 py-3 shadow-[0_12px_30px_-12px_rgba(79,70,229,0.5)]">
           <p className="text-[13.5px] text-[#161827]"><b>{ask.c.name}</b> was cancelled by a holiday or class cancel. Mark it {ask.s} anyway?</p>
-          <div className="flex gap-2 mt-2.5">
+          <div className="flex flex-wrap gap-2 mt-2.5">
             <button type="button" className={cx(ghost, "lg-on !text-white")} onClick={() => { onMark(ask.c, ask.s, true); setAsk(null); }}>Mark {ask.s}</button>
             <button type="button" className={ghost} onClick={() => setAsk(null)}>Keep cancelled</button>
           </div>
@@ -313,9 +325,9 @@ const AttendanceCard = ({ att, target, demo }) => {
   if (!att) return <Card className="p-5"><Title>Attendance</Title><p className="text-[13.5px] text-[#6A6F85]">Attendance could not be loaded. Pull to refresh or try again in a moment.</p></Card>;
   const ok = (att.pct ?? 0) >= target;
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="p-4 min-[380px]:p-5 sm:p-6">
       <Title right={!demo && <Link to={ROUTES.attendance} className="text-[13px] font-medium text-indigo-700 hover:underline">Details</Link>}>Attendance</Title>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap min-[360px]:flex-nowrap items-center gap-4">
         <Ring pct={att.pct} target={target} />
         <div className="min-w-0">
           <p className="text-[16px] font-semibold text-[#161827]">{att.held === 0 ? "No classes counted yet" : ok ? "You're on track" : "Below your target"}</p>
@@ -350,11 +362,11 @@ const WeekCard = ({ week, demo }) => {
   const [sel, setSel] = useState(() => (week.find((d) => d.isToday) || week[0]).date);
   const day = week.find((d) => d.date === sel) || week[0];
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="p-4 min-[380px]:p-5 sm:p-6">
       <Title right={!demo && <Link to={ROUTES.attendance} className="text-[13px] font-medium text-indigo-700 hover:underline">Timetable</Link>}>This week</Title>
 
       <div className="lg:hidden">
-        <div role="tablist" aria-label="Pick a day" className="grid grid-cols-7 gap-1.5">
+        <div role="tablist" aria-label="Pick a day" className="grid grid-cols-7 gap-1">
           {week.map((d) => (
             <button key={d.date} type="button" role="tab" aria-selected={d.date === sel} onClick={() => setSel(d.date)}
               className={cx("flex flex-col items-center gap-0.5 rounded-2xl border py-2 min-h-[64px] text-[12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50", d.date === sel ? "lg-on" : "lg-pill text-[#161827]", d.isToday && d.date !== sel && "!border-indigo-300")}>
@@ -411,7 +423,7 @@ const SkipCard = ({ att, target }) => {
   const need = pct < goal ? Math.ceil((t * h - a) / (1 - t) - 1e-9) : 0;
   const good = pct >= goal;
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="p-4 min-[380px]:p-5 sm:p-6">
       <Title>Can I skip?</Title>
       <div className="flex gap-1.5 overflow-x-auto hm-scroll -mx-1 px-1 pb-1" role="group" aria-label="Choose a subject">
         {[{ id: "all", name: "All" }, ...(att?.subjects || [])].map((s) => (
@@ -440,12 +452,12 @@ const SkipCard = ({ att, target }) => {
 const EventsCard = ({ events, today, demo }) => {
   const upcoming = events.filter((e) => e.endDate >= today && e.confirmed !== false).sort((a, b) => a.startDate.localeCompare(b.startDate)).slice(0, 5);
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="p-4 min-[380px]:p-5 sm:p-6">
       <Title right={!demo && <Link to={ROUTES.calendar} className="text-[13px] font-medium text-indigo-700 hover:underline">Calendar</Link>}>Coming up</Title>
       {upcoming.length ? (
         <ul className="space-y-2">
           {upcoming.map((e) => (
-            <li key={e.id} className="flex items-center gap-3 lg-in px-3 py-2.5">
+            <li key={e.id} className="flex flex-wrap sm:flex-nowrap items-center gap-3 lg-in px-3 py-2.5">
               <span aria-hidden="true" className="w-12 shrink-0 rounded-xl py-1.5 text-center leading-none bg-indigo-500/10 border border-indigo-200 text-indigo-700">
                 <span className="block text-[16px] font-semibold">{local(e.startDate).getDate()}</span>
                 <span className="block text-[11px] mt-1">{local(e.startDate).toLocaleDateString("en-IN", { month: "short" })}</span>
@@ -464,7 +476,7 @@ const EventsCard = ({ events, today, demo }) => {
 };
 
 const OfficialCard = ({ official, onReadAll, demo }) => (
-  <Card className="p-5 sm:p-6">
+  <Card className="p-4 min-[380px]:p-5 sm:p-6">
     <Title right={official.joined && official.unread > 0 && <button type="button" onClick={onReadAll} className={ghost}><CheckCheck className="w-4 h-4" aria-hidden="true" />Mark all read</button>}>
       Official updates {official.unread > 0 && <span className="ml-1 align-middle"><Badge tone="brand">{official.unread} new</Badge></span>}
     </Title>
@@ -472,7 +484,7 @@ const OfficialCard = ({ official, onReadAll, demo }) => (
       official.updates.length ? (
         <ul className="space-y-2">
           {official.updates.slice(0, 4).map((u) => (
-            <li key={u.id || u._id} className="flex items-start gap-2.5 lg-in px-3 py-2.5">
+            <li key={u.id || u._id} className="flex flex-wrap items-start gap-2.5 lg-in px-3 py-2.5">
               <span aria-hidden="true" className={cx("mt-1.5 w-2 h-2 rounded-full shrink-0", u.readAt || u.read ? "bg-transparent" : "bg-indigo-500")} />
               <p className="text-[13.5px] leading-snug text-[#161827] min-w-0 flex-1">{typeof u.summary === "string" ? u.summary : u.summary?.text || `A ${u.targetKind || "schedule"} was ${u.change || "updated"}.`}</p>
               {u.status === "pending" && <Badge tone="amber">Needs you</Badge>}
@@ -506,14 +518,14 @@ const NextUp = ({ vm }) => {
     { k: "Updates", v: official.unread, s: official.joined ? "unread" : "not joined" },
   ];
   return (
-    <section className="lg lg-hot overflow-hidden p-5 sm:p-6 grid md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] gap-5 md:gap-8 items-center" aria-label="Next class">
+    <section className="relative lg lg-hot overflow-hidden p-4 min-[380px]:p-5 sm:p-6 grid min-w-0 md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] gap-4 sm:gap-5 md:gap-8 items-center" aria-label="Next class">
       <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1.5" style={{ background: next?.color || "#4F46E5" }} />
       <div className="relative min-w-0">
         <p className="text-[13.5px] font-medium text-[#6A6F85]">{next ? when : "You're done"}</p>
         <p className="text-[24px] sm:text-[32px] font-semibold tracking-tight leading-[1.1] text-[#161827] mt-1 truncate">{next ? next.name : "No more classes today"}</p>
         {next && <p className="text-[14.5px] text-[#444A63] mt-1.5 tabular-nums">{next.start} to {next.end}{next.room ? `, ${next.room}` : ""}</p>}
       </div>
-      <div className="relative grid grid-cols-3 gap-2.5">
+      <div className="relative grid grid-cols-1 min-[360px]:grid-cols-3 gap-2 min-w-0">
         {stats.map((x) => (
           <div key={x.k} className="lg-in p-3 min-h-[84px] sm:min-h-[92px] flex flex-col items-center justify-center text-center">
             <p className={cx("text-[22px] sm:text-[26px] font-semibold leading-none tabular-nums", x.good === false ? "text-amber-700" : x.good ? "text-emerald-700" : "text-[#161827]")}>{x.v}</p>
@@ -563,10 +575,10 @@ const LiveHome = ({ user }) => {
       <header className="hm-rise flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
           <p className="text-[13.5px] text-[#6A6F85]">{fmtLong(vm?.today?.date || toIso(new Date()))}</p>
-          <h1 className="text-[28px] sm:text-[34px] font-semibold tracking-tight leading-[1.1] text-[#161827] mt-1">{greeting()}, {first}</h1>
+          <h1 className="text-[26px] min-[380px]:text-[28px] sm:text-[34px] font-semibold tracking-tight leading-[1.1] text-[#161827] mt-1 break-words">{greeting()}, {first}</h1>
           {vm && <p className="text-[14px] text-[#6A6F85] mt-1.5">{vm.setup.name}, target {vm.target}%</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <button type="button" aria-label="Refresh" onClick={live.reload} className={ghost}><RefreshCw className={cx("w-4 h-4", live.loading && "animate-spin")} aria-hidden="true" /><span className="hidden sm:inline">Refresh</span></button>
           {vm && <Link to={vm.cr ? ROUTES.crStudio : ROUTES.crRequest} className={ghost}><Megaphone className="w-4 h-4" aria-hidden="true" />{vm.cr ? "CR Studio" : "Become a CR"}</Link>}
           <Link to={ROUTES.dashboard} className={ghost}>Dashboard</Link>
@@ -638,7 +650,7 @@ const Landing = () => {
   const demo = useDemo();
   return (
     <>
-      <section className="max-w-3xl mx-auto text-center pt-4 sm:pt-10">
+      <section className="w-full min-w-0 max-w-3xl mx-auto text-center pt-4 sm:pt-10">
         <h1 className="hm-rise text-[36px] min-[380px]:text-[40px] sm:text-[56px] font-semibold tracking-[-0.025em] leading-[1.06] text-[#161827]">Know what's next, and whether you can skip it.</h1>
         <p className="hm-rise text-[16px] sm:text-[18px] leading-relaxed text-[#444A63] mt-5 max-w-xl mx-auto" style={{ animationDelay: "80ms" }}>
           Your timetable, attendance and academic calendar in one place, kept in sync with your class representative.
@@ -720,7 +732,7 @@ const Landing = () => {
 const Home = () => {
   const { user, loading } = useAuth();
   return (
-    <div className="hm relative z-[1] max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-12 pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-24 overflow-x-clip">
+    <div className="hm relative z-[1] w-full min-w-0 max-w-6xl xl:max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 pt-5 sm:pt-12 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-24 overflow-x-clip">
       <style>{css}</style>
       {user ? <LiveHome key={user._id} user={user} /> : loading ? <Skeleton /> : <Landing />}
     </div>
