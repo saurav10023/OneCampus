@@ -5,6 +5,19 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>
+    <meta name="theme-color" content="#F4F6FF" />
+    <style>
+      html, body, #root { background: #F4F6FF; min-height: 100%; }
+    </style>
+    <script>
+      // Shows any startup error on the page, so it can be read on the phone
+      window.addEventListener("error", function (e) {
+        var d = document.createElement("pre");
+        d.style.cssText = "padding:16px;white-space:pre-wrap;font:13px monospace;color:#A32A42";
+        d.textContent = "Error: " + e.message + "\n" + (e.filename || "") + ":" + (e.lineno || "");
+        document.body.appendChild(d);
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,12 +1,8 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react() , tailwindcss()],
-  server: {
-    host: true,        // 👈 this is the key
-    port: 5173
-  }
-})
+  plugins: [react(), tailwindcss()],
+  build: { target: ["es2019", "safari13"], cssTarget: "safari13" },
+});

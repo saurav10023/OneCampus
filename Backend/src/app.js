@@ -7,20 +7,30 @@ const app = express();
 
 // Behind Render / Nginx, so rate limiting sees the real client IP
 app.set('trust proxy', 1);
+// No ETags: Safari revalidates with them and can show stale data. API responses are no-store anyway.
+app.set('etag', false);
+app.disable('x-powered-by');
+
+// ---------- Compression (optional) ----------
+// Run `npm i compression` to enable. If it is not installed, the server still starts.
+try {
+  const { default: compression } = await import('compression');
+  app.use(compression());
+} catch {
+  console.warn('[compression] not installed, skipping (npm i compression)');
+}
 
 // ---------- CORS ----------
 // Two sources of allowed origins:
-//  1. BUILT_IN_ORIGINS below. They work even if the CORS_ORIGIN variable on Render is missing or
-//     wrong. They are tied to this Vercel account's team slug (sauravsonu216-3147s-projects), so
-//     nobody else can create a matching *.vercel.app address.
+//  1. BUILT_IN_ORIGINS below. They work even if the CORS_ORIGIN variable on Render is missing or wrong.
 //  2. CORS_ORIGIN (optional): a comma-separated list of extra origins. An entry can be an exact
 //     origin or a pattern where * matches one hostname part (letters, digits and dashes).
-// Vercel gives every deployment its own preview URL, which is why a pattern is needed.
 const BUILT_IN_ORIGINS = [
   'https://one-campus.vercel.app', // production alias
   /^https:\/\/one-campus(-[a-z0-9]+)*-sauravsonu216-3147s-projects\.vercel\.app$/i, // previews and team alias
   'http://localhost:5173', // Vite dev server
   'http://localhost:3000',
+  'http://127.0.0.1:5173',
 ];
 
 const escapeRegex = (s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
@@ -35,20 +45,24 @@ const envRules = (process.env.CORS_ORIGIN ?? '')
       : rule.toLowerCase()
   );
 
-const originRules = [...BUILT_IN_ORIGINS.map((r) => (typeof r === 'string' ? r.toLowerCase() : r)), ...envRules];
+const originRules = [
+  ...BUILT_IN_ORIGINS.map((r) => (typeof r === 'string' ? r.toLowerCase() : r)),
+  ...envRules,
+];
 
-const isAllowedOrigin = (origin) =>
-  originRules.some((rule) =>
-    typeof rule === 'string' ? rule === origin.toLowerCase() : rule.test(origin)
+const isAllowedOrigin = (origin) => {
+  if (typeof origin !== 'string') return false;
+  const clean = origin.replace(/\/+$/, '');
+  return originRules.some((rule) =>
+    typeof rule === 'string' ? rule === clean.toLowerCase() : rule.test(clean)
   );
+};
 
 console.log('[cors] extra origins from CORS_ORIGIN:', process.env.CORS_ORIGIN || '(not set)');
 
 app.use(
   cors({
-    // No Origin header (curl, server-to-server, same-origin) is allowed through.
-    // NOTE: when this returns false the cors package does NOT answer the preflight at all; the
-    // request falls through to Express, which replies "200 DELETE, POST" with no CORS headers.
+    // No Origin header (curl, server-to-server, uptime pings, same-origin) is allowed through.
     origin: (origin, cb) => {
       const ok = !origin || isAllowedOrigin(origin);
       if (!ok) console.warn('[cors] blocked origin:', origin);
@@ -56,8 +70,11 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    maxAge: 86400, // browsers cache the preflight answer for a day
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    // Without this the browser hides these headers from your frontend code
+    exposedHeaders: ['X-Official-Updates', 'X-Official-Status'],
+    optionsSuccessStatus: 204, // some older browsers choke on 200 with no body
+    maxAge: 600, // Safari caps the preflight cache at 10 minutes
   })
 );
 
@@ -68,6 +85,16 @@ app.use(cookieParser());
 
 // Cheap route for uptime pings (keeps a free Render instance awake) and quick "is it up" checks
 app.get('/health', (req, res) => res.status(200).json({ ok: true }));
+
+// Never cache API responses: Safari caches GETs aggressively, and attendance data must be fresh
+app.use('/api', (req, res, next) => {
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+    Pragma: 'no-cache',
+    Expires: '0',
+  });
+  next();
+});
 
 // ---------- route imports ----------
 import userRoutes from './routes/user.routes.js';
@@ -154,6 +181,8 @@ const normalizeError = (err) => {
 };
 
 app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+
   const normalized = normalizeError(err);
   const statusCode = normalized.statusCode || 500;
 

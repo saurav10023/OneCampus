@@ -66,7 +66,7 @@ const RulesPanel = ({ setup, onChanged }) => {
 
   const byDay = useMemo(() => {
     const map = {};
-    rules.forEach((r) => (map[r.weekday] ||= []).push(r));
+    rules.forEach((r) => { (map[r.weekday] = map[r.weekday] || []).push(r); });
     Object.values(map).forEach((l) => l.sort((a, b) => a.startTime.localeCompare(b.startTime)));
     return map;
   }, [rules]);
