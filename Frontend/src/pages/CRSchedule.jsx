@@ -8,6 +8,8 @@ import { FormModal, focusFirstInvalid } from "../components/FormKit";
 import ActionDialog from "../components/ActionDialog";
 import GroupsEditor from "../components/GroupsEditor";
 import SemesterMeter from "../components/SemesterMeter";
+import Choice from "../components/Choice";
+import { BRANCHES, SECTIONS, SEMESTERS, academicYearOptions, pickOption, withCurrent } from "../lib/academic";
 import SubjectsPanel from "./cr/SubjectsPanel";
 import OfficialRules from "./cr/OfficialRules";
 import ItemsPanel from "./cr/ItemsPanel";
@@ -216,11 +218,14 @@ const CRSchedule = () => {
   const scopeLocked = Boolean(schedule?.publishedAt) || schedule?.status === "published";
 
   const openEdit = () => {
+    // Match stored values to the dropdown options; if one doesn't match, keep the stored text
+    // so it still shows (and stays selectable) instead of going blank.
+    const norm = (options, value) => pickOption(options, value) || String(value || "").trim();
     const f = {
-      academicYear: schedule.academicYear || "",
-      semesterLabel: schedule.semesterLabel || "",
-      branch: schedule.branch || "",
-      section: schedule.section || "",
+      academicYear: String(schedule.academicYear || "").trim(),
+      semesterLabel: norm(SEMESTERS, schedule.semesterLabel),
+      branch: norm(BRANCHES, schedule.branch),
+      section: norm(SECTIONS, schedule.section),
       semesterStart: toDateInput(schedule.semesterStart),
       semesterEnd: toDateInput(schedule.semesterEnd),
     };
@@ -256,7 +261,7 @@ const CRSchedule = () => {
     if (!scopeLocked) {
       const need = { academicYear: "academic year", semesterLabel: "semester", branch: "branch", section: "section" };
       Object.entries(need).forEach(([k, l]) => {
-        if (!(form[k] || "").trim()) errs[k] = `Enter the ${l}.`;
+        if (!(form[k] || "").trim()) errs[k] = `Choose the ${l}.`;
       });
     }
     if (!form.semesterStart) errs.semesterStart = "Pick the start date.";
@@ -422,10 +427,10 @@ const CRSchedule = () => {
         )}
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <Field label="Academic year" value={form.academicYear || ""} onChange={setF("academicYear")} error={errors.academicYear} placeholder="2026-27" disabled={scopeLocked} maxLength={20} />
-          <Field label="Semester" value={form.semesterLabel || ""} onChange={setF("semesterLabel")} error={errors.semesterLabel} placeholder="Sem 5" disabled={scopeLocked} maxLength={30} />
-          <Field label="Branch" value={form.branch || ""} onChange={setF("branch")} error={errors.branch} disabled={scopeLocked} maxLength={60} />
-          <Field label="Section" value={form.section || ""} onChange={setF("section")} error={errors.section} disabled={scopeLocked} maxLength={20} autoCapitalize="characters" />
+          <Choice label="Academic year" value={form.academicYear || ""} options={withCurrent(academicYearOptions(), form.academicYear)} onChange={setF("academicYear")} error={errors.academicYear} disabled={scopeLocked} />
+          <Choice label="Semester" value={form.semesterLabel || ""} options={withCurrent(SEMESTERS, form.semesterLabel)} onChange={setF("semesterLabel")} error={errors.semesterLabel} disabled={scopeLocked} />
+          <Choice label="Branch" value={form.branch || ""} options={withCurrent(BRANCHES, form.branch)} onChange={setF("branch")} error={errors.branch} disabled={scopeLocked} />
+          <Choice label="Section" value={form.section || ""} options={withCurrent(SECTIONS, form.section)} onChange={setF("section")} error={errors.section} disabled={scopeLocked} />
           <Field label="Semester start" type="date" value={form.semesterStart || ""} onChange={setStart} error={errors.semesterStart} />
           <Field label="Semester end" type="date" min={form.semesterStart || undefined} value={form.semesterEnd || ""} onChange={setF("semesterEnd")} error={errors.semesterEnd} />
         </div>

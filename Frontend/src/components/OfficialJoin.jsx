@@ -71,9 +71,17 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
     load();
   }, [load]);
 
-  // TODO: replace this guess with the real field once a sample of GET /setup/:id/official is known.
+  // The server reports officialStatus: none | available | joined | unavailable
   const linked = Boolean(
-    status && (status.linked || status.joined || status.isLinked || status.officialScheduleId || status.scheduleId || status.schedule)
+    status &&
+      (status.officialStatus === "joined" ||
+        status.officialStatus === "unavailable" ||
+        status.linked ||
+        status.joined ||
+        status.isLinked ||
+        status.officialScheduleId ||
+        status.scheduleId ||
+        status.schedule)
   );
 
   const choose = (s) => {
@@ -129,7 +137,7 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
     setBusy("leave");
     setError("");
     try {
-      await officialApi.leave(setupId, {});
+      await officialApi.leave(setupId, { confirm: true });
       setLeaveOpen(false);
       setSelected(null);
       setPreview(null);
@@ -201,7 +209,7 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
       {!linked && schedules.length === 0 && !error && (
         <EmptyState
           title="No official schedule available yet"
-          text="Your class representative (CR) hasn't published a schedule for your college, branch and section. Until then, you can add your subjects and classes yourself."
+          text="No published schedule matches this setup's academic year, semester, branch and section. Check those four values in the Settings tab (they must be exactly what your CR chose), or add your subjects and classes yourself until your CR publishes."
         />
       )}
 

@@ -7,6 +7,7 @@ import Subject, { toNameKey } from '../models/TimeTable/subject.model.js';
 import RecurringRule from '../models/TimeTable/recurringRule.model.js';
 import CalendarEvent from '../models/Calendar/calendarEvent.model.js';
 import OccurrenceStatus from '../models/Attendance/occurrenceStatus.model.js';
+import SetupOfficialUpdate from '../models/Official/setupOfficialUpdate.model.js';
 import ApiError from '../utils/ApiError.js';
 import { normalizeScopePart, buildScopeKey } from '../utils/scopeKey.js';
 import { semesterMatches } from '../utils/semester.js';
@@ -29,8 +30,12 @@ import {
   SCHEDULE_STATUS,
   STATUS_SOURCE,
 } from '../utils/constants.js';
-import SetupOfficialUpdate from '../models/Official/setupOfficialUpdate.model.js';
+
 // The student side of an official schedule: find it, preview joining it, join, leave.
+//
+// A student's setup is matched to a schedule by FOUR things only:
+//   academic year, semester, branch and section.
+// College and the student's profile are never used.
 //
 // A join copies the CR's schedule into the student's own setup. The CR's records are never
 // edited, and the student's attendance is never sent anywhere. Every step below is repeatable,
@@ -62,18 +67,22 @@ const assertNotJoined = (setup) => {
 
 // ---------- Finding schedules ----------
 
-// Published schedules of the student's college and year, for their semester, in ANY branch and
-// section. The student picks one: that choice is how the section is asked at joining.
-const findJoinable = async ({ user, setup }) => {
-  if (!user.college) throw new ApiError(400, 'Add your college to your profile first');
+// The ONLY matching rule: same academic year, semester, branch and section.
+const sameScope = (setup, schedule) =>
+  schedule.academicYear === setup.academicYear &&
+  semesterMatches(setup.semesterLabel, schedule.semesterLabel) &&
+  normalizeScopePart(schedule.branch ?? '') === normalizeScopePart(setup.branch ?? '') &&
+  normalizeScopePart(schedule.section ?? '') === normalizeScopePart(setup.section ?? '');
+
+// Every published schedule that matches the setup
+const findJoinable = async ({ setup }) => {
   const schedules = await OfficialSchedule.find({
-    collegeKey: normalizeScopePart(user.college),
     academicYear: setup.academicYear,
     status: SCHEDULE_STATUS.PUBLISHED,
   })
     .sort({ branch: 1, section: 1 })
     .lean();
-  return schedules.filter((s) => semesterMatches(setup.semesterLabel, s.semesterLabel));
+  return schedules.filter((s) => sameScope(setup, s));
 };
 
 const countByScheduleId = async (Model, ids) => {
@@ -98,11 +107,14 @@ const shapeSummary = (schedule) => ({
 });
 
 // The picker
-const listJoinableSchedules = async ({ user, setup }) => {
-  const schedules = await findJoinable({ user, setup });
+const listJoinableSchedules = async ({ setup }) => {
+  const schedules = await findJoinable({ setup });
   const ids = schedules.map((s) => s._id);
-  const [subjects, rules] = await Promise.all([countByScheduleId(ScheduleSubject, ids), countByScheduleId(ScheduleRule, ids)]);
-  const current = scopeOf(setup);
+  const [subjects, rules] = await Promise.all([
+    countByScheduleId(ScheduleSubject, ids),
+    countByScheduleId(ScheduleRule, ids),
+  ]);
+  const current = buildScopeKey(scopeOf(setup));
 
   return {
     alreadyJoined: Boolean(setup.officialScheduleId),
@@ -110,16 +122,15 @@ const listJoinableSchedules = async ({ user, setup }) => {
       ...shapeSummary(s),
       subjectCount: subjects.get(String(s._id)) ?? 0,
       classCount: rules.get(String(s._id)) ?? 0,
-      // the class on the student's profile is suggested first
-      isYourProfileClass: s.branch === user.branch && s.section === user.section,
-      // joining it changes the setup's branch, section or semester label
-      changesSetupScope: buildScopeKey(scopeOf(s)) !== buildScopeKey(current),
+      // true only when the semester is worded differently ("Sem 5" vs "5th"):
+      // joining then renames the setup's label to the schedule's
+      changesSetupScope: buildScopeKey(scopeOf(s)) !== current,
     })),
   };
 };
 
 // none / available / joined / unavailable
-const getOfficialStatus = async ({ user, setup }) => {
+const getOfficialStatus = async ({ setup }) => {
   if (setup.officialScheduleId) {
     const schedule = await OfficialSchedule.findById(setup.officialScheduleId).lean();
     const live = schedule?.status === SCHEDULE_STATUS.PUBLISHED;
@@ -132,21 +143,17 @@ const getOfficialStatus = async ({ user, setup }) => {
       latestRevision: schedule?.contentRevision ?? null,
     };
   }
-  const joinable = await findJoinable({ user, setup });
+  const joinable = await findJoinable({ setup });
   return { officialStatus: joinable.length ? 'available' : 'none', schedule: null, candidates: joinable.length };
 };
 
 // ---------- The plan (shared by the preview and the join) ----------
 
-const loadScheduleForJoin = async ({ user, setup, scheduleId }) => {
-  const schedule = await OfficialSchedule.findOne({
-    _id: scheduleId,
-    collegeKey: normalizeScopePart(user.college ?? ''),
-    status: SCHEDULE_STATUS.PUBLISHED,
-  }).lean();
+const loadScheduleForJoin = async ({ setup, scheduleId }) => {
+  const schedule = await OfficialSchedule.findOne({ _id: scheduleId, status: SCHEDULE_STATUS.PUBLISHED }).lean();
   if (!schedule) throw new ApiError(404, 'Schedule not found');
-  if (schedule.academicYear !== setup.academicYear || !semesterMatches(setup.semesterLabel, schedule.semesterLabel)) {
-    throw new ApiError(409, 'This schedule is for a different year or semester than your setup');
+  if (!sameScope(setup, schedule)) {
+    throw new ApiError(409, 'This schedule is for a different year, semester, branch or section than your setup');
   }
   return schedule;
 };
@@ -164,7 +171,7 @@ const assertNoScopeCollision = async (setup, schedule) => {
 };
 
 // input (already cleaned): { scheduleId, groups?, subjectMap? }
-const buildPlan = async ({ user, setup, schedule, input }) => {
+const buildPlan = async ({ setup, schedule, input }) => {
   const chosenGroups = input.groups ?? [];
   const knownGroups = new Set((schedule.groups ?? []).map((g) => g.key));
   const unknown = chosenGroups.filter((g) => !knownGroups.has(g));
@@ -253,12 +260,12 @@ const previewLock = async (setup, userId, filter, cause) => {
   return { classes: plan.toCancel.length, marked };
 };
 
-const previewJoin = async ({ user, setup, input }) => {
+const previewJoin = async ({ setup, input }) => {
   assertSetupOpen(setup);
   assertNotJoined(setup);
-  const schedule = await loadScheduleForJoin({ user, setup, scheduleId: input.scheduleId });
+  const schedule = await loadScheduleForJoin({ setup, scheduleId: input.scheduleId });
   await assertNoScopeCollision(setup, schedule);
-  const plan = await buildPlan({ user, setup, schedule, input });
+  const plan = await buildPlan({ setup, schedule, input });
   const { mapping, rulePlan, officialByKey } = plan;
 
   const warnings = [];
@@ -354,7 +361,7 @@ const ensureOfficialEvent = async ({ setup, item }) => {
   }
 };
 
-const executeJoin = async ({ user, setup, plan }) => {
+const executeJoin = async ({ setup, plan }) => {
   const { schedule, chosenGroups, mapping, rulePlan, officialByKey } = plan;
   const setupId = setup._id;
   const userId = setup.ownerId;
@@ -480,13 +487,13 @@ const executeJoin = async ({ user, setup, plan }) => {
 };
 
 // input (already cleaned): { scheduleId, groups?, subjectMap?, confirm: true }
-const joinSchedule = async ({ user, setup, input }) => {
+const joinSchedule = async ({ setup, input }) => {
   assertSetupOpen(setup);
   assertNotJoined(setup);
-  const schedule = await loadScheduleForJoin({ user, setup, scheduleId: input.scheduleId });
+  const schedule = await loadScheduleForJoin({ setup, scheduleId: input.scheduleId });
   await assertNoScopeCollision(setup, schedule);
-  const plan = await buildPlan({ user, setup, schedule, input });
-  const { setup: joined, summary } = await executeJoin({ user, setup, plan });
+  const plan = await buildPlan({ setup, schedule, input });
+  const { setup: joined, summary } = await executeJoin({ setup, plan });
 
   return {
     joined: true,
@@ -509,49 +516,6 @@ const joinSchedule = async ({ user, setup, input }) => {
 // classes they cancelled can be marked again. Cancellations by a mass bunk or class cancel become
 // the student's own cancellations. Every step is repeatable, and the link goes last.
 // Also called when the student changes the scope of a joined setup (updateSetupDetails).
-// const leaveSchedule = async ({ setup }) => {
-//   if (setup.status === 'archived') throw new ApiError(409, 'Archived setups are read-only');
-//   if (!setup.officialScheduleId) throw new ApiError(409, 'This setup is not following an official schedule');
-//   const setupId = setup._id;
-
-//   const events = await CalendarEvent.updateMany(
-//     { setupId, source: 'official' },
-//     {
-//       $set: { source: 'manual', followOfficial: false },
-//       $unset: { officialRef: 1, officialRevisionSeen: 1, officialWithdrawn: 1, lastAutoUpdate: 1 },
-//     }
-//   );
-//   const cancels = await OccurrenceStatus.updateMany(
-//     { setupId, causeType: { $in: [CAUSE_TYPE.MASS_BUNK, CAUSE_TYPE.CLASS_CANCEL] } },
-//     { $set: { causeType: null, causeId: null, source: STATUS_SOURCE.USER } }
-//   );
-//   const rules = await RecurringRule.updateMany(
-//     { setupId, origin: ORIGIN.OFFICIAL },
-//     { $set: { origin: ORIGIN.MANUAL, officialRuleId: null, officialRevisionSeen: null, detachedFromOfficial: false } }
-//   );
-//   const subjects = await Subject.updateMany(
-//     { setupId, origin: ORIGIN.OFFICIAL },
-//     { $set: { origin: ORIGIN.MANUAL, officialRevisionSeen: 0, officialDetached: false }, $unset: { officialKey: 1 } }
-//   );
-
-//   setup.set({
-//     officialScheduleId: null,
-//     joinedOfficialAt: null,
-//     officialGroups: [],
-//     lastSyncedContentRevision: 0,
-//     officialOptOuts: [],
-//   });
-//   await setup.save();
-
-//   return {
-//     left: true,
-//     eventsNowYours: events.modifiedCount,
-//     cancellationsNowYours: cancels.modifiedCount,
-//     classesNowYours: rules.modifiedCount,
-//     subjectsNowYours: subjects.modifiedCount,
-//   };
-// };
-
 const leaveSchedule = async ({ setup }) => {
   if (setup.status === 'archived') throw new ApiError(409, 'Archived setups are read-only');
   if (!setup.officialScheduleId) throw new ApiError(409, 'This setup is not following an official schedule');
@@ -597,4 +561,12 @@ const leaveSchedule = async ({ setup }) => {
   };
 };
 
-export { listJoinableSchedules, getOfficialStatus, previewJoin, joinSchedule, leaveSchedule,ensureOfficialEvent,clipToSetup, };
+export {
+  listJoinableSchedules,
+  getOfficialStatus,
+  previewJoin,
+  joinSchedule,
+  leaveSchedule,
+  ensureOfficialEvent,
+  clipToSetup,
+};

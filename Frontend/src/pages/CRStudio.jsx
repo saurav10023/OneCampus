@@ -9,6 +9,8 @@ import { FormModal, focusFirstInvalid } from "../components/FormKit";
 import ActionDialog from "../components/ActionDialog";
 import GroupsEditor from "../components/GroupsEditor";
 import SemesterMeter from "../components/SemesterMeter";
+import Choice from "../components/Choice";
+import { BRANCHES, SECTIONS, SEMESTERS, academicYearOptions, pickOption, withCurrent } from "../lib/academic";
 
 const roleTone = { approved: "green", active: "green", pending: "amber", rejected: "red", revoked: "red", withdrawn: "neutral" };
 const statusLabel = { approved: "Approved", active: "Approved", pending: "Awaiting review", rejected: "Rejected", revoked: "Removed", withdrawn: "Withdrawn" };
@@ -101,7 +103,13 @@ const CRStudio = () => {
   const [reqError, setReqError] = useState("");
 
   const openReq = () => {
-    const f = { college: user?.college || "", role: "cr", branch: user?.branch || "", section: user?.section || "", requestNote: "" };
+    const f = {
+      college: user?.college || "",
+      role: "cr",
+      branch: pickOption(BRANCHES, user?.branch),
+      section: pickOption(SECTIONS, user?.section),
+      requestNote: "",
+    };
     setReq(f);
     setReqInitial(JSON.stringify(f));
     setReqErrors({});
@@ -121,8 +129,8 @@ const CRStudio = () => {
     const errs = {};
     if (!req.college.trim()) errs.college = "Enter your college name.";
     if (req.role === "cr") {
-      if (!req.branch.trim()) errs.branch = "Enter your branch.";
-      if (!req.section.trim()) errs.section = "Enter your section.";
+      if (!req.branch.trim()) errs.branch = "Choose your branch.";
+      if (!req.section.trim()) errs.section = "Choose your section.";
     }
     setReqErrors(errs);
     if (Object.keys(errs).length) return focusFirstInvalid();
@@ -218,8 +226,8 @@ const CRStudio = () => {
       college: base.college || user?.college || "",
       academicYear: "",
       semesterLabel: "",
-      branch: base.branch || user?.branch || "",
-      section: base.section || user?.section || "",
+      branch: pickOption(BRANCHES, base.branch || user?.branch),
+      section: pickOption(SECTIONS, base.section || user?.section),
       semesterStart: "",
       semesterEnd: "",
     };
@@ -252,7 +260,7 @@ const CRStudio = () => {
     const errs = {};
     const labels = { college: "college", academicYear: "academic year", semesterLabel: "semester", branch: "branch", section: "section" };
     Object.entries(labels).forEach(([k, l]) => {
-      if (!(form[k] || "").trim()) errs[k] = `Enter the ${l}.`;
+      if (!(form[k] || "").trim()) errs[k] = `${k === "college" ? "Enter" : "Choose"} the ${l}.`;
     });
     if (!form.semesterStart) errs.semesterStart = "Pick the start date.";
     if (!form.semesterEnd) errs.semesterEnd = "Pick the end date.";
@@ -493,8 +501,8 @@ const CRStudio = () => {
         <Field label="College" value={req.college} onChange={setR("college")} error={reqErrors.college} autoCapitalize="words" maxLength={120} />
         {req.role === "cr" && (
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            <Field label="Branch" value={req.branch} onChange={setR("branch")} error={reqErrors.branch} placeholder="CSE" maxLength={60} />
-            <Field label="Section" value={req.section} onChange={setR("section")} error={reqErrors.section} placeholder="A" maxLength={20} autoCapitalize="characters" />
+            <Choice label="Branch" value={req.branch} options={withCurrent(BRANCHES, req.branch)} onChange={setR("branch")} error={reqErrors.branch} />
+            <Choice label="Section" value={req.section} options={withCurrent(SECTIONS, req.section)} onChange={setR("section")} error={reqErrors.section} />
           </div>
         )}
         <Field
@@ -523,13 +531,16 @@ const CRStudio = () => {
 
         <Field label="College" value={form.college || ""} onChange={setF("college")} error={errors.college} autoCapitalize="words" maxLength={120} />
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <Field label="Academic year" value={form.academicYear || ""} onChange={setF("academicYear")} error={errors.academicYear} placeholder="2026-27" maxLength={20} />
-          <Field label="Semester" value={form.semesterLabel || ""} onChange={setF("semesterLabel")} error={errors.semesterLabel} placeholder="Sem 5" maxLength={30} />
-          <Field label="Branch" value={form.branch || ""} onChange={setF("branch")} error={errors.branch} placeholder="CSE" maxLength={60} />
-          <Field label="Section" value={form.section || ""} onChange={setF("section")} error={errors.section} placeholder="A" maxLength={20} autoCapitalize="characters" />
+          <Choice label="Academic year" value={form.academicYear || ""} options={withCurrent(academicYearOptions(), form.academicYear)} onChange={setF("academicYear")} error={errors.academicYear} />
+          <Choice label="Semester" value={form.semesterLabel || ""} options={withCurrent(SEMESTERS, form.semesterLabel)} onChange={setF("semesterLabel")} error={errors.semesterLabel} />
+          <Choice label="Branch" value={form.branch || ""} options={withCurrent(BRANCHES, form.branch)} onChange={setF("branch")} error={errors.branch} />
+          <Choice label="Section" value={form.section || ""} options={withCurrent(SECTIONS, form.section)} onChange={setF("section")} error={errors.section} />
           <Field label="Semester start" type="date" value={form.semesterStart || ""} onChange={setStart} error={errors.semesterStart} />
           <Field label="Semester end" type="date" min={form.semesterStart || undefined} value={form.semesterEnd || ""} onChange={setF("semesterEnd")} error={errors.semesterEnd} />
         </div>
+        <p className="text-[12.5px] text-[#6A6F85] px-1">
+          Students find your schedule by matching these four values, so they must be the same ones they choose in their setup.
+        </p>
 
         <GroupsEditor groups={groups} setGroups={setGroups} />
       </FormModal>

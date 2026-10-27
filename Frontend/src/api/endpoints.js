@@ -53,14 +53,30 @@ export const setupsApi = {
 
 // ---------------------------------------------------------------------------
 // Official schedule join  (/setup/:id/official)
+// The ONE officialApi used everywhere (api/official.js re-exports it).
+// confirm: true is required by the backend for join and leave.
 // ---------------------------------------------------------------------------
 
+const O = (id) => `${S(id)}/official`;
+const listSchedules = async (id) => asList(unwrap(await API.get(`${O(id)}/schedules`)), "schedules");
+const previewJoin = async (id, body) => pick(unwrap(await API.post(`${O(id)}/join-preview`, body)), "preview");
+
 export const officialApi = {
-  status: async (id) => unwrap(await API.get(`${S(id)}/official`)),
-  listJoinable: async (id) => asList(unwrap(await API.get(`${S(id)}/official/schedules`)), "schedules"),
-  previewJoin: async (id, body) => pick(unwrap(await API.post(`${S(id)}/official/join-preview`, body)), "preview"),
-  join: async (id, body) => unwrap(await API.post(`${S(id)}/official/join`, body)),
-  leave: async (id, body = {}) => unwrap(await API.post(`${S(id)}/official/leave`, body)),
+  status: async (id) => unwrap(await API.get(O(id))),
+  schedules: listSchedules,
+  listJoinable: listSchedules, // alias used by OfficialJoin
+  preview: previewJoin,
+  previewJoin, // alias used by OfficialJoin
+  join: async (id, body) => unwrap(await API.post(`${O(id)}/join`, { confirm: true, ...body })),
+  leave: async (id, body = {}) => unwrap(await API.post(`${O(id)}/leave`, { confirm: true, ...body })),
+  sync: async (id) => unwrap(await API.post(`${O(id)}/sync`)),
+  updates: async (id) => asList(unwrap(await API.get(`${O(id)}/updates`)), "updates"),
+  readAll: async (id) => unwrap(await API.post(`${O(id)}/updates/read-all`)),
+  read: async (id, updateId) => unwrap(await API.post(`${O(id)}/updates/${updateId}/read`)),
+  accept: async (id, updateId, body = {}) => unwrap(await API.post(`${O(id)}/updates/${updateId}/accept`, body)),
+  dismiss: async (id, updateId) => unwrap(await API.post(`${O(id)}/updates/${updateId}/dismiss`)),
+  optOuts: async (id) => asList(unwrap(await API.get(`${O(id)}/opt-outs`)), "optOuts", "items"),
+  restore: async (id, kind, itemId) => unwrap(await API.delete(`${O(id)}/opt-outs/${kind}/${itemId}`)),
 };
 
 // ---------------------------------------------------------------------------
@@ -171,13 +187,34 @@ export const scheduleRolesApi = {
 const OS = (id) => `${V1}/official-schedules/${id}`;
 
 // Sub-resources (subjects / rules / items) share the same verbs.
-const child = (name, listKey) => ({
-  list: async (id, params) => asList(unwrap(await API.get(`${OS(id)}/${name}`, { params })), listKey),
+// listFn lets a resource change how listing works (withdrawn records must stay visible).
+const child = (name, listKey, listFn) => ({
+  list:
+    listFn ||
+    (async (id, params) => asList(unwrap(await API.get(`${OS(id)}/${name}`, { params })), listKey)),
   create: async (id, body) => unwrap(await API.post(`${OS(id)}/${name}`, body)),
   update: async (id, childId, body) => unwrap(await API.patch(`${OS(id)}/${name}/${childId}`, body)),
   withdraw: async (id, childId, note) => unwrap(await API.post(`${OS(id)}/${name}/${childId}/withdraw`, { note })),
   restore: async (id, childId, note) => unwrap(await API.post(`${OS(id)}/${name}/${childId}/restore`, { note })),
 });
+
+// Subjects and rules: status "all" returns active and withdrawn together.
+const listAll = (name, listKey) => async (id, params) =>
+  asList(unwrap(await API.get(`${OS(id)}/${name}`, { params: { status: "all", ...params } })), listKey);
+
+// Items have no "all": fetch active and withdrawn, then merge.
+const listItemsAll = async (id, params) => {
+  const get = async (status) =>
+    asList(unwrap(await API.get(`${OS(id)}/items`, { params: { ...params, status } })), "items");
+  const [active, withdrawn] = await Promise.all([get("active"), get("withdrawn")]);
+  const seen = new Set();
+  return [...active, ...withdrawn].filter((x) => {
+    const k = x._id || x.id;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+};
 
 export const officialSchedulesApi = {
   list: async (params) => asList(unwrap(await API.get(`${V1}/official-schedules`, { params })), "schedules"),
@@ -188,9 +225,9 @@ export const officialSchedulesApi = {
   unpublish: async (id, note) => unwrap(await API.post(`${OS(id)}/unpublish`, { note })),
   archive: async (id, note) => unwrap(await API.post(`${OS(id)}/archive`, { note })),
 
-  subjects: child("subjects", "subjects"),
-  rules: child("rules", "rules"),
-  items: child("items", "items"),
+  subjects: child("subjects", "subjects", listAll("subjects", "subjects")),
+  rules: child("rules", "rules", listAll("rules", "rules")),
+  items: child("items", "items", listItemsAll),
 
   actions: {
     list: async (id, params) => asList(unwrap(await API.get(`${OS(id)}/actions`, { params })), "actions"),

@@ -65,6 +65,7 @@ const assertPasswordSize = (password) => {
         throw new ApiError(400, `Password can be at most ${MAX_PASSWORD_BYTES} bytes`);
     }
 };
+
 // ---- REGISTER ----
 // Public. Role/status fields are never read from the body.
 const registerUser = asyncHandler(async (req, res) => {
@@ -90,8 +91,8 @@ const registerUser = asyncHandler(async (req, res) => {
     }
     if (!isString(password) || !password) {
         throw new ApiError(400, "password is required");
-        assertPasswordSize(password);
     }
+    assertPasswordSize(password);
 
     for (const [key, value] of Object.entries({ college, rollNo, email, avatar })) {
         if (value !== undefined && value !== null && !isString(value)) {
@@ -405,6 +406,7 @@ const changePassword = asyncHandler(async (req, res) => {
         .cookie("accessToken", accessToken, loginCookieOptions)
         .json(new ApiResponse(200, { accessToken }, "Password changed successfully"));
 });
+
 // ---- REQUEST ACCOUNT DELETION (own account) ----
 const requestAccountDeletion = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(req.user._id, {

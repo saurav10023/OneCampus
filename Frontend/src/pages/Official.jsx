@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 import { CheckCheck, ChevronDown, Megaphone, RefreshCw, RotateCcw } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Badge, cx } from "../components/Ui";
+import OfficialJoin from "../components/OfficialJoin";
 import { homeApi, msg } from "../api/home";
 import { officialApi } from "../api/official";
 
-const ROUTES = { home: "/", setup: "/setup", login: "/login" };
+const ROUTES = { home: "/", setup: "/onboarding/setup", login: "/login" };
 
 /* Same surface language as the Home page. */
 const css = `
@@ -26,79 +27,12 @@ const btnPrimary = "inline-flex items-center justify-center gap-1.5 h-11 sm:h-10
 
 /* ---------- small helpers ---------- */
 const humanize = (k) => { const t = String(k).replace(/([A-Z])/g, " $1").replace(/[_-]/g, " ").trim().toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
-const itemLabel = (x) => (typeof x === "string" ? x : x?.name ?? x?.title ?? x?.summary ?? x?.subjectName ?? "");
+const itemLabel = (x) => (typeof x === "string" ? x : x?.name ?? x?.title ?? x?.label ?? x?.summary ?? x?.subjectName ?? "");
 const when = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""; };
 const titleOf = (s) => (s ? [s.semesterLabel, [s.branch, s.section].filter(Boolean).join("-")].filter(Boolean).join(" ") + (s.academicYear ? `, ${s.academicYear}` : "") : "Official schedule");
 const updateText = (u) => (typeof u.summary === "string" && u.summary ? u.summary : u.summary?.text || `A ${u.targetKind || "schedule item"} was ${u.change || "updated"}.`);
 const changeTone = { added: "green", updated: "brand", withdrawn: "red", conflict: "amber" };
 const idOf = (x) => x?._id ?? x?.id;
-
-/* ---------- join flow: choose groups, preview, then join ---------- */
-const PreviewSummary = ({ preview }) => {
-  const entries = Object.entries(preview || {}).filter(([, v]) => Array.isArray(v) || typeof v === "number");
-  if (!entries.length) return <p className="mt-4 text-[13.5px] text-[#6A6F85]">Nothing will clash. Your classes, exams and holidays will be added.</p>;
-  return (
-    <div className="mt-4 grid sm:grid-cols-2 gap-2.5" aria-live="polite">
-      {entries.map(([k, v]) => {
-        const count = Array.isArray(v) ? v.length : v;
-        const names = Array.isArray(v) ? v.map(itemLabel).filter(Boolean).slice(0, 3) : [];
-        return (
-          <div key={k} className="lg-in p-3.5">
-            <p className="text-[22px] font-semibold leading-none tabular-nums text-[#161827]">{count}</p>
-            <p className="text-[13px] text-[#6A6F85] mt-1.5">{humanize(k)}</p>
-            {names.length > 0 && <p className="text-[12px] text-[#6A6F85] mt-1.5 truncate">{names.join(", ")}{count > names.length ? "…" : ""}</p>}
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-const JoinPanel = ({ schedule, setupId, run, busy }) => {
-  const [pick, setPick] = useState({});
-  const [preview, setPreview] = useState(null);
-  const groups = schedule.groups || [];
-  const kinds = [...new Set(groups.map((g) => g.kind || "group"))];
-  const body = { scheduleId: idOf(schedule), groups: Object.values(pick).filter(Boolean) };
-  return (
-    <Card className="p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-[17px] font-semibold text-[#161827]">{titleOf(schedule)}</h3>
-          <p className="text-[13.5px] text-[#6A6F85] mt-1">Published by your class representative.</p>
-        </div>
-        <Badge tone="green">Published</Badge>
-      </div>
-
-      {kinds.map((k) => (
-        <fieldset key={k} className="mt-5">
-          <legend className="text-[13.5px] font-medium text-[#161827]">{humanize(k)}</legend>
-          <div role="radiogroup" className="flex flex-wrap gap-2 mt-2">
-            {[{ key: "", label: "None" }, ...groups.filter((g) => (g.kind || "group") === k)].map((g) => {
-              const on = (pick[k] || "") === g.key;
-              return (
-                <button key={g.key || "none"} type="button" role="radio" aria-checked={on} onClick={() => { setPick((p) => ({ ...p, [k]: g.key })); setPreview(null); }}
-                  className={cx("h-10 px-3.5 rounded-full text-[13px] font-medium border focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50", on ? "lg-on" : "lg-pill text-[#161827]/80")}>{g.label || g.key}</button>
-              );
-            })}
-          </div>
-        </fieldset>
-      ))}
-
-      {preview && <PreviewSummary preview={preview} />}
-
-      <div className="flex flex-col sm:flex-row gap-2 mt-5">
-        <button type="button" className={btn} disabled={busy === "preview"} onClick={() => run("preview", async () => setPreview(await officialApi.preview(setupId, body)), { reload: false })}>
-          {busy === "preview" ? "Checking…" : preview ? "Refresh preview" : "Preview changes"}
-        </button>
-        <button type="button" className={btnPrimary} disabled={!preview || busy === "join"} onClick={() => run("join", () => officialApi.join(setupId, body), { ok: "You joined the official schedule." })}>
-          {busy === "join" ? "Joining…" : "Join schedule"}
-        </button>
-      </div>
-      {!preview && <p className="text-[12.5px] text-[#6A6F85] mt-2.5">Preview first so you can see what will be added or merged with your own timetable.</p>}
-    </Card>
-  );
-};
 
 /* ---------- updates inbox ---------- */
 const UpdateRow = ({ u, run, busy, setupId, confirm, setConfirm }) => {
@@ -201,7 +135,7 @@ const Skeleton = () => (
 
 const Official = () => {
   const { user, loading: authLoading } = useAuth();
-  const [st, setSt] = useState({ loading: true, error: "", noSetup: false, setup: null, status: null, joined: false, joinable: [], updates: [], optOuts: [] });
+  const [st, setSt] = useState({ loading: true, error: "", noSetup: false, setup: null, status: null, joined: false, updates: [], optOuts: [] });
   const [busy, setBusy] = useState("");
   const [flash, setFlash] = useState(null);
   const [leaving, setLeaving] = useState(false);
@@ -217,10 +151,13 @@ const Official = () => {
       }
       const id = setup._id;
       const status = await officialApi.status(id);
-      const joined = Boolean(status?.joined ?? status?.isJoined ?? setup.officialScheduleId);
-      const safe = (p) => Promise.resolve(p).catch(() => []);
-      const [updates, joinable, optOuts] = await Promise.all([safe(joined ? officialApi.updates(id) : []), safe(joined ? [] : officialApi.schedules(id)), safe(officialApi.optOuts(id))]);
-      setSt({ loading: false, error: "", noSetup: false, setup, status, joined, joinable, updates, optOuts });
+      const joined = Boolean(status?.officialStatus === "joined" || status?.joined || status?.isJoined || setup.officialScheduleId);
+      // Errors surface in the "We couldn't load this page" card instead of looking like "no schedule".
+      const [updates, optOuts] = await Promise.all([
+        joined ? officialApi.updates(id) : [],
+        officialApi.optOuts(id).catch(() => []), // the hidden-items list is optional
+      ]);
+      setSt({ loading: false, error: "", noSetup: false, setup, status, joined, updates, optOuts });
     } catch (e) {
       setSt((p) => ({ ...p, loading: false, error: msg(e, "Could not load the official schedule") }));
     }
@@ -242,7 +179,7 @@ const Official = () => {
 
   if (authLoading) return <div className="of max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-12"><style>{css}</style><Skeleton /></div>;
 
-  const { setup, status, joined, joinable, updates, optOuts, loading, error, noSetup } = st;
+  const { setup, status, joined, updates, optOuts, loading, error, noSetup } = st;
   const sid = setup?._id;
   const schedule = status?.schedule ?? status?.officialSchedule;
   const syncText = status?.sync?.status;
@@ -308,7 +245,7 @@ const Official = () => {
                   <div role="alertdialog" aria-label="Leave official schedule" className="mt-4 rounded-xl border border-amber-200 bg-amber-500/10 p-3.5 text-[13.5px] text-amber-900">
                     <p>Leave this schedule? Your setup, classes and attendance stay, but you'll stop receiving changes from your CR.</p>
                     <div className="flex gap-2 mt-3">
-                      <button type="button" className={btnPrimary} disabled={busy === "leave"} onClick={() => run("leave", async () => { await officialApi.leave(sid); setLeaving(false); }, { ok: "You left the official schedule." })}>Leave schedule</button>
+                      <button type="button" className={btnPrimary} disabled={busy === "leave"} onClick={() => run("leave", async () => { await officialApi.leave(sid, { confirm: true }); setLeaving(false); }, { ok: "You left the official schedule." })}>Leave schedule</button>
                       <button type="button" className={btn} onClick={() => setLeaving(false)}>Stay</button>
                     </div>
                   </div>
@@ -342,21 +279,8 @@ const Official = () => {
             </>
           )}
 
-          {setup && !joined && !loading && (
-            joinable.length ? (
-              <>
-                <p className="text-[14px] text-[#6A6F85]">{joinable.length === 1 ? "Your CR has published a timetable for your class." : `${joinable.length} timetables match your class.`}</p>
-                <div className="grid gap-4 sm:gap-5">{joinable.map((s) => <JoinPanel key={idOf(s)} schedule={s} setupId={sid} run={run} busy={busy} />)}</div>
-              </>
-            ) : (
-              <Card className="p-8 text-center">
-                <span className="mx-auto w-11 h-11 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center"><Megaphone className="w-5 h-5" aria-hidden="true" /></span>
-                <p className="text-[16px] font-semibold text-[#161827] mt-4">No official timetable for your class yet</p>
-                <p className="text-[14px] text-[#6A6F85] mt-1.5 max-w-md mx-auto">Schedules are matched by college, academic year, semester, branch and section. Once your CR publishes one, it will show up here. If something looks wrong, check your setup details.</p>
-                <Link to={ROUTES.setup} className={cx(btn, "mt-5")}>Review setup details</Link>
-              </Card>
-            )
-          )}
+          {/* Not joined: the same join flow used in Onboarding and Setup details. */}
+          {setup && !joined && !loading && <OfficialJoin setupId={sid} onJoined={load} />}
         </div>
       )}
     </div>

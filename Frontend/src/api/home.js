@@ -55,17 +55,18 @@ export const normEvent = (e) => ({
   confirmed: e.confirmedAt !== null,
 });
 
-// The docs mark the /attendance response shape as [confirm]. Read the likely fields first and
-// fall back to summing per-subject units, so a slightly different shape still renders.
+// Top-level attendedUnits / heldUnits include extra classes and the ERP match, the same as the
+// percentage. The nested `timetable` counts are only a fallback.
 export const normAttendance = (a, setupTarget = 75) => {
   const subjects = asList(a, "subjects").map((s) => {
-    const t = s.timetable ?? s;
-    const att = num(t.attendedUnits, t.attended, 0);
-    const held = num(t.heldUnits, t.held, 0);
+    const t = s.timetable ?? {};
+    const att = num(s.attendedUnits, s.attended, t.attendedUnits, t.attended, 0);
+    const held = num(s.heldUnits, s.held, t.heldUnits, t.held, 0);
     const info = s.subject ?? s;
     return {
       id: info.id ?? info._id,
       name: info.name,
+      code: info.code,
       color: info.color || colorFor(info.id || info.name),
       att,
       held,
