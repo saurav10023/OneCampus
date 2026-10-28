@@ -100,7 +100,7 @@ const DatesPanel = ({ change, schedule }) => {
 // Joining cancels and locks the classes the schedule cancels, and moves your semester dates to the
 // official ones (when the schedule sets them). The server requires `confirm: true`, so the student
 // must preview the effect and tick the confirmation box before the Join button works.
-const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
+const OfficialJoin = ({ setupId, readOnly, onJoined  , autoContinue = false }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [status, setStatus] = useState(null);
@@ -185,6 +185,10 @@ const OfficialJoin = ({ setupId, readOnly, onJoined }) => {
     setError("");
     try {
       const data = await officialApi.join(setupId, { ...body(), confirm: true });
+      if (autoContinue && onJoined) {
+        onJoined(data); 
+        return;
+      }
       setResult(data);
       setPreview(null);
       setConfirmed(false);

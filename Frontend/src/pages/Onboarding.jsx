@@ -53,7 +53,7 @@ const Onboarding = () => {
   const navigate = useNavigate();
 
   // Someone who already has a current setup is adding another semester, not signing up.
-  const returning = Boolean(user?.activeSetupId);
+  const [returning] = useState(() => Boolean(user?.activeSetupId)); // fixed on first render
 
   const [step, setStep] = useState(0);
   const [setupId, setSetupId] = useState(null);
@@ -71,6 +71,7 @@ const Onboarding = () => {
     try {
       const data = await setupsApi.create(body);
       const created = pick(data, "setup");
+      await setupsApi.activate(created._id).catch(() => {}); // already active is fine
       await refreshUser();
       setSetupId(created._id);
       setStep(1);
@@ -123,7 +124,9 @@ const Onboarding = () => {
       )}
 
       {step === 1 && (
+        
         <div className="space-y-5 sm:space-y-6">
+          <OfficialJoin setupId={setupId} onJoined={finish} autoContinue />
           <Alert type="success">Your setup is ready. Next, add your classes.</Alert>
           <OfficialJoin setupId={setupId} onJoined={finish} />
           <div className="border-t border-white/70 pt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
