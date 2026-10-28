@@ -8,6 +8,7 @@ import {
   CalendarCheck,
   Check,
   CheckCircle2,
+  ChevronDown,
   Eye,
   EyeOff,
   Hash,
@@ -24,6 +25,17 @@ import { Alert, Button, Card, cx } from "../components/Ui";
 import { errMsg } from "../api/endpoints";
 
 /* ------------------------------------------------------------------------------------------
+   Options for the class fields.
+   These mirror DEFAULT_COLLEGE, BRANCHES and SECTIONS in the backend's src/utils/constants.js.
+   The backend file is temporary for branches and sections (they move to CollegeAcademicConfig),
+   so when that endpoint exists, replace these three lines with data fetched from it.
+------------------------------------------------------------------------------------------ */
+
+const COLLEGES = ["BIT Mesra, Ranchi"];
+const BRANCHES = ["CSE", "IT", "ECE", "EEE", "ME", "CE"];
+const SECTIONS = ["A", "B", "C", "D"];
+
+/* ------------------------------------------------------------------------------------------
    Motion and responsive sizing of the decorative preview (same approach as the Login page).
    The preview is drawn on a fixed 480 x 230 canvas and scaled with --s by width AND height.
 ------------------------------------------------------------------------------------------ */
@@ -32,9 +44,11 @@ const CSS = `
   @keyframes rg-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
   @keyframes rg-drift { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(36px,-24px,0) scale(1.1); } }
   @keyframes rg-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  @keyframes rg-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
   .rg-float { animation: rg-float 7s ease-in-out infinite; }
   .rg-drift { animation: rg-drift 20s ease-in-out infinite; }
   .rg-up { animation: rg-up .7s cubic-bezier(.22,1,.36,1) both; }
+  .rg-pop { animation: rg-pop .25s ease-out both; }
 
   .rg-prev { --s: .8; display: none; width: calc(480px * var(--s)); height: calc(230px * var(--s)); }
   .rg-prev > div { width: 480px; height: 230px; transform: scale(var(--s)); transform-origin: top left; }
@@ -42,7 +56,7 @@ const CSS = `
   @media (min-width: 1280px) { .rg-prev { --s: .95; } }
   @media (min-width: 1536px) and (min-height: 1000px) { .rg-prev { --s: 1.1; } }
 
-  @media (prefers-reduced-motion: reduce) { .rg-float, .rg-drift, .rg-up { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .rg-float, .rg-drift, .rg-up, .rg-pop { animation: none; } }
 `;
 
 const DOT_MASK = "radial-gradient(ellipse at 50% 40%, #000 25%, transparent 75%)";
@@ -130,13 +144,19 @@ const STEPS = [
    Form pieces
 ------------------------------------------------------------------------------------------ */
 
+const labelCls = "text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6A6F85]";
+
+const fieldBase =
+  "block w-full h-12 rounded-2xl bg-white/70 border shadow-[inset_0_1px_0_#fff] " +
+  "text-[16px] sm:text-[15px] transition focus:outline-none focus:ring-2 focus:bg-white";
+
 // 16px text on phones so iOS doesn't zoom the page when a field is focused.
 const Input = ({ id, label, optional, icon: Icon, trailing, hint, error, wrapClass, ...props }) => {
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   return (
     <div className={wrapClass}>
       <label htmlFor={id} className="flex items-baseline justify-between gap-2 mb-1.5 px-1">
-        <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6A6F85]">{label}</span>
+        <span className={labelCls}>{label}</span>
         {optional && <span className="text-[11.5px] text-[#6A6F85]/80">Optional</span>}
       </label>
       <div className="relative">
@@ -147,9 +167,8 @@ const Input = ({ id, label, optional, icon: Icon, trailing, hint, error, wrapCla
           aria-describedby={describedBy}
           {...props}
           className={cx(
-            "block w-full h-12 rounded-2xl bg-white/70 border shadow-[inset_0_1px_0_#fff]",
-            "text-[16px] sm:text-[15px] text-[#161827] placeholder:text-[#6A6F85]/60 transition",
-            "focus:outline-none focus:ring-2 focus:bg-white",
+            fieldBase,
+            "text-[#161827] placeholder:text-[#6A6F85]/60",
             Icon ? "pl-11" : "pl-4",
             trailing ? "pr-12" : "pr-4",
             error ? "border-[#F3B8C2] focus:ring-rose-400/40" : "border-white/90 focus:ring-indigo-500/40"
@@ -165,6 +184,68 @@ const Input = ({ id, label, optional, icon: Icon, trailing, hint, error, wrapCla
     </div>
   );
 };
+
+// Native <select> so phones open their own picker. Styled to match Input, with a custom chevron.
+const Select = ({ id, label, icon: Icon, options, placeholder, hint, wrapClass, value, ...props }) => (
+  <div className={wrapClass}>
+    <label htmlFor={id} className="block mb-1.5 px-1">
+      <span className={labelCls}>{label}</span>
+    </label>
+    <div className="relative">
+      {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[#6A6F85] pointer-events-none" aria-hidden="true" />}
+      <select
+        id={id}
+        value={value}
+        aria-describedby={hint ? `${id}-hint` : undefined}
+        {...props}
+        className={cx(
+          fieldBase,
+          "appearance-none cursor-pointer border-white/90 focus:ring-indigo-500/40 truncate",
+          Icon ? "pl-11" : "pl-4",
+          "pr-11",
+          value ? "text-[#161827]" : "text-[#6A6F85]/70"
+        )}
+      >
+        <option value="" disabled>{placeholder}</option>
+        {options.map((o) => (
+          <option key={o} value={o} className="text-[#161827]">{o}</option>
+        ))}
+      </select>
+      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[#6A6F85] pointer-events-none" aria-hidden="true" />
+    </div>
+    {hint && <p id={`${id}-hint`} className="text-[12.5px] text-[#6A6F85] mt-1.5 px-1">{hint}</p>}
+  </div>
+);
+
+// Section is a short list, so one tap on a chip is faster than opening a dropdown.
+const SectionPicker = ({ value, onChange, options, wrapClass }) => (
+  <div className={wrapClass}>
+    <span id="section-label" className={cx(labelCls, "block mb-1.5 px-1")}>Section</span>
+    <div role="radiogroup" aria-labelledby="section-label" className="flex gap-2">
+      {options.map((o) => {
+        const on = value === o;
+        return (
+          <button
+            key={o}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(o)}
+            className={cx(
+              "flex-1 h-12 rounded-2xl border text-[15px] font-semibold transition",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50",
+              on
+                ? "text-white border-transparent bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/30"
+                : "bg-white/70 border-white/90 text-[#444A63] shadow-[inset_0_1px_0_#fff] hover:bg-white hover:text-[#161827]"
+            )}
+          >
+            {o}
+          </button>
+        );
+      })}
+    </div>
+  </div>
+);
 
 const SectionTitle = ({ children, note }) => (
   <div className="flex items-center gap-3 sm:col-span-2">
@@ -196,14 +277,9 @@ const ABOUT = [
   { name: "email", label: "Email", type: "email", placeholder: "you@example.com", optional: true, icon: Mail, autoComplete: "email" },
 ];
 
-const CLASS_FIELDS = [
-  { name: "college", label: "College", type: "text", placeholder: "NIT Jamshedpur", required: true, wide: true, icon: Building2, autoComplete: "organization" },
-  { name: "branch", label: "Branch", type: "text", placeholder: "CSE", required: true, icon: BookOpen, autoComplete: "off" },
-  { name: "section", label: "Section", type: "text", placeholder: "A", required: true, icon: Users, autoComplete: "off" },
-  { name: "rollNo", label: "Roll number", type: "text", placeholder: "2023UGCS001", optional: true, wide: true, icon: Hash, autoComplete: "off" },
-];
+const ROLL = { name: "rollNo", label: "Roll number", type: "text", placeholder: "2023UGCS001", optional: true, wide: true, icon: Hash, autoComplete: "off" };
 
-const ALL_FIELDS = [...ABOUT, ...CLASS_FIELDS];
+const TEXT_FIELDS = [...ABOUT, ROLL];
 
 const normMobile = (v) => v.replace(/[\s-]/g, "").replace(/^(\+91|91)(?=\d{10}$)/, "");
 
@@ -215,7 +291,12 @@ const Register = () => {
   const { user, register } = useAuth();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState(() => Object.fromEntries(ALL_FIELDS.map((f) => [f.name, ""])));
+  const [form, setForm] = useState(() => ({
+    ...Object.fromEntries(TEXT_FIELDS.map((f) => [f.name, ""])),
+    college: COLLEGES.length === 1 ? COLLEGES[0] : "",
+    branch: "",
+    section: "",
+  }));
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -227,6 +308,7 @@ const Register = () => {
   if (user) return <Navigate to="/dashboard" replace />;
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const setValue = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   // Show the message and bring it into view, since the submit button can be far below it on phones.
   const fail = (msg) => {
@@ -239,17 +321,21 @@ const Register = () => {
   const mobileBad = mobileTouched && form.mobile !== "" && !/^\d{10}$/.test(mobile);
   const strength = strengthOf(password);
   const mismatch = confirm !== "" && password !== confirm;
+  const classPicked = form.college && form.branch && form.section;
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
 
     if (!/^\d{10}$/.test(mobile)) return fail("Enter a valid 10-digit mobile number.");
+    if (!form.college) return fail("Select your college.");
+    if (!form.branch) return fail("Select your branch.");
+    if (!form.section) return fail("Select your section.");
     if (password.length < 8) return fail("Your password must be at least 8 characters.");
     if (password !== confirm) return fail("The two passwords don't match. Please re-enter them.");
 
-    const payload = { password, mobile };
-    ALL_FIELDS.forEach(({ name }) => {
+    const payload = { password, mobile, college: form.college, branch: form.branch, section: form.section };
+    TEXT_FIELDS.forEach(({ name }) => {
       const v = form[name].trim();
       if (name !== "mobile" && v) payload[name] = v;
     });
@@ -265,30 +351,33 @@ const Register = () => {
     }
   };
 
-  const renderField = (f) => (
-    <Input
-      key={f.name}
-      id={f.name}
-      name={f.name}
-      label={f.label}
-      optional={f.optional}
-      icon={f.icon}
-      type={f.type}
-      placeholder={f.placeholder}
-      value={form[f.name]}
-      onChange={set(f.name)}
-      onBlur={f.name === "mobile" ? () => setMobileTouched(true) : undefined}
-      required={f.required}
-      autoComplete={f.autoComplete}
-      inputMode={f.inputMode}
-      autoCapitalize={f.name === "username" || f.name === "email" ? "none" : undefined}
-      autoCorrect={f.name === "username" || f.name === "email" ? "off" : undefined}
-      spellCheck={f.name === "username" || f.name === "email" ? false : undefined}
-      hint={f.hint}
-      error={f.name === "mobile" && mobileBad ? "Enter a 10-digit mobile number, for example 9876543210." : undefined}
-      wrapClass={f.wide ? "sm:col-span-2" : undefined}
-    />
-  );
+  const renderField = (f) => {
+    const textOnly = f.name === "username" || f.name === "email";
+    return (
+      <Input
+        key={f.name}
+        id={f.name}
+        name={f.name}
+        label={f.label}
+        optional={f.optional}
+        icon={f.icon}
+        type={f.type}
+        placeholder={f.placeholder}
+        value={form[f.name]}
+        onChange={set(f.name)}
+        onBlur={f.name === "mobile" ? () => setMobileTouched(true) : undefined}
+        required={f.required}
+        autoComplete={f.autoComplete}
+        inputMode={f.inputMode}
+        autoCapitalize={textOnly ? "none" : undefined}
+        autoCorrect={textOnly ? "off" : undefined}
+        spellCheck={textOnly ? false : undefined}
+        hint={f.hint}
+        error={f.name === "mobile" && mobileBad ? "Enter a 10-digit mobile number, for example 9876543210." : undefined}
+        wrapClass={f.wide ? "sm:col-span-2" : undefined}
+      />
+    );
+  };
 
   const eye = (
     <button
@@ -374,7 +463,7 @@ const Register = () => {
               <CalendarCheck className="w-6 h-6" aria-hidden="true" />
             </span>
             <h1 className="text-[24px] min-[380px]:text-[26px] sm:text-[28px] font-semibold tracking-tight text-[#161827] leading-tight lg:mt-5">Create your account</h1>
-            <p className="text-[14px] leading-relaxed text-[#6A6F85] mt-1">Your college, branch and section help us find your class schedule.</p>
+            <p className="text-[14px] leading-relaxed text-[#6A6F85] mt-1">Pick your college, branch and section and we will find your class schedule.</p>
 
             <form onSubmit={submit} className="mt-6 space-y-6">
               <div ref={alertRef} className="scroll-mt-28">
@@ -388,7 +477,46 @@ const Register = () => {
 
               <div className="grid sm:grid-cols-2 gap-x-4 gap-y-4">
                 <SectionTitle note="Used to match your class schedule">Your class</SectionTitle>
-                {CLASS_FIELDS.map(renderField)}
+
+                <Select
+                  id="college"
+                  name="college"
+                  label="College"
+                  icon={Building2}
+                  options={COLLEGES}
+                  placeholder="Select your college"
+                  value={form.college}
+                  onChange={set("college")}
+                  required
+                  autoComplete="organization"
+                  wrapClass="sm:col-span-2"
+                />
+
+                <Select
+                  id="branch"
+                  name="branch"
+                  label="Branch"
+                  icon={BookOpen}
+                  options={BRANCHES}
+                  placeholder="Select your branch"
+                  value={form.branch}
+                  onChange={set("branch")}
+                  required
+                  autoComplete="off"
+                />
+
+                <SectionPicker value={form.section} onChange={setValue("section")} options={SECTIONS} />
+
+                {classPicked && (
+                  <p className="rg-pop sm:col-span-2 flex items-start gap-2 rounded-2xl bg-indigo-500/[0.07] border border-indigo-200/70 px-3.5 py-2.5 text-[13px] leading-snug text-[#444A63]" aria-live="polite">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-indigo-600" aria-hidden="true" />
+                    <span>
+                      We will look for the <strong className="font-semibold text-[#161827]">{form.branch} Section {form.section}</strong> schedule at {form.college}.
+                    </span>
+                  </p>
+                )}
+
+                {renderField(ROLL)}
               </div>
 
               <div className="grid sm:grid-cols-2 gap-x-4 gap-y-4">

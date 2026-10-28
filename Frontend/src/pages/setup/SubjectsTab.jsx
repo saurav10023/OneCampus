@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, ArchiveRestore, BookOpen, Check, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, BookOpen, Check, ListPlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { subjectsApi, errMsg } from "../../api/endpoints";
 import { Alert, Badge, Button, Card, EmptyState, Field, Modal, Warnings, cx } from "../../components/Ui";
 import { FadeIn, Flash, SkeletonCards, Tabs, useFlash } from "../../components/Ux";
+import BulkSubjects from "../../components/BulkSubjects";
 
 const COLORS = ["#6366F1", "#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#8B5CF6", "#14B8A6"];
 
@@ -48,6 +49,8 @@ const SubjectsTab = ({ setupId, readOnly }) => {
   const [form, setForm] = useState(blank);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const [toDelete, setToDelete] = useState(null);
   const [impact, setImpact] = useState(null);
@@ -177,9 +180,14 @@ const SubjectsTab = ({ setupId, readOnly }) => {
             />
           </div>
           {canAdd && (
-            <Button size="sm" className="h-10" onClick={() => openForm(null)}>
-              <Plus className="w-4 h-4" />Add subject
-            </Button>
+            <>
+              <Button size="sm" variant="glass" className="h-10" onClick={() => setBulkOpen(true)}>
+                <ListPlus className="w-4 h-4" />Add many
+              </Button>
+              <Button size="sm" className="h-10" onClick={() => openForm(null)}>
+                <Plus className="w-4 h-4" />Add subject
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -201,7 +209,15 @@ const SubjectsTab = ({ setupId, readOnly }) => {
               ? "Subjects you archive keep their history and appear here."
               : "Add the subjects you study this semester, then build your weekly classes on top."
           }
-          action={canAdd && !query && <Button onClick={() => openForm(null)}><Plus className="w-4 h-4" />Add your first subject</Button>}
+          action={
+            canAdd &&
+            !query && (
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button onClick={() => setBulkOpen(true)}><ListPlus className="w-4 h-4" />Add all at once</Button>
+                <Button variant="glass" onClick={() => openForm(null)}><Plus className="w-4 h-4" />Add one subject</Button>
+              </div>
+            )
+          }
         />
       ) : (
         <>
@@ -306,6 +322,25 @@ const SubjectsTab = ({ setupId, readOnly }) => {
           <Button type="submit" loading={saving} className="w-full sm:w-auto">{editing === "new" ? "Add subject" : "Save changes"}</Button>
         </form>
       </Modal>
+
+      <BulkSubjects
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        existing={subjects}
+        withCredits
+        createOne={({ name, code, credits }, i) =>
+          subjectsApi.create(setupId, {
+            name,
+            ...(code ? { code } : {}),
+            ...(credits !== "" ? { credits: Number(credits) } : {}),
+            color: COLORS[(subjects.length + i) % COLORS.length],
+          })
+        }
+        onDone={(n) => {
+          flash(`${n} subject${n === 1 ? "" : "s"} added`);
+          load();
+        }}
+      />
 
       <Modal open={Boolean(toDelete)} onClose={() => !deleting && setToDelete(null)} title="Delete subject?">
         <div className="space-y-4">

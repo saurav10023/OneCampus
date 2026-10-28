@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Check } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Check } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { setupsApi, errMsg, pick } from "../api/endpoints";
 import { Alert, Button, Card, PageHeader, cx } from "../components/Ui";
@@ -52,6 +52,9 @@ const Onboarding = () => {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
 
+  // Someone who already has a current setup is adding another semester, not signing up.
+  const returning = Boolean(user?.activeSetupId);
+
   const [step, setStep] = useState(0);
   const [setupId, setSetupId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -86,7 +89,23 @@ const Onboarding = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-3 sm:px-4 py-6 sm:py-10">
-      <PageHeader title="Set up your semester" subtitle="This takes about a minute, and you can change everything later." />
+      {returning && step === 0 && (
+        <Link
+          to="/setups"
+          className="inline-flex items-center gap-1.5 mb-4 text-[13.5px] font-medium text-[#6A6F85] hover:text-[#161827] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 rounded-full"
+        >
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />Back to setups
+        </Link>
+      )}
+
+      <PageHeader
+        title={returning ? "New semester" : "Set up your semester"}
+        subtitle={
+          returning
+            ? "Create a setup for the new semester, then join your class schedule."
+            : "This takes about a minute, and you can change everything later."
+        }
+      />
 
       <Progress step={step} />
 

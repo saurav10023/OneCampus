@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, Plus, Search } from "lucide-react";
+import { BookOpen, ListPlus, Plus, Search } from "lucide-react";
 import { officialSchedulesApi, errMsg } from "../../api/endpoints";
 import { isWithdrawn } from "../../lib/prompt";
 import { Alert, Badge, Button, Card, EmptyState, Field, PageSpinner, cx } from "../../components/Ui";
 import { FormModal, RowActions, focusFirstInvalid, shortOf, useNoteDialog } from "../../components/FormKit";
+import BulkSubjects from "../../components/BulkSubjects";
 
 const api = officialSchedulesApi.subjects;
 const idOf = (x) => x?._id || x?.id; // works whether the backend returns `_id` or `id`
 const blank = { name: "", code: "", note: "" };
+
+// Same as MAX_SCHEDULE_SUBJECTS in the backend constants.
+const MAX_SCHEDULE_SUBJECTS = 20;
 
 const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
   const [list, setList] = useState([]);
@@ -22,6 +26,7 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
   const [formError, setFormError] = useState("");
   const [ask, noteDialog] = useNoteDialog();
   const [query, setQuery] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -109,6 +114,7 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
   };
 
   const sorted = useMemo(() => [...list].sort((a, b) => Number(isWithdrawn(a)) - Number(isWithdrawn(b)) || (a.name || "").localeCompare(b.name || "")), [list]);
+  const activeList = useMemo(() => list.filter((s) => !isWithdrawn(s)), [list]);
 
   if (loading) return <PageSpinner />;
 
@@ -116,12 +122,26 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
   const filtered = q ? sorted.filter((s) => `${s.name} ${s.code || ""}`.toLowerCase().includes(q)) : sorted;
 
   const addBtn = <Button onClick={() => open(null)}><Plus className="w-4 h-4" />Add subject</Button>;
+  const bulkBtn = (
+    <Button variant="glass" onClick={() => setBulkOpen(true)}>
+      <ListPlus className="w-4 h-4" />Add many
+    </Button>
+  );
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[14px] text-[#6A6F85]">{list.length} subject{list.length === 1 ? "" : "s"}</p>
-        {!readOnly && list.length > 0 && <Button size="sm" onClick={() => open(null)}><Plus className="w-4 h-4" /><span>Add<span className="hidden sm:inline"> subject</span></span></Button>}
+        {!readOnly && list.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="glass" onClick={() => setBulkOpen(true)}>
+              <ListPlus className="w-4 h-4" /><span>Add many</span>
+            </Button>
+            <Button size="sm" onClick={() => open(null)}>
+              <Plus className="w-4 h-4" /><span>Add<span className="hidden sm:inline"> subject</span></span>
+            </Button>
+          </div>
+        )}
       </div>
 
       <Alert type="error">{error}</Alert>
@@ -141,7 +161,12 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
       )}
 
       {list.length === 0 ? (
-        <EmptyState icon={BookOpen} title="No official subjects yet" text="Add the subjects for your section. Weekly classes are attached to them." action={!readOnly && addBtn} />
+        <EmptyState
+          icon={BookOpen}
+          title="No official subjects yet"
+          text="Add the subjects for your section. Weekly classes are attached to them."
+          action={!readOnly && <div className="flex flex-wrap justify-center gap-3">{bulkBtn}{addBtn}</div>}
+        />
       ) : filtered.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-[#161827]/15 px-4 py-6 text-center text-[13.5px] text-[#6A6F85]">No subject matches “{query}”.</p>
       ) : (
@@ -187,6 +212,20 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
         <Field label="Code (optional)" value={form.code} onChange={setField("code")} error={errors.code} placeholder="CS301" maxLength={20} autoCapitalize="characters" enterKeyHint="next" />
         <Field label="Note for the history (optional)" value={form.note} onChange={setField("note")} maxLength={200} enterKeyHint="done" />
       </FormModal>
+
+      <BulkSubjects
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        existing={activeList}
+        activeCount={activeList.length}
+        maxTotal={MAX_SCHEDULE_SUBJECTS}
+        createOne={({ name, code }) => api.create(scheduleId, { name, ...(code ? { code } : {}) })}
+        onDone={() => {
+          load();
+          onChanged?.();
+        }}
+      />
+
       {noteDialog}
     </div>
   );

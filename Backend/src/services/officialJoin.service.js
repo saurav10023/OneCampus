@@ -20,14 +20,16 @@ import {
   itemAppliesToStudent,
   buildCancelFilter,
 } from '../utils/officialJoinRules.js';
-import { generateOccurrences } from './occurrence.service.js';
+import { generateOccurrences, getOccurrenceIdsInRange, reconcileRangeStatuses } from './occurrence.service.js';
 import { applyCancellation, planCancellation } from './cancellation.service.js';
 import {
   ATTENDANCE_STATUS,
   CAUSE_TYPE,
+  DAY_MS,
   ITEM_STATUS,
   ORIGIN,
   SCHEDULE_STATUS,
+  STATUS_REASON,
   STATUS_SOURCE,
 } from '../utils/constants.js';
 
@@ -42,6 +44,17 @@ import {
 // and the link on the Setup is written LAST, so a join that stops halfway is finished by sending
 // it again (or cleaned up by leaving).
 //
+// SEMESTER DATES: joining also moves the setup's start and end date to the schedule's
+// semesterStart and semesterEnd. This happens once, at join time, and never again.
+//   - A schedule with no start (or no end) leaves that side of the student's dates alone.
+//   - A start after the end is refused.
+//   - Longer semester: own classes that ran for the whole old semester run for the whole new one,
+//     the new days are generated, and classes this same kind of change uncounted earlier come back.
+//   - Shorter semester: classes outside the new dates become not_counted with their mark remembered
+//     (the same reconcileRangeStatuses the setup's own date change uses), so nothing is deleted and
+//     the marks return if the dates are widened again. Own classes are cut to the new range.
+// The dates are saved together with the link in the last step, so a retry after a failure is safe.
+//
 // Official cancellations (exam, holiday, break, mass bunk, class cancel) apply to EVERY class in
 // their range, marked or not. The earlier mark is remembered and comes back if the cancellation
 // is withdrawn. That is why the preview tells the student how many marked classes this locks.
@@ -49,6 +62,7 @@ import {
 const MARKS = [ATTENDANCE_STATUS.PRESENT, ATTENDANCE_STATUS.ABSENT, ATTENDANCE_STATUS.EXCUSED];
 
 const dateText = (date) => (date ? date.toISOString().slice(0, 10) : null);
+const sameDay = (a, b) => dateText(a) === dateText(b);
 const scopeOf = (x) => ({
   academicYear: x.academicYear,
   semesterLabel: x.semesterLabel,
@@ -63,6 +77,146 @@ const assertNotJoined = (setup) => {
   if (setup.officialScheduleId) {
     throw new ApiError(409, 'This setup already follows an official schedule. Leave it first to join another.');
   }
+};
+
+// ---------- Semester dates ----------
+
+// The dates the setup will have after joining. Each side is decided on its own: the schedule's
+// date when it has one, otherwise the student's.
+const effectiveDates = (setup, schedule) => {
+  const startDate = schedule.semesterStart ?? setup.startDate;
+  const endDate = schedule.semesterEnd ?? setup.endDate;
+  if (endDate < startDate) {
+    throw new ApiError(
+      409,
+      'The official semester dates do not fit your setup dates (the end would be before the start). Change your setup dates, then join again.'
+    );
+  }
+  return { startDate, endDate };
+};
+
+const datesChange = (setup, dates) => !sameDay(setup.startDate, dates.startDate) || !sameDay(setup.endDate, dates.endDate);
+
+const maxDate = (a, b) => (a > b ? a : b);
+const minDate = (a, b) => (a < b ? a : b);
+const dayBefore = (d) => new Date(d.getTime() - DAY_MS);
+const dayAfter = (d) => new Date(d.getTime() + DAY_MS);
+
+// leaving: stretches of the OLD range that fall outside the new dates (shorter semester)
+// joining: stretches of the NEW range that the old dates did not cover (longer semester)
+const dateRanges = (setup, dates) => {
+  const leaving = [];
+  if (dates.startDate > setup.startDate) {
+    leaving.push({ from: setup.startDate, to: minDate(dayBefore(dates.startDate), setup.endDate), reason: STATUS_REASON.START_DATE_CHANGE });
+  }
+  if (dates.endDate < setup.endDate) {
+    leaving.push({ from: maxDate(dayAfter(dates.endDate), setup.startDate), to: setup.endDate, reason: STATUS_REASON.END_DATE_CHANGE });
+  }
+  const joining = [];
+  if (dates.startDate < setup.startDate) {
+    joining.push({ from: dates.startDate, to: minDate(dayBefore(setup.startDate), dates.endDate), reason: STATUS_REASON.START_DATE_CHANGE });
+  }
+  if (dates.endDate > setup.endDate) {
+    joining.push({ from: maxDate(dayAfter(setup.endDate), dates.startDate), to: dates.endDate, reason: STATUS_REASON.END_DATE_CHANGE });
+  }
+  return { leaving, joining };
+};
+
+// For the preview: how many existing classes fall outside the new dates, and how many carry a mark
+const previewDateImpact = async (setup, dates) => {
+  const { leaving } = dateRanges(setup, dates);
+  let classes = 0;
+  let marked = 0;
+  for (const r of leaving) {
+    if (r.from > r.to) continue;
+    const ids = await getOccurrenceIdsInRange(setup._id, r.from, r.to);
+    classes += ids.length;
+    if (ids.length) {
+      marked += await OccurrenceStatus.countDocuments({ userId: setup.ownerId, occurrenceId: { $in: ids }, status: { $in: MARKS } });
+    }
+  }
+  return { classes, marked };
+};
+
+// Moves the student's classes and statuses to the new dates (the old range is still on `setup`).
+// Repeatable: uncounted classes are skipped, restored/added ones already have their row.
+const applyDateChange = async ({ setup, dates }) => {
+  const setupId = setup._id;
+  const userId = setup.ownerId;
+  const { leaving, joining } = dateRanges(setup, dates);
+  const out = { leftOut: 0, generated: 0, restored: 0, added: 0 };
+
+  // Shorter: classes outside the new dates stop counting, marks remembered
+  for (const r of leaving) {
+    if (r.from > r.to) continue;
+    const ids = await getOccurrenceIdsInRange(setupId, r.from, r.to);
+    const res = await reconcileRangeStatuses({ occurrenceIds: ids, userId, shrinking: true, reason: r.reason, newStatus: ATTENDANCE_STATUS.PENDING });
+    out.leftOut += res.uncountedIds.length;
+  }
+
+  // Longer: generate the new days for every active class, then restore or add their statuses
+  if (joining.length) {
+    const rules = await RecurringRule.find({ setupId, isActive: true }).lean();
+    const ownEvents = await CalendarEvent.find({
+      setupId,
+      source: { $ne: 'official' },
+      affectsClasses: true,
+      confirmedAt: { $ne: null },
+    }).lean();
+
+    for (const r of joining) {
+      if (r.from > r.to) continue;
+      out.generated += await generateOccurrences(setupId, r.from, r.to, { rules });
+      const ids = await getOccurrenceIdsInRange(setupId, r.from, r.to);
+      const res = await reconcileRangeStatuses({ occurrenceIds: ids, userId, shrinking: false, reason: r.reason, newStatus: ATTENDANCE_STATUS.PENDING });
+      out.restored += res.restoredIds.length;
+      out.added += res.addedIds.length;
+
+      // The student's own holidays and breaks apply to the days that were just added.
+      // (Official ones are applied by step 3 over the whole new range.)
+      for (const ev of ownEvents) {
+        const range = { from: maxDate(ev.startDate, r.from), to: minDate(ev.endDate, r.to) };
+        if (range.from > range.to) continue;
+        await applyCancellation({ setupId, userId, filter: range, cause: { type: CAUSE_TYPE.CALENDAR_EVENT, id: ev._id }, skipMarked: true });
+      }
+    }
+  }
+  return out;
+};
+
+// Own classes follow the new dates. Repeatable: running it twice changes nothing the second time.
+// Only plain query operators are used here (no aggregation-pipeline updates), so it works on
+// every Mongoose version without the `updatePipeline` option.
+const alignRuleRanges = async (setupId, setup, dates) => {
+  // Wider: a class that ran for the whole old semester now runs for the whole new one
+  if (dates.startDate < setup.startDate) {
+    await RecurringRule.updateMany(
+      { setupId, origin: { $ne: ORIGIN.OFFICIAL }, effectiveStartDate: setup.startDate },
+      { $set: { effectiveStartDate: dates.startDate } }
+    );
+  }
+  if (dates.endDate > setup.endDate) {
+    await RecurringRule.updateMany(
+      { setupId, origin: { $ne: ORIGIN.OFFICIAL }, effectiveEndDate: setup.endDate },
+      { $set: { effectiveEndDate: dates.endDate } }
+    );
+  }
+  // Shorter: no class runs outside the new semester.
+  // Only rules that actually start before / end after the new dates are touched.
+  if (dates.startDate > setup.startDate) {
+    await RecurringRule.updateMany(
+      { setupId, effectiveStartDate: { $lt: dates.startDate } },
+      { $set: { effectiveStartDate: dates.startDate } }
+    );
+  }
+  if (dates.endDate < setup.endDate) {
+    await RecurringRule.updateMany(
+      { setupId, effectiveEndDate: { $gt: dates.endDate } },
+      { $set: { effectiveEndDate: dates.endDate } }
+    );
+  }
+  // A class left with no days at all is switched off, not deleted
+  await RecurringRule.updateMany({ setupId, $expr: { $gt: ['$effectiveStartDate', '$effectiveEndDate'] } }, { $set: { isActive: false } });
 };
 
 // ---------- Finding schedules ----------
@@ -177,6 +331,9 @@ const buildPlan = async ({ setup, schedule, input }) => {
   const unknown = chosenGroups.filter((g) => !knownGroups.has(g));
   if (unknown.length) throw new ApiError(400, 'Some groups are not defined in this schedule', unknown.map((g) => `Unknown group: ${g}`));
 
+  // The setup's dates AFTER joining. Classes are planned and clipped against these, not the old ones.
+  const dates = effectiveDates(setup, schedule);
+
   // Read at the start: everything written up to this revision is in the data read below
   const revisionAtRead = schedule.contentRevision;
   const active = { scheduleId: schedule._id, status: ITEM_STATUS.ACTIVE };
@@ -229,8 +386,8 @@ const buildPlan = async ({ setup, schedule, input }) => {
     subjectLinks,
     studentRulesBySubject,
     chosenGroups,
-    setupStart: setup.startDate,
-    setupEnd: setup.endDate,
+    setupStart: dates.startDate,
+    setupEnd: dates.endDate,
   });
 
   // Items
@@ -243,14 +400,15 @@ const buildPlan = async ({ setup, schedule, input }) => {
     else if (CANCEL_KINDS.has(item.kind)) cancelItems.push(item);
   }
 
-  return { schedule, chosenGroups, revisionAtRead, officialSubjects, officialByKey, mapping, rulePlan, eventItems, cancelItems, skippedItems };
+  return { schedule, chosenGroups, dates, revisionAtRead, officialSubjects, officialByKey, mapping, rulePlan, eventItems, cancelItems, skippedItems };
 };
 
 // ---------- Preview (writes nothing) ----------
 
-const clipToSetup = (setup, from, to) => ({
-  from: from > setup.startDate ? from : setup.startDate,
-  to: to < setup.endDate ? to : setup.endDate,
+// `range` is anything with startDate and endDate: the setup, or the dates it will have after joining
+const clipToSetup = (range, from, to) => ({
+  from: from > range.startDate ? from : range.startDate,
+  to: to < range.endDate ? to : range.endDate,
 });
 
 // How many existing classes an official cancellation would hold, and how many carry a mark
@@ -266,7 +424,7 @@ const previewJoin = async ({ setup, input }) => {
   const schedule = await loadScheduleForJoin({ setup, scheduleId: input.scheduleId });
   await assertNoScopeCollision(setup, schedule);
   const plan = await buildPlan({ setup, schedule, input });
-  const { mapping, rulePlan, officialByKey } = plan;
+  const { mapping, rulePlan, officialByKey, dates } = plan;
 
   const warnings = [];
   const from = scopeOf(setup);
@@ -274,10 +432,26 @@ const previewJoin = async ({ setup, input }) => {
   const scopeChange = buildScopeKey(from) === buildScopeKey(to) ? null : { from, to };
   if (scopeChange) warnings.push(`Joining changes your setup to ${to.branch} ${to.section}, ${to.semesterLabel}.`);
 
+  // Semester dates: they follow the official schedule when it sets them
+  let dateChange = null;
+  if (datesChange(setup, dates)) {
+    const impact = await previewDateImpact(setup, dates);
+    dateChange = {
+      from: { startDate: dateText(setup.startDate), endDate: dateText(setup.endDate) },
+      to: { startDate: dateText(dates.startDate), endDate: dateText(dates.endDate) },
+      classesLeftOut: impact.classes,
+      markedClassesLeftOut: impact.marked,
+    };
+    warnings.push(`Joining changes your semester dates to ${dateChange.to.startDate} - ${dateChange.to.endDate}, to match the official schedule.`);
+    if (impact.classes) {
+      warnings.push(`${impact.classes} of your classes (${impact.marked} with a mark) fall outside the new dates. They stop counting toward attendance. Their marks are kept and come back if the dates are widened again.`);
+    }
+  }
+
   // Locks: existing classes only. Classes a new weekly class creates start out cancelled by the same items.
   const locks = [];
   for (const item of plan.eventItems.filter((i) => i.affectsClasses)) {
-    const range = clipToSetup(setup, item.startDate, item.endDate);
+    const range = clipToSetup(dates, item.startDate, item.endDate);
     if (range.from > range.to) continue;
     const r = await previewLock(setup, setup.ownerId, range, { type: CAUSE_TYPE.CALENDAR_EVENT, id: item._id });
     locks.push({ title: item.title, kind: item.kind, ...r });
@@ -300,7 +474,7 @@ const previewJoin = async ({ setup, input }) => {
     warnings.push(`${mapping.suggestions.length} subject(s) look like ones you already have. Choose them in subjectMap to link them, or they will be added as new.`);
   }
   if (rulePlan.skipped.group) warnings.push(`${rulePlan.skipped.group} class(es) are for groups you did not pick and were left out.`);
-  if (rulePlan.skipped.range) warnings.push(`${rulePlan.skipped.range} class(es) fall outside your setup dates and were left out.`);
+  if (rulePlan.skipped.range) warnings.push(`${rulePlan.skipped.range} class(es) fall outside the semester dates and were left out.`);
 
   const byKind = {};
   for (const item of [...plan.eventItems, ...plan.cancelItems]) byKind[item.kind] = (byKind[item.kind] ?? 0) + 1;
@@ -309,6 +483,7 @@ const previewJoin = async ({ setup, input }) => {
   return {
     schedule: shapeSummary(schedule),
     scopeChange,
+    dateChange,
     groups: { available: shapeSummary(schedule).groups, chosen: plan.chosenGroups },
     subjects: {
       linked: mapping.links.map((l) => ({
@@ -362,10 +537,22 @@ const ensureOfficialEvent = async ({ setup, item }) => {
 };
 
 const executeJoin = async ({ setup, plan }) => {
-  const { schedule, chosenGroups, mapping, rulePlan, officialByKey } = plan;
+  const { schedule, chosenGroups, dates, mapping, rulePlan, officialByKey } = plan;
   const setupId = setup._id;
   const userId = setup.ownerId;
-  const summary = { subjectsLinked: 0, subjectsAdded: 0, classesLinked: 0, classesAdded: 0, newClasses: 0, events: 0, cancellations: 0 };
+  const changed = datesChange(setup, dates); // setup still holds the OLD dates until step 4
+  const summary = {
+    subjectsLinked: 0,
+    subjectsAdded: 0,
+    classesLinked: 0,
+    classesAdded: 0,
+    newClasses: 0,
+    events: 0,
+    cancellations: 0,
+    datesChanged: changed,
+    classesLeftOut: 0,
+    classesRestored: 0,
+  };
 
   // 1. Subjects. Adds are upserts on (setup, officialKey), so a retry never duplicates one.
   for (const link of mapping.links) {
@@ -398,6 +585,9 @@ const executeJoin = async ({ setup, plan }) => {
   }
   const subjectRows = await Subject.find({ setupId, officialKey: { $in: [...officialByKey.keys()] } }).select('officialKey').lean();
   const subjectIdByKey = new Map(subjectRows.map((s) => [s.officialKey, String(s._id)]));
+
+  // 1b. Own classes follow the new dates BEFORE official classes are added, so those are never touched by it
+  if (changed) await alignRuleRanges(setupId, setup, dates);
 
   // 2. Classes: link the ones the student already has, add the rest, then create their classes
   for (const { rule, studentRule } of rulePlan.link) {
@@ -436,8 +626,17 @@ const executeJoin = async ({ setup, plan }) => {
     created.push(doc);
     summary.classesAdded += 1;
   }
+
+  // Occurrences for the official classes created above, over the dates the setup will have
   if (created.length) {
-    summary.newClasses = await generateOccurrences(setupId, setup.startDate, setup.endDate, { rules: created });
+    summary.newClasses = await generateOccurrences(setupId, dates.startDate, dates.endDate, { rules: created });
+  }
+  // Dates moved: statuses and new days for the student's other classes
+  if (changed) {
+    const r = await applyDateChange({ setup, dates });
+    summary.newClasses += r.generated;
+    summary.classesLeftOut = r.leftOut;
+    summary.classesRestored = r.restored;
   }
 
   // 3. Calendar items. Official cancellations apply to every class, marked or not (no skipMarked).
@@ -445,7 +644,7 @@ const executeJoin = async ({ setup, plan }) => {
     const event = await ensureOfficialEvent({ setup, item });
     summary.events += 1;
     if (event.affectsClasses) {
-      const range = clipToSetup(setup, event.startDate, event.endDate);
+      const range = clipToSetup(dates, event.startDate, event.endDate);
       if (range.from <= range.to) {
         const r = await applyCancellation({ setupId, userId, filter: range, cause: { type: CAUSE_TYPE.CALENDAR_EVENT, id: event._id } });
         summary.cancellations += r.cancelled;
@@ -460,13 +659,15 @@ const executeJoin = async ({ setup, plan }) => {
     summary.cancellations += r.cancelled;
   }
 
-  // 4. The link, last. Scope, link and groups are saved together, in one write.
+  // 4. The link, last. Scope, dates, link and groups are saved together, in one write.
   const fresh = await Setup.findById(setupId);
   if (fresh.officialScheduleId && String(fresh.officialScheduleId) !== String(schedule._id)) {
     throw new ApiError(409, 'This setup joined another schedule in the meantime');
   }
   fresh.set({
     ...scopeOf(schedule),
+    startDate: dates.startDate,
+    endDate: dates.endDate,
     officialScheduleId: schedule._id,
     joinedOfficialAt: fresh.joinedOfficialAt ?? new Date(),
     officialGroups: chosenGroups,
@@ -504,6 +705,8 @@ const joinSchedule = async ({ setup, input }) => {
       semesterLabel: joined.semesterLabel,
       branch: joined.branch,
       section: joined.section,
+      startDate: dateText(joined.startDate),
+      endDate: dateText(joined.endDate),
       officialGroups: joined.officialGroups,
     },
     summary,
@@ -515,6 +718,7 @@ const joinSchedule = async ({ setup, input }) => {
 // Clears the link and keeps all the content. Official events become the student's own, so the
 // classes they cancelled can be marked again. Cancellations by a mass bunk or class cancel become
 // the student's own cancellations. Every step is repeatable, and the link goes last.
+// The semester dates stay as they are: they are the student's own again.
 // Also called when the student changes the scope of a joined setup (updateSetupDetails).
 const leaveSchedule = async ({ setup }) => {
   if (setup.status === 'archived') throw new ApiError(409, 'Archived setups are read-only');

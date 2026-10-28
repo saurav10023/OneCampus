@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Archive, ArrowRight, CalendarDays, CheckCircle2, ChevronRight, ClipboardCheck, Layers, Link2, Plus } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { setupsApi, errMsg, pick } from "../api/endpoints";
-import { Alert, Badge, Button, Card, Modal, PageHeader, cx, fmtDate } from "../components/Ui";
-import SetupForm from "../components/SetupForm";
+import { setupsApi, errMsg } from "../api/endpoints";
+import { Alert, Badge, Button, Card, PageHeader, cx, fmtDate } from "../components/Ui";
 import { ConfirmDialog, FadeIn, Flash, SemesterBar, SkeletonCards, Tabs, useFlash } from "../components/Ux";
+
+/* Creating a setup always happens in the onboarding flow (create, then join the class schedule).
+   Change this if your onboarding route is different. */
+const NEW_SETUP_PATH = "/onboarding/setup";
 
 const scopeOf = (s) => [s.branch, s.section && `Section ${s.section}`, s.semesterLabel, s.academicYear].filter(Boolean).join(" · ");
 
@@ -17,7 +20,6 @@ const STEPS = [
 
 const Setups = () => {
   const { user, refreshUser } = useAuth();
-  const navigate = useNavigate();
 
   const [all, setAll] = useState([]);
   const [filter, setFilter] = useState("all");
@@ -25,10 +27,6 @@ const Setups = () => {
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [flashMsg, flash] = useFlash();
-
-  const [createOpen, setCreateOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState("");
 
   const [toArchive, setToArchive] = useState(null);
 
@@ -62,28 +60,6 @@ const Setups = () => {
     .filter((s) => (filter === "all" ? true : filter === "archived" ? s.status === "archived" : s.status !== "archived"))
     .filter((s) => !(showHero && s._id === current._id));
 
-  const openCreate = () => {
-    setCreateError("");
-    setCreateOpen(true);
-  };
-
-  const create = async (body) => {
-    setCreating(true);
-    setCreateError("");
-    try {
-      const data = await setupsApi.create(body);
-      const created = pick(data, "setup");
-      setCreateOpen(false);
-      await refreshUser();
-      if (created?._id) navigate(`/setups/${created._id}`);
-      else load();
-    } catch (e) {
-      setCreateError(errMsg(e, "Could not create the setup"));
-    } finally {
-      setCreating(false);
-    }
-  };
-
   const act = async (id, fn, failText, okText) => {
     setBusyId(id);
     setError("");
@@ -110,9 +86,11 @@ const Setups = () => {
         title="Your setups"
         subtitle="One setup is one semester. Keep the current one up to date and archive the old ones."
         action={
-          <Button onClick={openCreate}>
-            <Plus className="w-4 h-4" />New setup
-          </Button>
+          <Link to={NEW_SETUP_PATH}>
+            <Button>
+              <Plus className="w-4 h-4" />New setup
+            </Button>
+          </Link>
         }
       />
 
@@ -142,9 +120,11 @@ const Setups = () => {
                   </li>
                 ))}
               </ol>
-              <Button className="mt-7" onClick={openCreate}>
-                <Plus className="w-4 h-4" />Create my first setup
-              </Button>
+              <Link to={NEW_SETUP_PATH} className="inline-block mt-7">
+                <Button>
+                  <Plus className="w-4 h-4" />Create my first setup
+                </Button>
+              </Link>
             </Card>
           </FadeIn>
         ) : (
@@ -279,12 +259,6 @@ const Setups = () => {
           </>
         )}
       </div>
-
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="New setup">
-        <p className="text-[13.5px] text-[#6A6F85] -mt-2 mb-4">Pick clear dates. Your classes are counted between them.</p>
-        {createError && <Alert type="error" className="mb-4">{createError}</Alert>}
-        <SetupForm submitLabel="Create setup" loading={creating} allowArchivePrevious onSubmit={create} />
-      </Modal>
 
       <ConfirmDialog
         open={Boolean(toArchive)}

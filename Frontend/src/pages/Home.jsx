@@ -11,7 +11,7 @@ import { homeApi, normOcc, normEvent, normAttendance, msg } from "../api/home";
 /* Change these if your routes differ. */
 const ROUTES = {
   dashboard: "/dashboard", attendance: "/attendance", calendar: "/calendar", official: "/official",
-  setup: "/setup", crStudio: "/cr-studio", crRequest: "/cr-studio", register: "/register", login: "/login",
+  setup: "/onboarding/setup", crStudio: "/cr-studio", crRequest: "/cr-studio", register: "/register", login: "/login",
 };
 
 const css = `

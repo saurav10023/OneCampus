@@ -9,6 +9,7 @@ import {
     SESSION_DAYS,
     USER_ROLES
 } from "../utils/constants.js";
+import { resolveCollege } from "../utils/colleges.js";
 
 // Accepts +91 / 91 / 0 prefixes and separators; always stores plain 10 digits.
 // Exported so controllers normalize login/uniqueness queries the same way.
@@ -71,7 +72,12 @@ const userSchema = new Schema(
             type: String,
             required: [true, "College is required"],
             trim: true,
-            default: DEFAULT_COLLEGE
+            default: DEFAULT_COLLEGE,
+            set: (v) => resolveCollege(v) ?? (typeof v === "string" ? v.trim() : v),
+            validate: {
+                validator: (v) => resolveCollege(v) !== null,
+                message: "Unknown college. Choose one from the list"
+            }
         },
         branch: {
             type: String,
