@@ -1,13 +1,16 @@
 import ScheduleRole from '../models/Official/scheduleRole.model.js';
 import ApiError from '../utils/ApiError.js';
-import { normalizeScopePart } from '../utils/scopeKey.js';
-import { isCollegeAdmin, roleRequestCooldown, hasFreeCrSeat } from '../utils/schedulePermissions.js';
+import { roleRequestCooldown, hasFreeCrSeat } from '../utils/schedulePermissions.js';
 import {
+  DEFAULT_COLLEGE,
   SCHEDULE_ROLE,
   SCHEDULE_ROLE_STATUS as STATUS,
   MAX_ACTIVE_CRS_PER_SCHEDULE,
 } from '../utils/constants.js';
 
+// This app serves ONE college, so roles are never matched by college. Whoever holds an active
+// admin role can see and decide every request. The college text is only stored on the role.
+//
 // Only an ACTIVE ScheduleRole gives any power over a schedule (see schedulePermissions.js).
 // The schedule services call this to get the roles they pass to canEditSchedule.
 const loadActiveRoles = (userId) => ScheduleRole.find({ userId, status: STATUS.ACTIVE }).lean();
@@ -43,14 +46,11 @@ const shapeRoleForAdmin = (role) => {
 // an admin is created by scripts/seedAdminRole.js, never by a request.
 // input (already cleaned by the validator): { branch?, section?, note? }
 const requestRole = async ({ user, input }) => {
-  if (!user.college) throw new ApiError(400, 'Add your college to your profile before requesting a role');
-
   const branch = input.branch ?? user.branch;
   const section = input.section ?? user.section;
   if (!branch || !section) throw new ApiError(400, 'A CR request needs a branch and a section');
 
-  const collegeKey = normalizeScopePart(user.college);
-  const sameClass = { userId: user._id, collegeKey, role: SCHEDULE_ROLE.CR, branch, section };
+  const sameClass = { userId: user._id, role: SCHEDULE_ROLE.CR, branch, section };
 
   const open = await ScheduleRole.findOne({ ...sameClass, isOpen: true }).select('status').lean();
   if (open) {
@@ -76,7 +76,7 @@ const requestRole = async ({ user, input }) => {
   try {
     const role = await ScheduleRole.create({
       userId: user._id,
-      college: user.college,
+      college: user.college || DEFAULT_COLLEGE,
       role: SCHEDULE_ROLE.CR,
       branch,
       section,
@@ -112,39 +112,34 @@ const withdrawRole = async ({ roleId, userId }) => {
   return shapeRole(role);
 };
 
-// ---------- College admin ----------
+// ---------- Admin ----------
 
-// Loads a role and checks the caller is an active admin of that role's college
+// The caller must hold an ACTIVE admin role. No college is compared.
+const assertAdmin = async (adminUserId) => {
+  const adminRoles = (await loadActiveRoles(adminUserId)).filter((r) => r.role === SCHEDULE_ROLE.ADMIN);
+  if (!adminRoles.length) throw new ApiError(403, 'Only an admin can do this');
+};
+
+// Loads a role and checks the caller is an active admin
 const loadRoleForAdmin = async ({ roleId, adminUserId }) => {
   const role = await ScheduleRole.findById(roleId);
   if (!role) throw new ApiError(404, 'Role not found');
-  const adminRoles = await loadActiveRoles(adminUserId);
-  if (!isCollegeAdmin(adminRoles, role.collegeKey)) {
-    throw new ApiError(403, 'Only an admin of this college can do this');
-  }
+  await assertAdmin(adminUserId);
   return role;
 };
 
-// A college must always keep one active admin, or nobody could approve a CR again
+// There must always be one active admin, or nobody could approve a CR again
 const assertNotLastAdmin = async (role) => {
   if (role.role !== SCHEDULE_ROLE.ADMIN || role.status !== STATUS.ACTIVE) return;
-  const admins = await ScheduleRole.countDocuments({
-    collegeKey: role.collegeKey,
-    role: SCHEDULE_ROLE.ADMIN,
-    status: STATUS.ACTIVE,
-  });
-  if (admins <= 1) throw new ApiError(409, 'This is the last admin of the college, so it cannot be removed');
+  const admins = await ScheduleRole.countDocuments({ role: SCHEDULE_ROLE.ADMIN, status: STATUS.ACTIVE });
+  if (admins <= 1) throw new ApiError(409, 'This is the last admin, so it cannot be removed');
 };
 
 // query (already cleaned): { status?, branch?, section? }. The default is pending requests.
 const listRoleRequests = async ({ adminUserId, query = {} }) => {
-  const adminRoles = (await loadActiveRoles(adminUserId)).filter((r) => r.role === SCHEDULE_ROLE.ADMIN);
-  if (!adminRoles.length) throw new ApiError(403, 'Only a college admin can view role requests');
+  await assertAdmin(adminUserId);
 
-  const filter = {
-    collegeKey: { $in: [...new Set(adminRoles.map((r) => r.collegeKey))] },
-    status: query.status ?? STATUS.PENDING,
-  };
+  const filter = { status: query.status ?? STATUS.PENDING };
   if (query.branch) filter.branch = query.branch;
   if (query.section) filter.section = query.section;
 
@@ -167,7 +162,6 @@ const approveRole = async ({ roleId, adminUserId, note }) => {
     // Two approvals sent at the exact same moment could both pass this check, so the limit can
     // be exceeded by one at worst. An admin can revoke the extra CR.
     const activeCrs = await ScheduleRole.countDocuments({
-      collegeKey: role.collegeKey,
       role: SCHEDULE_ROLE.CR,
       branch: role.branch,
       section: role.section,
