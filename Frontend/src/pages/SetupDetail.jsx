@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BookOpen, CalendarRange, CheckCircle2, Link2, Settings } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, CalendarRange, CheckCircle2, ImagePlus, Link2, Settings } from "lucide-react"; // NEW: ImagePlus
 import { useAuth } from "../context/AuthContext";
 import { setupsApi, errMsg } from "../api/endpoints";
 import { Alert, Button, Card, fmtDate } from "../components/Ui";
@@ -8,6 +8,7 @@ import SubjectsTab from "./setup/SubjectsTab";
 import CalendarTab from "./setup/CalendarTab";
 import SettingsTab from "./setup/SettingsTab";
 import OfficialJoin from "../components/OfficialJoin";
+import ImportToSetup from "../components/ImportToSetup";
 import { FadeIn, Flash, SemesterBar, Skeleton, Tabs, useFlash } from "../components/Ux";
 
 const TABS = [
@@ -34,6 +35,10 @@ const SetupDetail = () => {
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
   const [flashMsg, flash] = useFlash();
+
+  // NEW: import from images
+  const [importOpen, setImportOpen] = useState(false);
+  const [importKey, setImportKey] = useState(0); // remounts the open tab so imported rows show up
 
   // The open tab lives in the URL (?tab=calendar) so a refresh or shared link keeps it.
   const wanted = params.get("tab");
@@ -122,6 +127,12 @@ const SetupDetail = () => {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                {/* NEW */}
+                {!readOnly && (
+                  <Button variant="glass" onClick={() => setImportOpen(true)}>
+                    <ImagePlus className="w-4 h-4" />Import from images
+                  </Button>
+                )}
                 {isCurrent ? (
                   <Link
                     to="/dashboard"
@@ -167,12 +178,24 @@ const SetupDetail = () => {
         items={TABS}
       />
 
-      <FadeIn key={tab}>
+      {/* NEW: importKey in the key remounts the tab after an import so it reloads its data */}
+      <FadeIn key={`${tab}-${importKey}`}>
         {tab === "subjects" && <SubjectsTab setupId={setupId} readOnly={readOnly} />}
         {tab === "calendar" && <CalendarTab setupId={setupId} readOnly={readOnly} />}
         {tab === "official" && <OfficialJoin setupId={setupId} readOnly={readOnly} />}
         {tab === "settings" && <SettingsTab setup={setup} onUpdated={setSetup} readOnly={readOnly} />}
       </FadeIn>
+
+      {/* NEW: import from images */}
+      <ImportToSetup
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        setup={setup}
+        onDone={() => {
+          setImportKey((k) => k + 1);
+          flash("Import finished");
+        }}
+      />
     </div>
   );
 };

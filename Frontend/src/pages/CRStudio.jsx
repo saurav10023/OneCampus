@@ -27,6 +27,9 @@ const isApproved = (r) => r.status === "approved" || r.status === "active";
 const idOf = (x) => x?._id || x?.id; // works whether the backend returns `_id` or `id`
 const scopeOf = (r) => [r.college, r.branch, r.section && `Section ${r.section}`].filter(Boolean).join(" · ");
 
+// The requests endpoint may answer with a bare list or wrap it in an object.
+const asList = (data) => (Array.isArray(data) ? data : data?.requests || data?.items || data?.roles || []);
+
 const STEPS = [
   { icon: ShieldCheck, title: "Request your role", text: "Tell us your college, branch and section." },
   { icon: Users, title: "A college admin approves", text: "They check that you are your class's CR." },
@@ -65,12 +68,14 @@ const CRStudio = () => {
   const [roles, setRoles] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [reqLoadError, setReqLoadError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const approvedRoles = roles.filter(isApproved);
   const canManage = approvedRoles.length > 0;
-  const isAdmin = approvedRoles.some((r) => r.role === "admin");
+  // A college admin is either approved through a schedule role, or has the account-level admin role.
+  const isAdmin = approvedRoles.some((r) => r.role === "admin") || user?.role === "admin";
   const hasPending = roles.some((r) => r.status === "pending");
 
   const load = useCallback(async () => {
@@ -79,16 +84,30 @@ const CRStudio = () => {
       const r = await scheduleRolesApi.mine();
       setRoles(r);
       const ok = r.filter(isApproved);
-      if (ok.length) {
-        setSchedules(await officialSchedulesApi.list().catch(() => []));
-        if (ok.some((x) => x.role === "admin")) setRequests(await scheduleRolesApi.requests({ status: "pending" }).catch(() => []));
+      if (ok.length) setSchedules(await officialSchedulesApi.list().catch(() => []));
+
+      // Admins load the waiting requests. This does not depend on the admin also being a CR,
+      // and a failure is shown instead of looking like an empty list.
+      const admin = ok.some((x) => x.role === "admin") || user?.role === "admin";
+      if (admin) {
+        try {
+          setRequests(asList(await scheduleRolesApi.requests({ status: "pending" })));
+          setReqLoadError("");
+        } catch (e) {
+          console.error("Role requests failed:", e?.response?.status, e?.response?.data || e);
+          setRequests([]);
+          setReqLoadError(errMsg(e, "Could not load role requests."));
+        }
+      } else {
+        setRequests([]);
+        setReqLoadError("");
       }
     } catch (e) {
       setError(errMsg(e, "We couldn't load your roles. Please refresh and try again."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => {
     load();
@@ -137,7 +156,8 @@ const CRStudio = () => {
 
     setReqBusy(true);
     setReqError("");
-    const body = { college: req.college.trim(), role: req.role };
+    // Single spaces and trimmed, so "ABC  College " and "ABC College" are the same college.
+    const body = { college: req.college.trim().replace(/\s+/g, " "), role: req.role };
     if (req.role === "cr") {
       body.branch = req.branch.trim();
       body.section = req.section.trim();
@@ -298,9 +318,17 @@ const CRStudio = () => {
 
   const requestsCard = isAdmin && (
     <Card className="p-4 sm:p-6 mb-5 sm:mb-6">
-      <SectionTitle icon={Inbox} title="Role requests" text="Students asking to publish schedules. Approve only people you know." />
+      <SectionTitle
+        icon={Inbox}
+        title="Role requests"
+        text="Students asking to publish schedules. Approve only people you know."
+        action={<Button size="sm" variant="glass" onClick={load}>Refresh</Button>}
+      />
+      <Alert type="error" className="mb-3">{reqLoadError}</Alert>
       {requests.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[#161827]/15 px-4 py-5 text-center text-[13.5px] text-[#6A6F85]">No requests are waiting for review.</p>
+        !reqLoadError && (
+          <p className="rounded-2xl border border-dashed border-[#161827]/15 px-4 py-5 text-center text-[13.5px] text-[#6A6F85]">No requests are waiting for review.</p>
+        )
       ) : (
         <div className="space-y-2.5">
           {requests.map((r) => (
@@ -363,8 +391,8 @@ const CRStudio = () => {
 
       <Alert type="error" className="mb-5">{error}</Alert>
 
-      {/* admins see waiting requests first: it is the thing that needs action */}
-      {requests.length > 0 && requestsCard}
+      {/* admins see waiting requests (or a load error) first: it is the thing that needs action */}
+      {(requests.length > 0 || reqLoadError) && requestsCard}
 
       {/* schedules */}
       {canManage &&
@@ -481,7 +509,7 @@ const CRStudio = () => {
         )}
       </Card>
 
-      {requests.length === 0 && requestsCard}
+      {requests.length === 0 && !reqLoadError && requestsCard}
 
       {/* request role */}
       <FormModal

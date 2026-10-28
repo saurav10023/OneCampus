@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Archive, ArrowLeft, BookOpen, CalendarClock, CalendarRange, Check, History, Layers, Pencil, Rocket, Undo2 } from "lucide-react";
+import { Archive, ArrowLeft, BookOpen, CalendarClock, CalendarRange, Check, History, ImagePlus, Layers, Pencil, Rocket, Undo2 } from "lucide-react"; // NEW: ImagePlus
 import { officialSchedulesApi, scheduleRolesApi, errMsg, toDateInput } from "../api/endpoints";
 import { fromApiGroups, cleanGroups } from "../lib/groups";
 import { Alert, Badge, Button, Field, PageSpinner, cx, fmtDate } from "../components/Ui";
@@ -9,6 +9,7 @@ import ActionDialog from "../components/ActionDialog";
 import GroupsEditor from "../components/GroupsEditor";
 import SemesterMeter from "../components/SemesterMeter";
 import Choice from "../components/Choice";
+import ImportFromImages from "../components/ImportFromImages"; // NEW
 import { BRANCHES, SECTIONS, SEMESTERS, academicYearOptions, pickOption, withCurrent } from "../lib/academic";
 import SubjectsPanel from "./cr/SubjectsPanel";
 import OfficialRules from "./cr/OfficialRules";
@@ -153,6 +154,10 @@ const CRSchedule = () => {
   const [error, setError] = useState("");
   const [tab, setTab] = useState("subjects");
   const [version, setVersion] = useState(0); // bump to refresh History after changes
+
+  /* ---- import from images ---- */ // NEW
+  const [importOpen, setImportOpen] = useState(false);
+  const [importKey, setImportKey] = useState(0); // remounts the tab panels so imported rows show up
 
   /* ---- publish / back to draft / archive ---- */
   const [life, setLife] = useState(null);
@@ -359,6 +364,11 @@ const CRSchedule = () => {
                   <Pencil className="w-4 h-4" />
                   Edit details
                 </Button>
+                {/* NEW */}
+                <Button variant="glass" size="sm" className="col-span-2 sm:col-span-1 sm:order-1 !h-10 sm:!h-9" onClick={() => setImportOpen(true)}>
+                  <ImagePlus className="w-4 h-4" />
+                  Import from images
+                </Button>
                 <Button variant="ghost" size="sm" className="sm:order-3 !h-10 sm:!h-9" onClick={() => openLife("archive")}>
                   <Archive className="w-4 h-4" />
                   Archive
@@ -402,11 +412,24 @@ const CRSchedule = () => {
       <SectionTabs value={tab} onChange={setTab} />
 
       <div role="tabpanel" id="schedule-panel" aria-labelledby={`tab-${tab}`}>
-        {tab === "subjects" && <SubjectsPanel scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
-        {tab === "rules" && <OfficialRules schedule={schedule} scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
-        {tab === "items" && <ItemsPanel schedule={schedule} scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
+        {/* NEW: key={importKey} remounts the panel after an import so it reloads its data */}
+        {tab === "subjects" && <SubjectsPanel key={importKey} scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
+        {tab === "rules" && <OfficialRules key={importKey} schedule={schedule} scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
+        {tab === "items" && <ItemsPanel key={importKey} schedule={schedule} scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
         {tab === "history" && <HistoryPanel scheduleId={scheduleId} isAdmin={isAdmin} readOnly={archived} version={version} onChanged={changed} />}
       </div>
+
+      {/* NEW: import from images */}
+      <ImportFromImages
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        schedule={schedule}
+        scheduleId={scheduleId}
+        onDone={() => {
+          setImportKey((k) => k + 1);
+          changed();
+        }}
+      />
 
       {/* edit schedule */}
       <FormModal
