@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { homeApi, normOcc, normEvent, normAttendance, msg } from "../../api/home";
 import { occurrencesApi } from "../../api/endpoints";
-import { toIso, addDays, pad } from "./shared";
+import { toIso, addDays, pad } from "./Shared";
 
 /* Merge lists of {date, classes} days by date; later lists win. */
 const mergeDays = (...lists) => {
