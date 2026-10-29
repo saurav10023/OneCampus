@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { cx } from "../components/Ui";
 import { useRemainingClasses } from "../lib/useRemainingClasses";
 import { css } from "../components/home/homeStyles";
-import { Card, ROUTES, fmtLong, greeting, ghost, linkBase, linkPrimary, toIso } from "../components/home/shared";
+import { Card, ROUTES, fmtLong, greeting, ghost, linkBase, linkPrimary, toIso } from "../components/home/Shared";
 import { useLive } from "../components/home/useHomeData";
 import DashboardView from "../components/home/DashboardView";
 import Landing from "../components/home/Landing";
