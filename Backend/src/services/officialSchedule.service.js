@@ -27,6 +27,9 @@ import {
 // A crash after step 1 leaves a gap in the revision numbers, which is harmless: sync asks for
 // "everything after the revision I last saw".
 
+// Case-insensitive equality for text fields such as branch and section ("CSE" == "cse").
+const TEXT_COLLATION = { locale: 'en', strength: 2 };
+
 const dateText = (date) => (date ? date.toISOString().slice(0, 10) : null);
 
 const shapeSchedule = (schedule) => ({
@@ -47,8 +50,45 @@ const shapeSchedule = (schedule) => ({
   updatedAt: schedule.updatedAt,
 });
 
-const duplicateScheduleError = () =>
-  new ApiError(409, 'A live schedule already exists for this college, year, semester, branch and section');
+// createdBy may be a bare id or a populated { _id, fullName, username }.
+// `mine` lets the app label a schedule "You" or "Your classmate".
+const withOwner = (schedule, viewerId) => {
+  const owner = schedule.createdBy;
+  const ownerId = owner?._id ?? owner ?? null;
+  return {
+    createdBy: ownerId,
+    createdByName: owner?.fullName || owner?.username || null,
+    mine: ownerId ? String(ownerId) === String(viewerId) : false,
+  };
+};
+
+const duplicateScheduleError = async ({ college, input }) => {
+  // Point the CR at the schedule that is already there instead of leaving them stuck
+  const existing = await OfficialSchedule.findOne({
+    collegeKey: normalizeScopePart(college),
+    academicYear: input.academicYear,
+    semesterNumber: parseSemester(input.semesterLabel),
+    branch: input.branch,
+    section: input.section,
+    status: { $ne: SCHEDULE_STATUS.ARCHIVED },
+  })
+    .collation(TEXT_COLLATION)
+    .select('_id status')
+    .lean()
+    .catch(() => null);
+
+  const details = existing
+    ? [
+        `A ${existing.status} schedule for this class already exists. Open it from "Your schedules" in CR Studio.`,
+        `existingScheduleId:${existing._id}`,
+      ]
+    : [];
+  return new ApiError(
+    409,
+    'A live schedule already exists for this college, year, semester, branch and section',
+    details
+  );
+};
 
 // Students attached to a schedule. Setup.officialScheduleId must exist in the Setup schema: an
 // unknown field in a query filter can be dropped by Mongoose, which would count every setup.
@@ -75,8 +115,37 @@ const countStudentsBySchedule = async (scheduleIds) => {
   return new Map(rows.map((row) => [String(row._id), row.count]));
 };
 
+// Active subjects, weekly classes and calendar items for several schedules, three queries in total.
+// Each Map is scheduleId text -> count; read with `?? 0`.
+const countContentBySchedule = async (scheduleIds) => {
+  const empty = { subjects: new Map(), rules: new Map(), items: new Map() };
+  if (!scheduleIds.length) return empty;
+
+  const countOf = async (Model) => {
+    const rows = await Model.aggregate([
+      { $match: { scheduleId: { $in: scheduleIds }, status: ITEM_STATUS.ACTIVE } },
+      { $group: { _id: '$scheduleId', count: { $sum: 1 } } },
+    ]);
+    return new Map(rows.map((row) => [String(row._id), row.count]));
+  };
+
+  try {
+    const [subjects, rules, items] = await Promise.all([
+      countOf(ScheduleSubject),
+      countOf(ScheduleRule),
+      countOf(ScheduleItem),
+    ]);
+    return { subjects, rules, items };
+  } catch {
+    // The counts are a nicety for the list page; never fail the whole list because of them
+    return empty;
+  }
+};
+
 // Loads a schedule and checks the caller may edit it. Returns the document and the actor that
 // goes into the action log (an admin acts as admin, anyone else as CR).
+// Access depends only on the caller's role scope (college, branch, section), never on who
+// created the schedule, so every CR of a class can open and edit the class's schedules.
 const loadEditableSchedule = async ({ user, scheduleId, allowArchived = false }) => {
   const schedule = await OfficialSchedule.findById(scheduleId);
   if (!schedule) throw new ApiError(404, 'Schedule not found');
@@ -103,16 +172,38 @@ const freshSchedule = async (scheduleId) => shapeSchedule(await OfficialSchedule
 
 // ---------- Create ----------
 
+// Which college a new schedule belongs to. It comes from the role that lets the caller create it
+// (the college the admin approved), NOT from the profile text. Two CRs of the same class can
+// spell their profile college differently; the approved role is what keeps them on one college.
+// If several roles qualify, the one matching the profile college wins.
+const resolveHomeCollege = ({ roles, user, input }) => {
+  const sameText = (a, b) => String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
+  const candidates = roles.filter(
+    (r) =>
+      r.role === SCHEDULE_ROLE.ADMIN ||
+      (r.role === SCHEDULE_ROLE.CR && sameText(r.branch, input.branch) && sameText(r.section, input.section))
+  );
+  if (!candidates.length) {
+    throw new ApiError(403, 'You can only create a schedule for a class you are the CR of');
+  }
+
+  const profileKey = user.college ? normalizeScopePart(user.college) : null;
+  const pick = candidates.find((r) => r.collegeKey === profileKey) ?? candidates[0];
+  const college = pick.college || user.college;
+  if (!college) throw new ApiError(400, 'Add your college to your profile before creating a schedule');
+  return { college, collegeKey: pick.collegeKey ?? normalizeScopePart(college) };
+};
+
 // input (already cleaned by the validator):
 //   { academicYear, semesterLabel, branch, section, semesterStart?, semesterEnd?, groups? }
 const createSchedule = async ({ user, input }) => {
-  if (!user.college) throw new ApiError(400, 'Add your college to your profile before creating a schedule');
   if (parseSemester(input.semesterLabel) === null) {
     throw new ApiError(400, `Could not read a semester number from "${input.semesterLabel}". Try "Sem 5".`);
   }
 
   const roles = await loadActiveRoles(user._id);
-  const target = { collegeKey: normalizeScopePart(user.college), branch: input.branch, section: input.section };
+  const home = resolveHomeCollege({ roles, user, input });
+  const target = { collegeKey: home.collegeKey, branch: input.branch, section: input.section };
   if (!canEditSchedule(roles, target)) {
     throw new ApiError(403, 'You can only create a schedule for a class you are the CR of');
   }
@@ -124,7 +215,7 @@ const createSchedule = async ({ user, input }) => {
   let schedule;
   try {
     schedule = new OfficialSchedule({
-      college: user.college,
+      college: home.college,
       academicYear: input.academicYear,
       semesterLabel: input.semesterLabel,
       branch: input.branch,
@@ -137,7 +228,7 @@ const createSchedule = async ({ user, input }) => {
     });
     await saveOrThrow(schedule);
   } catch (err) {
-    if (err?.code === 11000) throw duplicateScheduleError();
+    if (err?.code === 11000) throw await duplicateScheduleError({ college: home.college, input });
     throw err;
   }
 
@@ -164,24 +255,80 @@ const createSchedule = async ({ user, input }) => {
 
 // ---------- Read ----------
 
-// query (already cleaned): { status?, branch?, section? }. Archived schedules are hidden unless
-// status=archived is asked for.
+// Turns the caller's active roles into the visibility scopes of the list:
+//   - admin -> every schedule of the college
+//   - CR    -> every schedule of college + branch + section, whoever created it, any semester
+// Roles that cannot be turned into a safe scope are skipped, and repeated scopes are removed.
+const buildScopes = (roles) => {
+  const seen = new Set();
+  const scopes = [];
+
+  for (const r of roles) {
+    const collegeKey = r.collegeKey || (r.college ? normalizeScopePart(r.college) : null);
+    if (!collegeKey) continue;
+
+    let scope;
+    if (r.role === SCHEDULE_ROLE.ADMIN) {
+      scope = { collegeKey };
+    } else {
+      const branch = typeof r.branch === 'string' ? r.branch.trim() : '';
+      const section = typeof r.section === 'string' ? r.section.trim() : '';
+      // An incomplete CR role must never widen the query to the whole college
+      if (!branch || !section) continue;
+      scope = { collegeKey, branch, section };
+    }
+
+    const id = JSON.stringify(scope);
+    if (!seen.has(id)) {
+      seen.add(id);
+      scopes.push(scope);
+    }
+  }
+  return scopes;
+};
+
+// query (already cleaned): { status?, branch?, section?, semester? }
+//   semester is the number (5 for "Sem 5"). Archived schedules are hidden unless
+//   status=archived is asked for.
+// Each row also carries: owner info (createdBy, createdByName, mine), the number of attached
+// students, and the number of active subjects, weekly classes and calendar items.
 const listSchedules = async ({ user, query = {} }) => {
   const roles = await loadActiveRoles(user._id);
-  const scopes = roles.map((r) =>
-    r.role === SCHEDULE_ROLE.ADMIN
-      ? { collegeKey: r.collegeKey }
-      : { collegeKey: r.collegeKey, branch: r.branch, section: r.section }
-  );
+  const scopes = buildScopes(roles);
   if (!scopes.length) throw new ApiError(403, 'Only a CR or an admin can manage schedules');
 
   const filter = { $or: scopes, status: query.status ?? { $ne: SCHEDULE_STATUS.ARCHIVED } };
+  // Optional narrowing by the caller. Never by creator: classmates' schedules always show.
   if (query.branch) filter.branch = query.branch;
   if (query.section) filter.section = query.section;
+  if (query.semester) filter.semesterNumber = query.semester;
 
-  const schedules = await OfficialSchedule.find(filter).sort({ updatedAt: -1, _id: 1 }).limit(100).lean();
-  const students = await countStudentsBySchedule(schedules.map((s) => s._id));
-  return schedules.map((s) => ({ ...shapeSchedule(s), students: students.get(String(s._id)) ?? 0 }));
+  let find = OfficialSchedule.find(filter)
+    .collation(TEXT_COLLATION)
+    .sort({ updatedAt: -1, _id: 1 })
+    .limit(100);
+  // Show who made each schedule when createdBy points at the user collection
+  if (OfficialSchedule.schema.path('createdBy')?.options?.ref) {
+    find = find.populate({ path: 'createdBy', select: 'fullName username' });
+  }
+  const schedules = await find.lean();
+
+  const ids = schedules.map((s) => s._id);
+  const [students, content] = await Promise.all([countStudentsBySchedule(ids), countContentBySchedule(ids)]);
+
+  return schedules.map((s) => {
+    const key = String(s._id);
+    return {
+      ...shapeSchedule(s),
+      ...withOwner(s, user._id),
+      students: students.get(key) ?? 0,
+      counts: {
+        subjects: content.subjects.get(key) ?? 0,
+        rules: content.rules.get(key) ?? 0,
+        items: content.items.get(key) ?? 0,
+      },
+    };
+  });
 };
 
 const getSchedule = async ({ user, scheduleId }) => {
@@ -193,7 +340,10 @@ const getSchedule = async ({ user, scheduleId }) => {
     ScheduleItem.countDocuments(active),
     countAttachedStudents(schedule._id),
   ]);
-  return { schedule: shapeSchedule(schedule), counts: { subjects, rules, items, students } };
+  return {
+    schedule: { ...shapeSchedule(schedule), ...withOwner(schedule, user._id) },
+    counts: { subjects, rules, items, students },
+  };
 };
 
 // ---------- Update (groups and semester dates) ----------

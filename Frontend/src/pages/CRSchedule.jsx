@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Archive, ArrowLeft, BookOpen, CalendarClock, CalendarRange, Check, History, ImagePlus, Layers, Pencil, Rocket, Undo2 } from "lucide-react"; // NEW: ImagePlus
+import { Archive, ArrowLeft, BookOpen, CalendarClock, CalendarRange, Check, History, ImagePlus, Layers, Pencil, Rocket, Undo2 } from "lucide-react";
 import { officialSchedulesApi, scheduleRolesApi, errMsg, toDateInput } from "../api/endpoints";
 import { fromApiGroups, cleanGroups } from "../lib/groups";
 import { Alert, Badge, Button, Field, PageSpinner, cx, fmtDate } from "../components/Ui";
@@ -8,9 +8,7 @@ import { FormModal, focusFirstInvalid } from "../components/FormKit";
 import ActionDialog from "../components/ActionDialog";
 import GroupsEditor from "../components/GroupsEditor";
 import SemesterMeter from "../components/SemesterMeter";
-import Choice from "../components/Choice";
-import ImportFromImages from "../components/ImportFromImages"; // NEW
-import { BRANCHES, SECTIONS, SEMESTERS, academicYearOptions, pickOption, withCurrent } from "../lib/academic";
+import ImportFromImages from "../components/ImportFromImages";
 import SubjectsPanel from "./cr/SubjectsPanel";
 import OfficialRules from "./cr/OfficialRules";
 import ItemsPanel from "./cr/ItemsPanel";
@@ -155,7 +153,7 @@ const CRSchedule = () => {
   const [tab, setTab] = useState("subjects");
   const [version, setVersion] = useState(0); // bump to refresh History after changes
 
-  /* ---- import from images ---- */ // NEW
+  /* ---- import from images ---- */
   const [importOpen, setImportOpen] = useState(false);
   const [importKey, setImportKey] = useState(0); // remounts the tab panels so imported rows show up
 
@@ -185,7 +183,9 @@ const CRSchedule = () => {
       const sid = s?._id || s?.id || scheduleId;
       setSchedule({ ...s, _id: sid, id: sid });
       setIsAdmin(roles.some((r) => r.role === "admin" && (r.status === "approved" || r.status === "active")));
+      setError("");
     } catch (e) {
+      console.error("Schedule load failed:", e?.response?.status, e?.response?.data || e);
       setError(errMsg(e, "We couldn't load this schedule. Please refresh and try again."));
     } finally {
       setLoading(false);
@@ -218,19 +218,12 @@ const CRSchedule = () => {
     }
   };
 
-  /* ---- edit handlers ---- */
-  // Once a schedule has been published at any point, the backend locks its scope fields.
-  const scopeLocked = Boolean(schedule?.publishedAt) || schedule?.status === "published";
-
+  /* ---- edit handlers ----
+     The backend only changes the semester dates and the groups of an existing schedule.
+     College, academic year, semester, branch and section decide which CRs and students can see
+     the schedule, so they are shown read-only and never sent. */
   const openEdit = () => {
-    // Match stored values to the dropdown options; if one doesn't match, keep the stored text
-    // so it still shows (and stays selectable) instead of going blank.
-    const norm = (options, value) => pickOption(options, value) || String(value || "").trim();
     const f = {
-      academicYear: String(schedule.academicYear || "").trim(),
-      semesterLabel: norm(SEMESTERS, schedule.semesterLabel),
-      branch: norm(BRANCHES, schedule.branch),
-      section: norm(SECTIONS, schedule.section),
       semesterStart: toDateInput(schedule.semesterStart),
       semesterEnd: toDateInput(schedule.semesterEnd),
     };
@@ -263,12 +256,6 @@ const CRSchedule = () => {
     if (saving) return;
 
     const errs = {};
-    if (!scopeLocked) {
-      const need = { academicYear: "academic year", semesterLabel: "semester", branch: "branch", section: "section" };
-      Object.entries(need).forEach(([k, l]) => {
-        if (!(form[k] || "").trim()) errs[k] = `Choose the ${l}.`;
-      });
-    }
     if (!form.semesterStart) errs.semesterStart = "Pick the start date.";
     if (!form.semesterEnd) errs.semesterEnd = "Pick the end date.";
     else if (form.semesterStart && form.semesterEnd < form.semesterStart) errs.semesterEnd = "Must be on or after the start date.";
@@ -282,13 +269,6 @@ const CRSchedule = () => {
     if (groupError) return setFormError(groupError);
 
     const body = { semesterStart: form.semesterStart, semesterEnd: form.semesterEnd, groups: cleaned };
-    // Scope fields are only sent while the schedule has never been published.
-    if (!scopeLocked) {
-      body.academicYear = form.academicYear.trim();
-      body.semesterLabel = form.semesterLabel.trim();
-      body.branch = form.branch.trim();
-      body.section = form.section.trim();
-    }
 
     setSaving(true);
     setFormError("");
@@ -345,6 +325,11 @@ const CRSchedule = () => {
                 <Badge tone={tone[schedule.status] || "neutral"}>{statusText[schedule.status] || schedule.status}</Badge>
               </div>
               <p className="text-[14px] text-[#6A6F85] mt-1 break-words">{schedule.college}</p>
+              {schedule.createdByName && (
+                <p className="text-[12.5px] text-[#6A6F85] mt-0.5 break-words">
+                  Created by {schedule.mine ? "you" : schedule.createdByName}
+                </p>
+              )}
             </div>
 
             {!archived && (
@@ -364,7 +349,6 @@ const CRSchedule = () => {
                   <Pencil className="w-4 h-4" />
                   Edit details
                 </Button>
-                {/* NEW */}
                 <Button variant="glass" size="sm" className="col-span-2 sm:col-span-1 sm:order-1 !h-10 sm:!h-9" onClick={() => setImportOpen(true)}>
                   <ImagePlus className="w-4 h-4" />
                   Import from images
@@ -412,14 +396,14 @@ const CRSchedule = () => {
       <SectionTabs value={tab} onChange={setTab} />
 
       <div role="tabpanel" id="schedule-panel" aria-labelledby={`tab-${tab}`}>
-        {/* NEW: key={importKey} remounts the panel after an import so it reloads its data */}
+        {/* key={importKey} remounts the panel after an import so it reloads its data */}
         {tab === "subjects" && <SubjectsPanel key={importKey} scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
         {tab === "rules" && <OfficialRules key={importKey} schedule={schedule} scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
         {tab === "items" && <ItemsPanel key={importKey} schedule={schedule} scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
         {tab === "history" && <HistoryPanel scheduleId={scheduleId} isAdmin={isAdmin} readOnly={archived} version={version} onChanged={changed} />}
       </div>
 
-      {/* NEW: import from images */}
+      {/* import from images */}
       <ImportFromImages
         open={importOpen}
         onClose={() => setImportOpen(false)}
@@ -443,17 +427,15 @@ const CRSchedule = () => {
         dirty={dirty}
         error={formError}
       >
-        {scopeLocked && (
-          <Alert type="info">
-            This schedule has been published, so its college, academic year, semester, branch and section are locked. You can still change the semester dates and groups.
-          </Alert>
-        )}
+        <Alert type="info">
+          The college, academic year, semester, branch and section decide which CRs and students can see this schedule, so they can't be changed here. You can change the semester dates and groups. If the class details are wrong, archive this schedule and create a new one.
+        </Alert>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <Choice label="Academic year" value={form.academicYear || ""} options={withCurrent(academicYearOptions(), form.academicYear)} onChange={setF("academicYear")} error={errors.academicYear} disabled={scopeLocked} />
-          <Choice label="Semester" value={form.semesterLabel || ""} options={withCurrent(SEMESTERS, form.semesterLabel)} onChange={setF("semesterLabel")} error={errors.semesterLabel} disabled={scopeLocked} />
-          <Choice label="Branch" value={form.branch || ""} options={withCurrent(BRANCHES, form.branch)} onChange={setF("branch")} error={errors.branch} disabled={scopeLocked} />
-          <Choice label="Section" value={form.section || ""} options={withCurrent(SECTIONS, form.section)} onChange={setF("section")} error={errors.section} disabled={scopeLocked} />
+          <Fact icon={BookOpen} label="Academic year">{schedule.academicYear || "-"}</Fact>
+          <Fact icon={BookOpen} label="Semester">{schedule.semesterLabel || "-"}</Fact>
+          <Fact icon={Layers} label="Branch">{schedule.branch || "-"}</Fact>
+          <Fact icon={Layers} label="Section">{schedule.section || "-"}</Fact>
           <Field label="Semester start" type="date" value={form.semesterStart || ""} onChange={setStart} error={errors.semesterStart} />
           <Field label="Semester end" type="date" min={form.semesterStart || undefined} value={form.semesterEnd || ""} onChange={setF("semesterEnd")} error={errors.semesterEnd} />
         </div>

@@ -1,6 +1,24 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Archive, CalendarRange, ChevronRight, FileText, Inbox, Megaphone, Plus, Rocket, ShieldCheck, Sparkles, Users } from "lucide-react";
+import {
+  Archive,
+  BookOpen,
+  CalendarClock,
+  CalendarRange,
+  ChevronRight,
+  FileText,
+  Inbox,
+  Megaphone,
+  Plus,
+  RefreshCw,
+  Rocket,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  User,
+  Users,
+  X,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { officialSchedulesApi, scheduleRolesApi, errMsg } from "../api/endpoints";
 import { cleanGroups } from "../lib/groups";
@@ -30,11 +48,43 @@ const scopeOf = (r) => [r.college, r.branch, r.section && `Section ${r.section}`
 // The requests endpoint may answer with a bare list or wrap it in an object.
 const asList = (data) => (Array.isArray(data) ? data : data?.requests || data?.items || data?.roles || []);
 
+const norm = (v) => String(v || "").trim().toLowerCase();
+const semesterNumberOf = (s) => {
+  if (Number.isFinite(s?.semesterNumber)) return s.semesterNumber;
+  const m = String(s?.semesterLabel || "").match(/\d+/);
+  return m ? Number(m[0]) : null;
+};
+
+const EXISTING_PREFIX = "existingScheduleId:";
+
 const STEPS = [
   { icon: ShieldCheck, title: "Request your role", text: "Tell us your college, branch and section." },
   { icon: Users, title: "A college admin approves", text: "They check that you are your class's CR." },
   { icon: Rocket, title: "Publish your schedule", text: "Students join it and stay in sync with you." },
 ];
+
+const STATUS_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "published", label: "Live" },
+  { key: "draft", label: "Drafts" },
+  { key: "archived", label: "Archived" },
+];
+
+const OWNER_FILTERS = [
+  { key: "all", label: "Everyone" },
+  { key: "mine", label: "Created by me" },
+  { key: "others", label: "Created by classmates" },
+];
+
+const SORTS = [
+  { key: "updated", label: "Recently updated" },
+  { key: "semester", label: "Semester, newest first" },
+  { key: "students", label: "Most students" },
+  { key: "name", label: "Branch and section" },
+];
+
+const selectCls =
+  "h-10 rounded-full bg-white/70 border border-white/80 shadow-[inset_0_1px_0_#fff] px-3.5 text-[13.5px] text-[#161827] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400";
 
 const StatTile = ({ icon: Icon, value, label, tint }) => (
   <div className="rounded-2xl bg-white/60 border border-white/80 shadow-[inset_0_1px_0_#fff] px-3 sm:px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
@@ -61,16 +111,61 @@ const SectionTitle = ({ icon: Icon, title, text, action }) => (
   </div>
 );
 
+// Small count shown on a schedule card: icon, number, label.
+const Count = ({ icon: Icon, value, label }) => (
+  <span className="flex items-center gap-1.5 text-[12.5px] text-[#444A63] min-w-0">
+    <Icon className="w-3.5 h-3.5 text-[#6A6F85] shrink-0" aria-hidden="true" />
+    <span className="font-semibold text-[#161827]">{value}</span>
+    <span className="text-[#6A6F85] truncate">{label}</span>
+  </span>
+);
+
+const FilterChip = ({ active, onClick, children, count }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={active}
+    className={cx(
+      "h-9 px-3.5 rounded-full text-[13px] font-medium whitespace-nowrap transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
+      active
+        ? "text-white bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/25"
+        : "text-[#161827]/70 bg-white/60 border border-white/80 hover:bg-white/80"
+    )}
+  >
+    {children}
+    {count !== undefined && <span className={cx("ml-1.5 text-[12px]", active ? "text-white/80" : "text-[#6A6F85]")}>{count}</span>}
+  </button>
+);
+
 const blankReq = { college: "", role: "cr", branch: "", section: "", requestNote: "" };
+
+// Removes repeated schedules (same id) while keeping the first one seen.
+const dedupeById = (list) => {
+  const seen = new Set();
+  return list.filter((s) => {
+    const id = String(idOf(s));
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+};
 
 const CRStudio = () => {
   const { user } = useAuth();
   const [roles, setRoles] = useState([]);
-  const [schedules, setSchedules] = useState([]);
+  const [schedules, setSchedules] = useState([]); // live + draft + archived, every creator
   const [requests, setRequests] = useState([]);
   const [reqLoadError, setReqLoadError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+
+  /* ---- list filters ---- */
+  const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("all");
+  const [semFilter, setSemFilter] = useState("all");
+  const [sort, setSort] = useState("updated");
 
   const approvedRoles = roles.filter(isApproved);
   const canManage = approvedRoles.length > 0;
@@ -84,7 +179,41 @@ const CRStudio = () => {
       const r = await scheduleRolesApi.mine();
       setRoles(r);
       const ok = r.filter(isApproved);
-      if (ok.length) setSchedules(await officialSchedulesApi.list().catch(() => []));
+
+      if (ok.length) {
+        // The backend hides archived schedules unless asked, so fetch them separately.
+        // The list holds every schedule of the CR's college, branch and section, whoever created it.
+        // allSettled: one failing request must not hide the other, and must never look like "no schedules".
+        const [activeRes, archivedRes] = await Promise.allSettled([
+          officialSchedulesApi.list(),
+          officialSchedulesApi.list({ status: "archived" }),
+        ]);
+
+        if (activeRes.status === "rejected") {
+          console.error(
+            "Schedule list failed:",
+            activeRes.reason?.response?.status,
+            activeRes.reason?.response?.data || activeRes.reason
+          );
+          setSchedules([]);
+          setError(errMsg(activeRes.reason, "We couldn't load your schedules. Please refresh and try again."));
+        } else {
+          let archived = [];
+          if (archivedRes.status === "fulfilled") {
+            archived = archivedRes.value;
+          } else {
+            console.error(
+              "Archived schedule list failed:",
+              archivedRes.reason?.response?.status,
+              archivedRes.reason?.response?.data || archivedRes.reason
+            );
+            setError("Archived schedules couldn't be loaded. Your live and draft schedules are shown.");
+          }
+          setSchedules(dedupeById([...activeRes.value, ...archived]));
+        }
+      } else {
+        setSchedules([]);
+      }
 
       // Admins load the waiting requests. This does not depend on the admin also being a CR,
       // and a failure is shown instead of looking like an empty list.
@@ -112,6 +241,12 @@ const CRStudio = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
 
   /* ---- request a role ---- */
   const [reqOpen, setReqOpen] = useState(false);
@@ -239,6 +374,7 @@ const CRStudio = () => {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [existingId, setExistingId] = useState(""); // set when the server says the class already has a schedule
 
   const openNew = () => {
     const base = approvedRoles.find((r) => r.role === "cr") || approvedRoles[0] || {};
@@ -256,6 +392,7 @@ const CRStudio = () => {
     setNewInitial(JSON.stringify({ f, g: [] }));
     setErrors({});
     setFormError("");
+    setExistingId("");
     setNewOpen(true);
   };
 
@@ -263,6 +400,7 @@ const CRStudio = () => {
     const v = e.target.value;
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((x) => ({ ...x, [k]: undefined }));
+    setExistingId("");
   };
 
   // Moving the start date past the end date drags the end date along.
@@ -273,6 +411,23 @@ const CRStudio = () => {
   };
 
   const newDirty = newOpen && JSON.stringify({ f: form, g: groups }) !== newInitial;
+
+  // A schedule for the same year, semester, branch and section that is not archived. Checked while
+  // the CR fills the form, so they find a classmate's schedule before trying to create a second one.
+  const duplicate = useMemo(() => {
+    if (!newOpen || !form.academicYear || !form.semesterLabel || !form.branch || !form.section) return null;
+    const sem = semesterNumberOf({ semesterLabel: form.semesterLabel });
+    return (
+      schedules.find(
+        (s) =>
+          s.status !== "archived" &&
+          norm(s.academicYear) === norm(form.academicYear) &&
+          semesterNumberOf(s) === sem &&
+          norm(s.branch) === norm(form.branch) &&
+          norm(s.section) === norm(form.section)
+      ) || null
+    );
+  }, [newOpen, form.academicYear, form.semesterLabel, form.branch, form.section, schedules]);
 
   const createSchedule = async (e) => {
     e.preventDefault();
@@ -290,12 +445,17 @@ const CRStudio = () => {
       setFormError("Check the highlighted fields.");
       return focusFirstInvalid();
     }
+    if (duplicate) {
+      setFormError("This class already has a schedule for that semester. Open it instead of creating a second one.");
+      return;
+    }
 
     const { groups: cleaned, error: groupError } = cleanGroups(groups);
     if (groupError) return setFormError(groupError);
 
     setSaving(true);
     setFormError("");
+    setExistingId("");
     try {
       await officialSchedulesApi.create({
         ...Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim()])),
@@ -304,17 +464,77 @@ const CRStudio = () => {
       setNewOpen(false);
       await load();
     } catch (err) {
-      setFormError(errMsg(err, "We couldn't create the schedule. Please check the details and try again."));
+      // 409: the server names the schedule that is already there, so offer a link to it
+      const details = Array.isArray(err?.response?.data?.errors) ? err.response.data.errors : [];
+      const found = details.find((d) => typeof d === "string" && d.startsWith(EXISTING_PREFIX));
+      if (found) {
+        setExistingId(found.slice(EXISTING_PREFIX.length));
+        setFormError(err.response.data.message || "This class already has a schedule.");
+      } else {
+        setFormError(errMsg(err, "We couldn't create the schedule. Please check the details and try again."));
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <PageSpinner />;
-
+  /* ---- list: counts, semester options, filtered and sorted view ---- */
   const live = schedules.filter((s) => s.status === "published").length;
   const drafts = schedules.filter((s) => s.status === "draft").length;
   const archivedCount = schedules.filter((s) => s.status === "archived").length;
+  const notArchived = schedules.length - archivedCount;
+
+  const semesterOptions = useMemo(() => {
+    const nums = new Set();
+    schedules.forEach((s) => {
+      const n = semesterNumberOf(s);
+      if (n !== null) nums.add(n);
+    });
+    return [...nums].sort((a, b) => b - a);
+  }, [schedules]);
+
+  const view = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const list = schedules.filter((s) => {
+      // Archived schedules only show under the Archived filter, like the backend default
+      if (statusFilter === "archived" ? s.status !== "archived" : s.status === "archived") return false;
+      if (statusFilter !== "all" && statusFilter !== "archived" && s.status !== statusFilter) return false;
+      if (ownerFilter === "mine" && !s.mine) return false;
+      if (ownerFilter === "others" && s.mine) return false;
+      if (semFilter !== "all" && semesterNumberOf(s) !== Number(semFilter)) return false;
+      if (needle) {
+        const hay = [s.branch, s.section, s.semesterLabel, s.academicYear, s.college, s.createdByName].join(" ").toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+
+    const byUpdated = (a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+    const sorters = {
+      updated: byUpdated,
+      semester: (a, b) => (semesterNumberOf(b) ?? -1) - (semesterNumberOf(a) ?? -1) || byUpdated(a, b),
+      students: (a, b) => (b.students || 0) - (a.students || 0) || byUpdated(a, b),
+      name: (a, b) => `${a.branch} ${a.section}`.localeCompare(`${b.branch} ${b.section}`) || byUpdated(a, b),
+    };
+    return [...list].sort(sorters[sort] || byUpdated);
+  }, [schedules, q, statusFilter, ownerFilter, semFilter, sort]);
+
+  const filtersActive = q.trim() || statusFilter !== "all" || ownerFilter !== "all" || semFilter !== "all";
+  const clearFilters = () => {
+    setQ("");
+    setStatusFilter("all");
+    setOwnerFilter("all");
+    setSemFilter("all");
+  };
+
+  const statusCount = (key) => {
+    if (key === "all") return notArchived;
+    if (key === "published") return live;
+    if (key === "draft") return drafts;
+    return archivedCount;
+  };
+
+  if (loading) return <PageSpinner />;
 
   const requestsCard = isAdmin && (
     <Card className="p-4 sm:p-6 mb-5 sm:mb-6">
@@ -369,10 +589,15 @@ const CRStudio = () => {
             </p>
           </div>
           {canManage && (
-            <Button onClick={openNew} className="w-full sm:w-auto !h-12 px-6 shrink-0">
-              <Plus className="w-4 h-4" />
-              New schedule
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto shrink-0">
+              <Button variant="glass" onClick={refresh} disabled={refreshing} className="!h-12 px-4" aria-label="Refresh schedules">
+                <RefreshCw className={cx("w-4 h-4", refreshing && "animate-spin motion-reduce:animate-none")} />
+              </Button>
+              <Button onClick={openNew} className="flex-1 sm:flex-none !h-12 px-6">
+                <Plus className="w-4 h-4" />
+                New schedule
+              </Button>
+            </div>
           )}
         </div>
 
@@ -397,50 +622,140 @@ const CRStudio = () => {
       {/* schedules */}
       {canManage &&
         (schedules.length === 0 ? (
-          <div className="mb-5 sm:mb-6">
-            <EmptyState
-              icon={Megaphone}
-              title="No official schedules yet"
-              text="Create a draft, add your subjects and weekly classes, then publish it so your class can join."
-              action={<Button onClick={openNew}><Plus className="w-4 h-4" />New schedule</Button>}
-            />
-          </div>
+          // When loading failed, the error alert above explains it. Never claim "no schedules" then.
+          error ? (
+            <div className="mb-5 sm:mb-6">
+              <Button variant="glass" onClick={refresh} disabled={refreshing}>
+                <RefreshCw className={cx("w-4 h-4", refreshing && "animate-spin motion-reduce:animate-none")} />
+                Try again
+              </Button>
+            </div>
+          ) : (
+            <div className="mb-5 sm:mb-6">
+              <EmptyState
+                icon={Megaphone}
+                title="No official schedules yet"
+                text="Create a draft, add your subjects and weekly classes, then publish it so your class can join."
+                action={<Button onClick={openNew}><Plus className="w-4 h-4" />New schedule</Button>}
+              />
+            </div>
+          )
         ) : (
           <section className="mb-5 sm:mb-6">
-            <h2 className="text-[17px] font-semibold text-[#161827] mb-3 px-1">Your schedules</h2>
-            <div className="grid sm:grid-cols-2 gap-4 sm:gap-5">
-              {schedules.map((s) => {
-                const sid = idOf(s);
-                return (
-                  <Link key={sid} to={`/cr-studio/${sid}`} className="group block rounded-3xl focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">
-                    <Card className="relative overflow-hidden p-5 sm:p-6 h-full flex flex-col transition group-hover:bg-white/80 group-hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
-                      <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-1", schedAccent[s.status] || schedAccent.archived)} />
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="text-[18px] font-semibold text-[#161827] break-words leading-snug">
-                            {[s.branch, s.section && `Section ${s.section}`].filter(Boolean).join(" ") || "Schedule"}
-                          </h3>
-                          <p className="text-[13.5px] text-[#444A63] mt-0.5">{[s.semesterLabel, s.academicYear].filter(Boolean).join(" · ")}</p>
-                          <p className="text-[12.5px] text-[#6A6F85] mt-0.5 break-words">{s.college}</p>
+            <SectionTitle
+              title="Your schedules"
+              text="Every schedule of your class appears here, including the ones your classmate CRs created. You can open and edit all of them."
+            />
+
+            {/* search and filters */}
+            <Card className="p-3 sm:p-4 mb-4 space-y-3">
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <label className="relative flex-1 min-w-0">
+                  <span className="sr-only">Search schedules</span>
+                  <Search className="w-4 h-4 text-[#6A6F85] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Search by branch, section, semester or creator"
+                    className="w-full h-10 rounded-full bg-white/70 border border-white/80 shadow-[inset_0_1px_0_#fff] pl-10 pr-4 text-[13.5px] text-[#161827] placeholder:text-[#6A6F85] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                  />
+                </label>
+                <select value={semFilter} onChange={(e) => setSemFilter(e.target.value)} className={selectCls} aria-label="Filter by semester">
+                  <option value="all">All semesters</option>
+                  {semesterOptions.map((n) => (
+                    <option key={n} value={n}>Semester {n}</option>
+                  ))}
+                </select>
+                <select value={sort} onChange={(e) => setSort(e.target.value)} className={selectCls} aria-label="Sort schedules">
+                  {SORTS.map((s) => (
+                    <option key={s.key} value={s.key}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5" role="group" aria-label="Filter by status">
+                {STATUS_FILTERS.map((f) => (
+                  <FilterChip key={f.key} active={statusFilter === f.key} onClick={() => setStatusFilter(f.key)} count={statusCount(f.key)}>
+                    {f.label}
+                  </FilterChip>
+                ))}
+              </div>
+              <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5" role="group" aria-label="Filter by creator">
+                {OWNER_FILTERS.map((f) => (
+                  <FilterChip key={f.key} active={ownerFilter === f.key} onClick={() => setOwnerFilter(f.key)}>
+                    {f.label}
+                  </FilterChip>
+                ))}
+              </div>
+            </Card>
+
+            <p className="text-[12.5px] text-[#6A6F85] mb-3 px-1" aria-live="polite">
+              Showing {view.length} of {statusFilter === "archived" ? archivedCount : notArchived}
+              {filtersActive && (
+                <button type="button" onClick={clearFilters} className="ml-2 inline-flex items-center gap-1 text-indigo-600 font-medium hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded">
+                  <X className="w-3 h-3" aria-hidden="true" />
+                  Clear filters
+                </button>
+              )}
+            </p>
+
+            {view.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-[#161827]/15 px-4 py-8 text-center text-[13.5px] text-[#6A6F85]">
+                No schedules match these filters.
+              </p>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-4 sm:gap-5">
+                {view.map((s) => {
+                  const sid = idOf(s);
+                  const counts = s.counts || {};
+                  return (
+                    <Link key={sid} to={`/cr-studio/${sid}`} className="group block rounded-3xl focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">
+                      <Card className="relative overflow-hidden p-5 sm:p-6 h-full flex flex-col transition group-hover:bg-white/80 group-hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
+                        <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-1", schedAccent[s.status] || schedAccent.archived)} />
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="text-[18px] font-semibold text-[#161827] break-words leading-snug">
+                              {[s.branch, s.section && `Section ${s.section}`].filter(Boolean).join(" ") || "Schedule"}
+                            </h3>
+                            <p className="text-[13.5px] text-[#444A63] mt-0.5">{[s.semesterLabel, s.academicYear].filter(Boolean).join(" · ")}</p>
+                            <p className="text-[12.5px] text-[#6A6F85] mt-0.5 break-words">{s.college}</p>
+                          </div>
+                          <Badge tone={schedTone[s.status] || "neutral"}>{schedLabel[s.status] || s.status}</Badge>
                         </div>
-                        <Badge tone={schedTone[s.status] || "neutral"}>{schedLabel[s.status] || s.status}</Badge>
-                      </div>
 
-                      <p className="flex items-center gap-1.5 text-[13px] text-[#6A6F85] mt-4">
-                        <CalendarRange className="w-4 h-4 shrink-0" aria-hidden="true" />
-                        {fmtDate(s.semesterStart)} to {fmtDate(s.semesterEnd)}
-                      </p>
-                      <SemesterMeter start={s.semesterStart} end={s.semesterEnd} className="mt-3" />
+                        <p className="flex items-center gap-1.5 text-[12.5px] mt-3 min-w-0">
+                          <User className="w-3.5 h-3.5 text-[#6A6F85] shrink-0" aria-hidden="true" />
+                          {s.mine ? (
+                            <span className="font-medium text-indigo-600">Created by you</span>
+                          ) : (
+                            <span className="text-[#6A6F85] truncate">Created by {s.createdByName || "a classmate CR"}</span>
+                          )}
+                        </p>
 
-                      <p className="text-[13px] text-indigo-600 font-medium mt-auto pt-4 flex items-center gap-1">
-                        Open schedule
-                        <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
-                      </p>
-                    </Card>
-                  </Link>
-                );
-              })}
-            </div>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-3">
+                          <Count icon={BookOpen} value={counts.subjects ?? 0} label="subjects" />
+                          <Count icon={CalendarClock} value={counts.rules ?? 0} label="weekly classes" />
+                          <Count icon={CalendarRange} value={counts.items ?? 0} label="calendar items" />
+                          <Count icon={Users} value={s.students ?? 0} label="students joined" />
+                        </div>
+
+                        <p className="flex items-center gap-1.5 text-[13px] text-[#6A6F85] mt-4">
+                          <CalendarRange className="w-4 h-4 shrink-0" aria-hidden="true" />
+                          {fmtDate(s.semesterStart)} to {fmtDate(s.semesterEnd)}
+                        </p>
+                        <SemesterMeter start={s.semesterStart} end={s.semesterEnd} className="mt-3" />
+
+                        <p className="text-[13px] text-indigo-600 font-medium mt-auto pt-4 flex items-center gap-1">
+                          Open schedule
+                          <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+                        </p>
+                      </Card>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </section>
         ))}
 
@@ -556,6 +871,21 @@ const CRStudio = () => {
         error={formError}
       >
         <p className="text-[13.5px] leading-relaxed text-[#6A6F85]">This creates a draft. Students can't see it until you add your classes and publish.</p>
+
+        {(duplicate || existingId) && (
+          <Alert type="warning">
+            This class already has a schedule for that semester
+            {duplicate && !existingId && duplicate.createdByName && !duplicate.mine ? `, created by ${duplicate.createdByName}` : ""}.{" "}
+            <Link
+              to={`/cr-studio/${existingId || idOf(duplicate)}`}
+              onClick={() => setNewOpen(false)}
+              className="font-semibold text-indigo-600 underline underline-offset-2"
+            >
+              Open it
+            </Link>{" "}
+            and add your changes there instead of creating a second one.
+          </Alert>
+        )}
 
         <Field label="College" value={form.college || ""} onChange={setF("college")} error={errors.college} autoCapitalize="words" maxLength={120} />
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
