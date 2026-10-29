@@ -1,20 +1,28 @@
-// src/components/Navbar.jsx
-// OneCampus liquid-glass navbar.
+// OneCampus liquid-glass navbar (v2).
 //
-// - Floating glass pill with a single Menu button. Everything (all pages,
-//   account, login / sign up, search on mobile) also lives in the Menu.
-// - Continuous scroll morph: one eased value (--p, 0 -> 1) drives height,
-//   logo size, width, blur, tint, border and shadow together.
-// - Desktop: inline links with a hover pill + a sliding active pill, and the
-//   menu opens as a floating glass panel. Mobile: a floating glass drawer.
-// - Self-contained colours (CSS vars in the <style> block below), so it does
-//   not depend on any Tailwind theme tokens.
+// What's new
+// - Calendar added (/calendar). Order: Home, Today, Attendance, Calendar,
+//   Timetable, Setups, CR Studio.
+// - Mobile: slim glass top bar (brand, profile, menu) + a floating glass
+//   BOTTOM TAB BAR for thumb reach (Home, Today, Attendance, Calendar, More).
+//   "More" opens the full drawer (Timetable, Setups, CR Studio, account).
+// - Desktop: inline links with hover pill + sliding active pill, compact
+//   spacing at lg so all links fit, roomier at xl.
+// - Continuous scroll morph (--p, 0 -> 1) drives height, logo, width, blur,
+//   tint, border and shadow together.
+// - Safe-area aware (iPhone notch / home bar), reduced-motion aware,
+//   keyboard focus rings, aria-current on the active page.
+// - Self-contained colours (CSS vars in the <style> block).
+//
+// NOTE: on mobile the bottom bar floats over content. Give your page wrapper
+// bottom padding on small screens, e.g. className="pb-28 md:pb-0".
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   BarChart3,
   CalendarDays,
+  CalendarRange,
   ChevronRight,
   GraduationCap,
   Home,
@@ -23,22 +31,28 @@ import {
   LogIn,
   LogOut,
   Megaphone,
+  MoreHorizontal,
   Sparkles,
   User,
   UserPlus,
+  X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 /* ---------- config: edit routes here ---------- */
 
-// auth: true  -> shown only when logged in
+// auth: true      -> shown only when logged in
+// menuOnly: true  -> hidden from the desktop inline links (still in the menu)
+// tab: true       -> shown in the mobile bottom tab bar (keep to 4 + "More")
+// short           -> label used in the bottom tab bar
 const NAV = [
-  { to: "/", label: "Home", hint: "Back to the start", icon: Home, end: true },
-  { to: "/dashboard", label: "Today", hint: "Mark today's classes", icon: LayoutDashboard, auth: true },
-  { to: "/timetable", label: "Timetable", hint: "Weekly classes", icon: CalendarDays, auth: true },
-  { to: "/attendance", label: "Attendance", hint: "Percentages and bunk calculator", icon: BarChart3, auth: true },
-  { to: "/setups", label: "Setups", hint: "Subjects, calendar, official sync", icon: Layers, auth: true },
-  { to: "/cr-studio", label: "CR Studio", hint: "Publish your class timetable", icon: Megaphone, auth: true, menuOnly: true },
+  { to: "/", label: "Home", short: "Home", hint: "Back to the start", icon: Home, end: true, tab: true },
+  { to: "/dashboard", label: "Today", short: "Today", hint: "Mark today's classes", icon: LayoutDashboard, auth: true, tab: true },
+  { to: "/attendance", label: "Attendance", short: "Attend", hint: "Percentages and bunk calculator", icon: BarChart3, auth: true, tab: true },
+  { to: "/calendar", label: "Calendar", short: "Calendar", hint: "Holidays, exams and events", icon: CalendarRange, auth: true, tab: true },
+  { to: "/timetable", label: "Timetable", short: "Timetable", hint: "Weekly classes", icon: CalendarDays, auth: true },
+  { to: "/setups", label: "Setups", short: "Setups", hint: "Subjects, calendar, official sync", icon: Layers, auth: true },
+  { to: "/cr-studio", label: "CR Studio", short: "CR", hint: "Publish your class timetable", icon: Megaphone, auth: true, menuOnly: true },
 ];
 
 const SCROLL_RANGE = 90; // px of scrolling over which the bar morphs
@@ -118,10 +132,13 @@ const Navbar = () => {
   const popoverRef = useRef(null);
 
   const links = NAV.filter((l) => !l.auth || user);
+  const tabs = links.filter((l) => l.tab);
   const displayName = user?.displayName || user?.fullName || user?.username || user?.email || "Student";
   const isStaff = user?.role === "admin" || user?.role === "moderator";
 
   const isActive = (l) => (l.end ? location.pathname === "/" : location.pathname.startsWith(l.to));
+  // "More" lights up when the current page lives only in the menu
+  const moreActive = tabs.length > 0 && !tabs.some(isActive) && links.some(isActive);
 
   /* ---- continuous, eased scroll progress written straight to a CSS var ---- */
   useEffect(() => {
@@ -234,7 +251,7 @@ const Navbar = () => {
           >
             Navigate
           </p>
-          <nav className="flex flex-col gap-1">
+          <nav className="flex flex-col gap-1" aria-label="Site pages">
             {links.map((l) => {
               const active = isActive(l);
               const Icon = l.icon;
@@ -243,8 +260,9 @@ const Navbar = () => {
                   <Link
                     to={l.to}
                     onClick={() => setMenuOpen(false)}
+                    aria-current={active ? "page" : undefined}
                     className={`oc-focus flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-colors ${
-                      active ? "oc-row-active" : "text-[color:var(--oc-ink)] hover:bg-white/70"
+                      active ? "oc-row-active" : "text-[color:var(--oc-ink)] hover:bg-white/70 active:bg-white/80"
                     }`}
                   >
                     <span
@@ -393,8 +411,23 @@ const Navbar = () => {
           border: 1px solid rgba(255,255,255,0.85);
           box-shadow: inset 0 1px 0 #fff, 0 28px 56px -22px rgba(30,32,70,0.5);
         }
+        /* mobile bottom tab bar */
+        .oc-tabbar {
+          background: rgba(247,248,255,0.74);
+          backdrop-filter: blur(26px) saturate(1.8);
+          -webkit-backdrop-filter: blur(26px) saturate(1.8);
+          border: 1px solid rgba(255,255,255,0.9);
+          box-shadow:
+            inset 0 1px 0 #fff,
+            inset 0 0 18px rgba(255,255,255,0.35),
+            0 20px 40px -16px rgba(30,32,70,0.45),
+            0 4px 12px -6px rgba(30,32,70,0.2);
+        }
+        .oc-tab { -webkit-tap-highlight-color: transparent; }
+        .oc-tab:active { transform: scale(0.94); }
         @media (prefers-reduced-motion: reduce) {
           .oc-menu-btn::after { transition: none; }
+          .oc-tab:active { transform: none; }
         }
       `}</style>
 
@@ -402,7 +435,7 @@ const Navbar = () => {
         <header
           ref={headerRef}
           className="sticky top-0 z-50 px-3 sm:px-5"
-          style={{ paddingTop: `calc(12px - 5px * ${P})` }}
+          style={{ paddingTop: `calc(12px - 5px * ${P} + env(safe-area-inset-top, 0px))` }}
         >
           {/* width wrapper: narrows slightly on scroll; popover anchors to it */}
           <div
@@ -421,14 +454,15 @@ const Navbar = () => {
                 <span className="absolute right-10 -bottom-12 w-64 h-24 rounded-full bg-[#B9C8FF]/40 blur-2xl" />
               </span>
 
-              <div className="relative h-full flex items-center justify-between gap-4 px-2.5 sm:px-3 lg:px-3.5">
+              <div className="relative h-full flex items-center justify-between gap-3 px-2.5 sm:px-3 lg:px-3.5">
                 <BrandMark onClick={() => setMenuOpen(false)} />
 
                 {/* Desktop inline links (the menu still holds everything) */}
                 <nav
                   ref={navRef}
+                  aria-label="Primary"
                   onMouseLeave={() => setHoverPill(null)}
-                  className="relative hidden lg:flex items-center gap-1 rounded-full p-1 bg-white/25 border border-white/60 shadow-[inset_0_1px_2px_rgba(22,24,39,0.06)]"
+                  className="relative hidden lg:flex items-center gap-0.5 xl:gap-1 rounded-full p-1 bg-white/25 border border-white/60 shadow-[inset_0_1px_2px_rgba(22,24,39,0.06)]"
                 >
                   <span
                     aria-hidden
@@ -464,9 +498,10 @@ const Navbar = () => {
                           key={l.to}
                           to={l.to}
                           data-active={active}
+                          aria-current={active ? "page" : undefined}
                           onMouseEnter={hoverIn}
                           onFocus={hoverIn}
-                          className={`oc-focus relative z-10 px-[17px] py-2 rounded-full text-[14.5px] font-medium transition-colors duration-200 ${
+                          className={`oc-focus relative z-10 px-3.5 xl:px-[17px] py-2 rounded-full text-[14px] xl:text-[14.5px] font-medium whitespace-nowrap transition-colors duration-200 ${
                             active ? "text-white" : "text-[color:var(--oc-ink)]/75 hover:text-[color:var(--oc-ink)]"
                           }`}
                         >
@@ -497,13 +532,13 @@ const Navbar = () => {
                     </>
                   )}
 
-                  {/* Logged-in profile button: name chip on desktop, avatar on mobile */}
+                  {/* Logged-in profile: name chip on xl, avatar on smaller screens */}
                   {!authLoading && user && (
                     <>
                       <Link
                         to="/profile"
                         aria-label="Your profile"
-                        className={`oc-focus hidden md:flex items-center gap-2 h-10 pl-1 pr-3.5 rounded-full border transition-colors ${
+                        className={`oc-focus hidden xl:flex items-center gap-2 h-10 pl-1 pr-3.5 rounded-full border transition-colors ${
                           location.pathname === "/profile"
                             ? "bg-white/85 border-white shadow-[inset_0_1px_0_#fff,0_8px_20px_-12px_rgba(22,24,39,0.4)]"
                             : "bg-white/40 border-white/70 shadow-[inset_0_1px_0_#fff] hover:bg-white/70"
@@ -517,21 +552,21 @@ const Navbar = () => {
                       <Link
                         to="/profile"
                         aria-label="Your profile"
-                        className="oc-focus md:hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/40 border border-white/70 shadow-[inset_0_1px_0_#fff]"
+                        className="oc-focus xl:hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/40 border border-white/70 shadow-[inset_0_1px_0_#fff]"
                       >
                         <Avatar name={displayName} size="w-8 h-8" text="text-[12px]" />
                       </Link>
                     </>
                   )}
 
-                  {/* MENU button */}
+                  {/* MENU button (on phones with the tab bar it is a compact icon) */}
                   <button
                     ref={menuBtnRef}
                     onClick={() => setMenuOpen((v) => !v)}
                     aria-label={menuOpen ? "Close menu" : "Open menu"}
                     aria-expanded={menuOpen}
                     aria-controls="site-menu"
-                    className={`oc-focus flex items-center gap-2.5 h-10 px-3.5 sm:px-4 rounded-full text-[13.5px] font-medium transition-all duration-300 ${
+                    className={`oc-focus flex items-center justify-center gap-2.5 h-10 min-w-10 px-3 sm:px-4 rounded-full text-[13.5px] font-medium transition-all duration-300 ${
                       menuOpen
                         ? "bg-white/80 text-[color:var(--oc-ink)] border border-white shadow-[inset_0_1px_0_#fff,0_8px_20px_-12px_rgba(22,24,39,0.4)]"
                         : "oc-menu-btn border border-transparent"
@@ -561,8 +596,57 @@ const Navbar = () => {
           </div>
         </header>
 
+        {/* Mobile bottom tab bar (logged-in only; hidden on md+) */}
+        {!authLoading && user && tabs.length > 0 && (
+          <nav
+            aria-label="Quick navigation"
+            className="fixed inset-x-0 z-[60] md:hidden px-3 pointer-events-none"
+            style={{ bottom: "calc(10px + env(safe-area-inset-bottom, 0px))" }}
+          >
+            <div className="oc-tabbar pointer-events-auto mx-auto max-w-md rounded-[28px] p-1.5 grid grid-cols-5 gap-1 relative overflow-hidden">
+              <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/60 to-transparent opacity-70" />
+              {tabs.map((l) => {
+                const active = isActive(l);
+                const Icon = l.icon;
+                return (
+                  <Link
+                    key={l.to}
+                    to={l.to}
+                    aria-current={active ? "page" : undefined}
+                    className={`oc-focus oc-tab relative flex flex-col items-center justify-center gap-0.5 h-[54px] rounded-[22px] transition-all duration-300 ${
+                      active ? "oc-row-active" : "text-[color:var(--oc-ink)]/70 active:bg-white/60"
+                    }`}
+                  >
+                    <Icon className="w-[21px] h-[21px]" strokeWidth={active ? 2.3 : 2} />
+                    <span className={`text-[10.5px] leading-none ${active ? "font-semibold" : "font-medium"}`}>
+                      {l.short}
+                    </span>
+                  </Link>
+                );
+              })}
+              <button
+                onClick={() => setMenuOpen(true)}
+                aria-label="More pages and account"
+                aria-haspopup="dialog"
+                className={`oc-focus oc-tab relative flex flex-col items-center justify-center gap-0.5 h-[54px] rounded-[22px] transition-all duration-300 ${
+                  moreActive ? "oc-row-active" : "text-[color:var(--oc-ink)]/70 active:bg-white/60"
+                }`}
+              >
+                <MoreHorizontal className="w-[21px] h-[21px]" strokeWidth={moreActive ? 2.3 : 2} />
+                <span className={`text-[10.5px] leading-none ${moreActive ? "font-semibold" : "font-medium"}`}>More</span>
+              </button>
+            </div>
+          </nav>
+        )}
+
         {/* Mobile drawer */}
-        <div className={`fixed inset-0 z-[70] md:hidden ${menuOpen ? "pointer-events-auto" : "pointer-events-none"}`}>
+        <div
+          className={`fixed inset-0 z-[70] md:hidden ${menuOpen ? "pointer-events-auto" : "pointer-events-none"}`}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+          aria-hidden={!menuOpen}
+        >
           <div
             onClick={() => setMenuOpen(false)}
             className={`absolute inset-0 bg-[#161827]/35 backdrop-blur-sm transition-opacity duration-300 ${
@@ -570,9 +654,13 @@ const Navbar = () => {
             }`}
           />
           <aside
-            className={`oc-panel absolute right-2 top-2 bottom-2 w-[88%] max-w-sm rounded-[28px] flex flex-col overflow-hidden transition-transform duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            className={`oc-panel absolute right-2 w-[88%] max-w-sm rounded-[28px] flex flex-col overflow-hidden transition-transform duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
               menuOpen ? "translate-x-0" : "translate-x-[110%]"
             }`}
+            style={{
+              top: "calc(8px + env(safe-area-inset-top, 0px))",
+              bottom: "calc(8px + env(safe-area-inset-bottom, 0px))",
+            }}
           >
             <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/60 to-transparent" />
 
@@ -581,13 +669,13 @@ const Navbar = () => {
               <button
                 onClick={() => setMenuOpen(false)}
                 aria-label="Close menu"
-                className="oc-focus w-10 h-10 flex items-center justify-center rounded-full bg-white/60 border border-white/80 text-[color:var(--oc-ink)] hover:bg-white/90"
+                className="oc-focus w-10 h-10 flex items-center justify-center rounded-full bg-white/60 border border-white/80 text-[color:var(--oc-ink)] hover:bg-white/90 active:bg-white"
               >
-                <MenuIcon open />
+                <X className="w-[18px] h-[18px]" />
               </button>
             </div>
 
-            <div className="relative flex-1 overflow-y-auto px-4 py-5">{renderMenu()}</div>
+            <div className="relative flex-1 overflow-y-auto overscroll-contain px-4 py-5">{renderMenu()}</div>
           </aside>
         </div>
       </div>
