@@ -166,6 +166,28 @@ export const profileApi = {
 };
 
 // ---------------------------------------------------------------------------
+// Admin: user management  (/admin/users)  -- admin role only
+// ---------------------------------------------------------------------------
+
+const AU = `${V1}/admin/users`;
+const AUser = (username) => `${AU}/${encodeURIComponent(username)}`;
+
+export const adminUsersApi = {
+  stats: async () => unwrap(await API.get(`${AU}/stats`)), // { total, active, inactive, pendingDeletion, newThisWeek, roles }
+  // params: { q, role, isActive, isDeleted, college, branch, section, page, limit, sort }
+  list: async (params) => unwrap(await API.get(AU, { params })), // { users, pagination }
+  search: async (q) => asList(unwrap(await API.get(`${AU}/search`, { params: { q } })), "users"),
+  get: async (username) => unwrap(await API.get(AUser(username))),
+  // newPassword is optional: without it the server returns { username, temporaryPassword } once.
+  resetPassword: async (username, newPassword) =>
+    unwrap(await API.post(`${AUser(username)}/reset-password`, newPassword ? { newPassword } : {})),
+  setRole: async (username, role) => unwrap(await API.patch(`${AUser(username)}/role`, { role })),
+  setStatus: async (username, isActive) => unwrap(await API.patch(`${AUser(username)}/status`, { isActive })),
+  forceLogout: async (username) => unwrap(await API.post(`${AUser(username)}/force-logout`)),
+  restore: async (username) => unwrap(await API.post(`${AUser(username)}/restore`)),
+};
+
+// ---------------------------------------------------------------------------
 // CR / Admin: schedule roles  (/schedule-roles)
 // ---------------------------------------------------------------------------
 

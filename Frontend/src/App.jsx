@@ -19,6 +19,7 @@ import CRSchedule from "./pages/CRSchedule";
 import NotFound from "./pages/NotFound";
 import Official from "./pages/Official";
 import Calendar from "./pages/Calendar";
+import AdminUsers from "./pages/AdminUsers";
 
 const App = () => (
   <>
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/profile" element={<Profile />} />
           <Route path="/cr-studio" element={<CRStudio />} />
           <Route path="/cr-studio/:scheduleId" element={<CRSchedule />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
 
           {/* logged in AND has an active setup (otherwise -> onboarding) */}
           <Route element={<ActiveSetupRoute />}>

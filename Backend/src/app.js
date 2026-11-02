@@ -117,6 +117,11 @@ import officialSyncRoutes from './routes/officialSync.routes.js';
 import officialUpdateRoutes from './routes/officialUpdate.routes.js';
 import sharedPublicationRoutes from './routes/sharedPublication.routes.js';
 import copyRoutes from './routes/copy.routes.js';
+import adminRouter from './routes/admin.routes.js';
+
+
+app.use('/api/v1/admin', adminRouter);
+
 
 // ---------- student side (per setup) ----------
 app.use('/api/v1/setup/:setupId/official', officialJoinRoutes);

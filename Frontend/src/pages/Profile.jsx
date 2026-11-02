@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, GraduationCap, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Camera, GraduationCap, ShieldCheck, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { changePassword } from "../api/axios";
 import { profileApi, errMsg } from "../api/endpoints";
@@ -224,6 +225,26 @@ const Profile = () => {
             )}
           </div>
         </Card>
+
+        {/* admin tools (admins only) */}
+        {user?.role === "admin" && (
+          <Card className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className="w-10 h-10 rounded-xl bg-[#EEEDFD] text-[#5B52EE] flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </span>
+              <div>
+                <h2 className="text-[17px] font-semibold text-[#161827]">Admin tools</h2>
+                <p className="text-[13.5px] text-[#6A6F85]">
+                  Search users, change roles, reset passwords and manage account access.
+                </p>
+              </div>
+            </div>
+            <Link to="/admin/users" className="shrink-0">
+              <Button type="button">Manage users</Button>
+            </Link>
+          </Card>
+        )}
 
         {/* details */}
         <Card className="p-6">
