@@ -136,6 +136,7 @@ export const extraApi = {
   matchCollege: async (id, subjectId, body) => unwrap(await API.post(`${S(id)}/extra-classes/${subjectId}/match`, body)),
   set: async (id, subjectId, body) => unwrap(await API.put(`${S(id)}/extra-classes/${subjectId}`, body)),
   remove: async (id, subjectId) => unwrap(await API.delete(`${S(id)}/extra-classes/${subjectId}`)),
+  list: async (id) => unwrap(await API.get(`${S(id)}/extra-classes`)),
 };
 
 // ---------------------------------------------------------------------------
