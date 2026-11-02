@@ -18,13 +18,13 @@ export const Title = ({ children, right }) => (
 );
 
 /* ---------- shared class strings (44px touch targets on phones, compact on desktop) ---------- */
+const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400";
 export const linkBase =
-  "inline-flex w-full min-[420px]:w-auto items-center justify-center gap-2 h-12 sm:h-11 px-6 rounded-full text-[14.5px] font-medium transition " +
-  "focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 active:scale-[0.98]";
-export const linkPrimary = "text-white bg-[#161827] hover:bg-black shadow-[0_10px_24px_-12px_rgba(22,24,39,.7)]";
-export const linkGlass = "lg-pill text-[#161827]";
-export const ghost = "lg-pill inline-flex items-center gap-1.5 h-11 sm:h-9 min-w-11 sm:min-w-10 justify-center px-3.5 rounded-full text-[13px] font-medium text-[#161827] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50";
-export const glassGhost = "lq-btn inline-flex items-center gap-1.5 h-11 sm:h-9 min-w-11 sm:min-w-10 justify-center px-3.5 rounded-full text-[13px] font-medium text-[#161827] focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50";
+  "inline-flex w-full min-[420px]:w-auto items-center justify-center gap-2 h-12 sm:h-11 px-6 rounded-full text-[14.5px] font-medium transition active:scale-[0.98] " + FOCUS;
+export const linkPrimary = "hm-grad hover:brightness-110";
+export const linkGlass = "lq-btn text-[#161827]";
+export const ghost = cx("lg-pill inline-flex items-center gap-1.5 h-11 sm:h-9 min-w-11 sm:min-w-10 justify-center px-3.5 rounded-full text-[13px] font-medium text-[#161827]", FOCUS);
+export const glassGhost = cx("lq-btn inline-flex items-center gap-1.5 h-11 sm:h-9 min-w-11 sm:min-w-10 justify-center px-3.5 rounded-full text-[13px] font-medium text-[#161827]", FOCUS);
 export const H2 = "text-[22px] sm:text-[30px] font-semibold tracking-tight leading-[1.15] text-[#161827]";
 
 /* ---------- date helpers (setup dates arrive as plain YYYY-MM-DD) ---------- */

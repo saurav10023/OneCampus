@@ -1,8 +1,8 @@
-import { CalendarDays, Clock, MapPin } from "lucide-react";
+import { Bell, CalendarDays, CheckCheck, Clock, MapPin, Sparkles, Target } from "lucide-react";
 import { cx } from "../Ui";
 import { Glass, LOOKAHEAD, addDays, dayName, fmtShort, local, mins, toIso } from "./Shared";
 
-/* 1 / 6: Hero. What's next, today's progress and three quick stats. */
+/* Hero: what's next, a segmented progress bar for today, and three colour-coded stats. */
 export default function NextUpHero({ vm }) {
   const { today, att, official, target, days } = vm;
   const list = today?.classes || [];
@@ -25,46 +25,65 @@ export default function NextUpHero({ vm }) {
   }
   const aheadLabel = ahead ? (ahead.o === 1 ? "Tomorrow" : dayName(ahead.date, "long")) : "";
   const hero = next || ahead?.c;
-  const accent = hero?.color || "#94A3B8";
+  const accent = /^#[0-9a-f]{6}$/i.test(hero?.color || "") ? hero.color : "#5B52EE";
+  const good = (att?.pct ?? 0) >= target;
 
   const stats = [
-    { k: "Attendance", v: att?.pct == null ? "–" : `${Math.round(att.pct)}%`, s: `target ${target}%`, good: (att?.pct ?? 0) >= target },
-    { k: "Marked", v: `${done}/${counted.length}`, s: toGo ? `${toGo} to go` : counted.length ? "all done" : "no classes" },
-    { k: "Updates", v: official.unread, s: official.joined ? "unread" : "not joined" },
+    { k: "Attendance", v: att?.pct == null ? "–" : `${Math.round(att.pct)}%`, s: `target ${target}%`, Icon: Target,
+      tint: good ? "from-emerald-400 to-teal-500" : "from-amber-400 to-orange-500", vc: good ? "text-emerald-700" : "text-amber-700" },
+    { k: "Marked", v: `${done}/${counted.length}`, s: toGo ? `${toGo} to go` : counted.length ? "all done" : "no classes", Icon: CheckCheck,
+      tint: "from-sky-400 to-blue-500", vc: "text-[#161827]" },
+    { k: "Updates", v: official.unread, s: official.joined ? "unread" : "not joined", Icon: Bell,
+      tint: "from-violet-500 to-indigo-500", vc: "text-[#161827]" },
   ];
 
+  const nextId = next?.id;
+
   return (
-    <Glass className="relative lq-glow overflow-hidden p-3.5 min-[380px]:p-4 sm:p-6 grid min-w-0 md:grid-cols-[minmax(0,1fr)_minmax(0,23rem)] gap-4 sm:gap-5 md:gap-8 items-center" aria-label="Next class" role="region">
+    <Glass className="relative lq-glow overflow-hidden p-4 sm:p-6 lg:p-8 grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,27rem)] gap-5 lg:gap-10 items-center" aria-label="Next class" role="region">
+      {/* colour wash that follows the subject */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(60% 120% at 0% 0%, ${accent}33, transparent 70%), radial-gradient(50% 100% at 100% 100%, rgba(43,141,224,.22), transparent 70%)` }} />
+      <div aria-hidden="true" className="hm-orb -top-16 right-[30%] h-48 w-48" style={{ background: accent, opacity: 0.28 }} />
+
       <div className="relative min-w-0">
-        <p className="inline-flex items-center gap-2 rounded-full lq-btn px-3 py-1.5 text-[12px] font-semibold text-[#161827]">
-          <span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ background: accent, boxShadow: `0 0 0 4px ${accent}26` }} />
-          {next ? when : ahead ? `Next class, ${aheadLabel}` : "You're done"}
+        <p className={cx("inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold", next ? "hm-grad" : "lq-btn text-[#161827]")}>
+          {next ? <Sparkles className="w-3.5 h-3.5" aria-hidden="true" /> : <span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ background: accent }} />}
+          {next ? when : ahead ? `Next class, ${aheadLabel}` : "You're all done"}
         </p>
-        <p className="text-[22px] sm:text-[32px] font-semibold tracking-tight leading-[1.1] text-[#161827] mt-2.5 truncate">
+
+        <p className="text-[28px] min-[380px]:text-[32px] sm:text-[44px] lg:text-[52px] font-semibold tracking-[-0.025em] leading-[1.05] text-[#161827] mt-3.5 break-words">
           {hero ? hero.name : "No more classes today"}
         </p>
+
         {hero ? (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            <span className="lq-in !rounded-full inline-flex items-center gap-1.5 px-2.5 py-1 text-[12.5px] font-medium text-[#161827] tabular-nums"><Clock className="w-3.5 h-3.5 text-[#6A6F85]" aria-hidden="true" />{hero.start} to {hero.end}</span>
-            {hero.room && <span className="lq-in !rounded-full inline-flex items-center gap-1.5 px-2.5 py-1 text-[12.5px] font-medium text-[#161827]"><MapPin className="w-3.5 h-3.5 text-[#6A6F85]" aria-hidden="true" />{hero.room}</span>}
-            {!next && ahead && <span className="lq-in !rounded-full inline-flex items-center gap-1.5 px-2.5 py-1 text-[12.5px] font-medium text-[#161827]"><CalendarDays className="w-3.5 h-3.5 text-[#6A6F85]" aria-hidden="true" />{fmtShort(ahead.date)}</span>}
+          <div className="mt-3.5 flex flex-wrap gap-2">
+            <span className="lq-in !rounded-full inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#161827] tabular-nums"><Clock className="w-4 h-4 text-[#4F46E5]" aria-hidden="true" />{hero.start} to {hero.end}</span>
+            {hero.room && <span className="lq-in !rounded-full inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#161827]"><MapPin className="w-4 h-4 text-[#4F46E5]" aria-hidden="true" />{hero.room}</span>}
+            {!next && ahead && <span className="lq-in !rounded-full inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#161827]"><CalendarDays className="w-4 h-4 text-[#4F46E5]" aria-hidden="true" />{fmtShort(ahead.date)}</span>}
           </div>
-        ) : <p className="text-[13.5px] text-[#6A6F85] mt-2">Nothing scheduled in the next two weeks.</p>}
+        ) : <p className="text-[14px] text-[#6A6F85] mt-3">Nothing scheduled in the next two weeks.</p>}
+
         {counted.length > 0 && (
-          <div className="mt-3.5 max-w-sm" role="img" aria-label={`${done} of ${counted.length} classes marked today`}>
-            <div className="h-1.5 rounded-full bg-[#161827]/[.07] overflow-hidden">
-              <span className="block h-full rounded-full bg-gradient-to-r from-emerald-300 to-emerald-500 transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${(done / counted.length) * 100}%` }} />
+          <div className="mt-5 max-w-md" role="img" aria-label={`${done} of ${counted.length} classes marked today`}>
+            <div className="flex gap-1.5">
+              {counted.map((c) => (
+                <span key={c.id} className={cx("h-2 flex-1 rounded-full transition-colors duration-500 motion-reduce:transition-none",
+                  c.status === "pending" ? (c.id === nextId ? "animate-pulse" : "bg-[#161827]/10") : c.status === "absent" ? "bg-gradient-to-r from-rose-300 to-rose-500" : c.status === "excused" ? "bg-gradient-to-r from-sky-300 to-sky-500" : "bg-gradient-to-r from-emerald-300 to-emerald-500")}
+                  style={c.status === "pending" && c.id === nextId ? { background: `linear-gradient(90deg, ${accent}99, ${accent})` } : undefined} />
+              ))}
             </div>
+            <p className="text-[12px] text-[#6A6F85] mt-2 tabular-nums">{done} of {counted.length} marked today{toGo ? `, ${toGo} to go` : ""}</p>
           </div>
         )}
       </div>
 
-      <div className="relative grid grid-cols-3 gap-2 min-w-0">
-        {stats.map((x) => (
-          <div key={x.k} className="lq-in p-2 min-h-[72px] sm:min-h-[88px] flex flex-col items-center justify-center text-center">
-            <p className={cx("text-[19px] min-[380px]:text-[21px] sm:text-[26px] font-semibold leading-none tabular-nums", x.good === false ? "text-amber-700" : x.good ? "text-emerald-700" : "text-[#161827]")}>{x.v}</p>
-            <p className="text-[11.5px] sm:text-[12px] font-medium text-[#444A63] mt-1.5 leading-tight">{x.k}</p>
-            <p className="text-[10.5px] sm:text-[11.5px] text-[#6A6F85] mt-0.5 leading-tight">{x.s}</p>
+      <div className="relative grid grid-cols-3 gap-2 sm:gap-3 min-w-0">
+        {stats.map(({ k, v, s, Icon, tint, vc }) => (
+          <div key={k} className="lq-in p-2.5 sm:p-3.5 min-h-[104px] sm:min-h-[132px] flex flex-col items-center justify-center text-center">
+            <span className={cx("w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br text-white flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,.4),0_8px_14px_-8px_rgba(22,24,39,.45)]", tint)}><Icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" aria-hidden="true" /></span>
+            <p className={cx("text-[20px] min-[380px]:text-[22px] sm:text-[28px] font-semibold leading-none tabular-nums mt-2.5", vc)}>{v}</p>
+            <p className="text-[11.5px] sm:text-[12.5px] font-medium text-[#444A63] mt-1.5 leading-tight">{k}</p>
+            <p className="text-[10.5px] sm:text-[11.5px] text-[#6A6F85] mt-0.5 leading-tight">{s}</p>
           </div>
         ))}
       </div>
