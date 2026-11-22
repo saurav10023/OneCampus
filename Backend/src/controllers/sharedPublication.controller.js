@@ -127,7 +127,8 @@ const listPublications = asyncHandler(async (req, res) => {
   const [publications, total] = await Promise.all([
     SharedPublication.find(filter)
       .select(PUBLIC_FIELDS)
-      .populate('publisherId', 'displayName')
+      // .populate('publisherId', 'displayName')
+      .populate('publisherId', 'fullName username avatar')
       .sort(SORT_OPTIONS[sort])
       .skip((page - 1) * limit)
       .limit(limit),
@@ -161,7 +162,8 @@ const getPublicationById = asyncHandler(async (req, res) => {
     $or: [{ status: 'published' }, { publisherId: req.user._id }],
   })
     .select(`${PUBLIC_FIELDS} status +snapshot`)
-    .populate('publisherId', 'displayName');
+    // .populate('publisherId', 'displayName');
+    .populate('publisherId', 'fullName username avatar')
   if (!publication) throw new ApiError(404, 'Publication not found');
 
   const myCopy = await SetupCopy.findOne({

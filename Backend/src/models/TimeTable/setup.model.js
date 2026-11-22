@@ -4,6 +4,7 @@ import {
   ACADEMIC_YEAR_REGEX,
   DEFAULT_TARGET_PERCENTAGE,
   OPT_OUT_KIND,
+  SETUP_STATUS,
   DAY_MS,
 } from '../../utils/constants.js';
 
@@ -47,9 +48,13 @@ const setupSchema = new Schema(
     timezone: { type: String, required: true, default: 'Asia/Kolkata' },
     status: {
       type: String,
-      enum: ['active', 'archived'],
-      default: 'active',
+      enum: Object.values(SETUP_STATUS),
+      default: SETUP_STATUS.ACTIVE,
     },
+    // Set when a setup is archived by the system (for example, its official schedule was
+    // archived). Setups archived by hand before these fields existed keep the null defaults.
+    archivedAt: { type: Date, default: null },
+    archivedReason: { type: String, default: null },
 
     // Overall attendance target. A subject's own targetPercentage overrides it.
     targetPercentage: {
@@ -101,6 +106,8 @@ const setupSchema = new Schema(
 setupSchema.index({ ownerId: 1, status: 1 });
 // Used to find the matching official schedule
 setupSchema.index({ scopeKey: 1 });
+// Used to count and archive the setups attached to an official schedule
+setupSchema.index({ officialScheduleId: 1, status: 1 });
 // A student cannot hold two active setups for the same scope (many setups are allowed,
 // one per semester). Archived setups are not counted. Copying a shared setup whose scope
 // matches one of the student's own hits this index: the copy service must return a clear
@@ -109,7 +116,7 @@ setupSchema.index(
   { ownerId: 1, scopeKey: 1 },
   {
     unique: true,
-    partialFilterExpression: { status: 'active', scopeKey: { $type: 'string' } },
+    partialFilterExpression: { status: SETUP_STATUS.ACTIVE, scopeKey: { $type: 'string' } },
   }
 );
 

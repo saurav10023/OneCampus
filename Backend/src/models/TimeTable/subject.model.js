@@ -67,7 +67,7 @@ const subjectSchema = new Schema(
 );
 
 // Runs on save() only. Edit subjects with doc.save(), not findOneAndUpdate, or nameKey goes stale.
-subjectSchema.pre('validate', function (next) {
+subjectSchema.pre('validate', function () {
   if (this.isNew || this.isModified('name')) {
     this.nameKey = toNameKey(this.name);
   }

@@ -48,7 +48,7 @@ const occurrenceStatusSchema = new Schema(
 
 // NOTE: bulk writes (updateMany, bulkWrite) skip this hook. Services must set causeType,
 // causeId, source and previousStatus together themselves.
-occurrenceStatusSchema.pre('validate', function (next) {
+occurrenceStatusSchema.pre('validate', function () {
   const hasType = this.causeType !== null && this.causeType !== undefined;
   const hasId = this.causeId !== null && this.causeId !== undefined;
 

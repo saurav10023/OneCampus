@@ -18,7 +18,7 @@ const extraClassAdjustmentSchema = new Schema(
 // One adjustment record per subject in a setup
 extraClassAdjustmentSchema.index({ setupId: 1, subjectId: 1 }, { unique: true });
 
-extraClassAdjustmentSchema.pre('validate', function (next) {
+extraClassAdjustmentSchema.pre('validate', function () {
   if (this.attendedCount + this.missedCount > this.totalCount) {
     this.invalidate('totalCount', 'attendedCount + missedCount cannot exceed totalCount');
   }

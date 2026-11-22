@@ -2,7 +2,9 @@ import OfficialSchedule from '../models/Official/officialSchedule.model.js';
 import ScheduleSubject from '../models/Official/scheduleSubject.model.js';
 import ScheduleRule from '../models/Official/scheduleRule.model.js';
 import ScheduleItem from '../models/Official/scheduleItem.model.js';
+import SetupOfficialUpdate from '../models/Official/setupOfficialUpdate.model.js';
 import Setup from '../models/TimeTable/setup.model.js';
+import { User } from '../models/user.model.js';
 import ApiError from '../utils/ApiError.js';
 import saveOrThrow from '../utils/saveOrThrow.js';
 import { normalizeScopePart } from '../utils/scopeKey.js';
@@ -18,6 +20,7 @@ import {
   ITEM_STATUS,
   SCHEDULE_ROLE,
   SCHEDULE_STATUS,
+  SETUP_STATUS,
 } from '../utils/constants.js';
 
 // Every change below follows the same order, so a failure can be retried:
@@ -98,9 +101,10 @@ const assertSetupLink = () => {
   }
 };
 
+// Only live setups count. An archived setup no longer follows the schedule.
 const countAttachedStudents = (scheduleId) => {
   assertSetupLink();
-  return Setup.countDocuments({ officialScheduleId: scheduleId });
+  return Setup.countDocuments({ officialScheduleId: scheduleId, status: SETUP_STATUS.ACTIVE });
 };
 
 // Attached students for several schedules in one query: Map of scheduleId text to count.
@@ -109,7 +113,7 @@ const countStudentsBySchedule = async (scheduleIds) => {
   if (!scheduleIds.length) return new Map();
   assertSetupLink();
   const rows = await Setup.aggregate([
-    { $match: { officialScheduleId: { $in: scheduleIds } } },
+    { $match: { officialScheduleId: { $in: scheduleIds }, status: SETUP_STATUS.ACTIVE } },
     { $group: { _id: '$officialScheduleId', count: { $sum: 1 } } },
   ]);
   return new Map(rows.map((row) => [String(row._id), row.count]));
@@ -420,14 +424,21 @@ const updateSchedule = async ({ user, scheduleId, input }) => {
 
 // ---------- Publish, unpublish, archive ----------
 
-// from: the statuses this change may start from. guard: an extra check that may throw.
-const changeStatus = async ({ user, scheduleId, from, to, op, summary, verb, note, guard }) => {
+// from: the statuses this change may start from.
+// guard: an extra check that may throw.
+// beforeChange: side effects that run after the checks but BEFORE the status flips. They must be
+//   repeatable: if one fails or the process crashes, the schedule keeps its old status and the
+//   request can simply be sent again.
+const changeStatus = async ({ user, scheduleId, from, to, op, summary, verb, note, guard, beforeChange }) => {
   const { schedule, actor } = await loadEditableSchedule({ user, scheduleId });
   if (!from.includes(schedule.status)) {
     throw new ApiError(409, `This schedule is ${schedule.status}, so it cannot be ${verb}`);
   }
+  // Counted BEFORE any cascade, so the action log records how many students were affected
   const students = await countAttachedStudents(schedule._id);
   if (guard) guard({ schedule, students });
+
+  if (beforeChange) await beforeChange({ schedule, students });
 
   const before = canonicalSnapshot('schedule', schedule);
   const seq = await allocateRevision(schedule._id);
@@ -483,7 +494,35 @@ const unpublishSchedule = ({ user, scheduleId, note }) =>
     },
   });
 
-// Read-only from now on and skipped by sync. Allowed with students attached.
+// Archives (ends) every live student setup attached to the given schedule(s). Safe to run twice.
+// officialScheduleId stays set so the history is kept. The setup's content and attendance are
+// untouched; only the setup itself is archived (read-only).
+const archiveAttachedSetups = async (scheduleIds, reason = 'official_schedule_archived') => {
+  const ids = [].concat(scheduleIds);
+  if (!ids.length) return 0;
+  assertSetupLink();
+
+  const setups = await Setup.find({
+    officialScheduleId: { $in: ids },
+    status: SETUP_STATUS.ACTIVE,
+  })
+    .select('_id')
+    .lean();
+  if (!setups.length) return 0;
+
+  const setupIds = setups.map((s) => s._id);
+  await Setup.updateMany(
+    { _id: { $in: setupIds }, status: SETUP_STATUS.ACTIVE },
+    { $set: { status: SETUP_STATUS.ARCHIVED, archivedAt: new Date(), archivedReason: reason } }
+  );
+  // An archived setup must not stay selected as the user's active one
+  await User.updateMany({ activeSetupId: { $in: setupIds } }, { $unset: { activeSetupId: 1 } });
+  // Waiting official changes mean nothing on an ended setup
+  await SetupOfficialUpdate.deleteMany({ setupId: { $in: setupIds }, status: 'pending' });
+  return setupIds.length;
+};
+
+// Read-only from now on and skipped by sync. The students' setups are archived with it.
 const archiveSchedule = ({ user, scheduleId, note }) =>
   changeStatus({
     user,
@@ -494,7 +533,20 @@ const archiveSchedule = ({ user, scheduleId, note }) =>
     op: ACTION_OP.UPDATE,
     verb: 'archived',
     summary: 'Archived the schedule',
+    beforeChange: ({ schedule }) => archiveAttachedSetups(schedule._id),
   });
+
+// One-off repair: schedules archived before the cascade existed left their students' setups
+// active. Archives those setups now. Safe to run more than once.
+const archiveSetupsOfArchivedSchedules = async () => {
+  const schedules = await OfficialSchedule.find({ status: SCHEDULE_STATUS.ARCHIVED }).select('_id').lean();
+  if (!schedules.length) return { schedules: 0, setups: 0 };
+  const setups = await archiveAttachedSetups(
+    schedules.map((s) => s._id),
+    'official_schedule_archived_backfill'
+  );
+  return { schedules: schedules.length, setups };
+};
 
 export {
   saveOrThrow,
@@ -508,4 +560,6 @@ export {
   publishSchedule,
   unpublishSchedule,
   archiveSchedule,
+  archiveAttachedSetups,
+  archiveSetupsOfArchivedSchedules,
 };

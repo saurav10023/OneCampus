@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import Setup from '../models/TimeTable/setup.model.js';
-import Subject from '../models/TimeTable/subject.model.js';
+import Subject ,{ toNameKey, SUBJECT_ORIGIN } from '../models/TimeTable/subject.model.js';
 import RecurringRule from '../models/TimeTable/recurringRule.model.js';
 import CalendarEvent from '../models/Calendar/calendarEvent.model.js';
 import SharedPublication from '../models/Sharing/sharedPublication.model.js';
@@ -65,9 +65,16 @@ const createSetupFromSnapshot = async ({ snapshot, ownerId, setupId, publication
 
   const subjectIdByKey = new Map();
   const subjects = snapshot.subjects.map((s) => {
-    const _id = new mongoose.Types.ObjectId();
-    subjectIdByKey.set(s.key, _id);
-    return { _id, setupId, name: s.name, code: s.code ?? undefined };
+  const _id = new mongoose.Types.ObjectId();
+  subjectIdByKey.set(s.key, _id);
+  return {
+    _id,
+    setupId,
+    name: s.name,
+    nameKey: toNameKey(s.name),
+    code: s.code ?? undefined,
+    origin: SUBJECT_ORIGIN.SHARED_COPY,
+  };
   });
   await Subject.insertMany(subjects);
 

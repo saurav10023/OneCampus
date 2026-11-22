@@ -36,6 +36,12 @@ export const DEFAULT_TARGET_PERCENTAGE = 75;
 // academicYear format, for example 2026-27
 export const ACADEMIC_YEAR_REGEX = /^\d{4}-\d{2}$/;
 
+// Setup.status. An archived setup is read-only and no longer counts as the student's live setup.
+export const SETUP_STATUS = Object.freeze({
+  ACTIVE: 'active',
+  ARCHIVED: 'archived',
+});
+
 /* ------------------------------------------------------------------ */
 /* Official link (Lifecycle §5.1)                                     */
 /* ------------------------------------------------------------------ */
@@ -216,7 +222,7 @@ export const CALENDAR_ITEM_AFFECTS_CLASSES = Object.freeze({
 export const SCHEDULE_STATUS = Object.freeze({
   DRAFT: 'draft', // only editors see it
   PUBLISHED: 'published', // students can attach
-  ARCHIVED: 'archived', // read-only, skipped by sync
+  ARCHIVED: 'archived', // read-only, skipped by sync; attached student setups are archived too
 });
 
 // State of one item inside a schedule: subject, timetable entry, slot, calendar item,
