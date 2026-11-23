@@ -71,8 +71,9 @@
   --bad-bg: #FFF1F2;   --bad-line: #FECDD3;  --bad-fg: #A32A42;
   --bad-icon: #E11D48; --bad-solid: #F43F5E; --bad-btn: #F43F5E;
   /* status: info (sky) and violet */
-  --info-bg: #F0F9FF;  --info-icon: #0284C7; --info-solid: #38BDF8; --info-btn: #0EA5E9;
-  --violet-bg: #F5F3FF; --violet-icon: #7C3AED;
+  --info-bg: #F0F9FF;  --info-line: #BAE6FD; --info-fg: #0369A1;
+  --info-icon: #0284C7; --info-solid: #38BDF8; --info-btn: #0EA5E9;
+  --violet-bg: #F5F3FF; --violet-line: #DDD6FE; --violet-fg: #6D28D9; --violet-icon: #7C3AED;
 
   /* chart ticks, handles, overlays */
   --tick: rgba(27, 31, 51, 0.35);
@@ -86,63 +87,72 @@
   --shadow-pop: 0 24px 48px -20px rgba(27, 31, 51, 0.38);
 }
 
-/* Dark: mirrors the light theme's layering exactly.
-     page    = darkest backdrop
-     surface = cards, sidebar, dialogs (lifted off the page)
-     inset   = recessed wells inside cards, like the light theme's grey blocks
-     raised / hover = lifted pills and hover fills
-   Status colours are low-alpha fills with a visible hairline and softened pastel text,
-   so they read calm and sharp on dark instead of neon. */
+/* Dark: a calm, cool-neutral scale with even steps between layers.
+
+     page    #050608   backdrop, near-black
+     inset   #07080B   recessed wells inside cards (same idea as the light theme's grey blocks)
+     surface #0B0D11   cards, sidebar, dialogs
+     raised  #11141A   floating pills and chips
+     hover   #181C23   hover fill
+
+   Rules that keep it sleek:
+   - Text is never pure white. Headings #ECEEF3, body #B3B9C7, secondary #8991A4.
+   - Borders are quiet hairlines (#222731) that still separate cards from the page.
+   - One accent only: a soft indigo (#5E6AD2, white text passes AA). Indigo text on dark is a lighter tint.
+   - Status colours are low-alpha tints with a thin matching border and softened pastel text,
+     so green, amber, red and blue read calm and professional instead of neon.
+   - Cards get a 1px top highlight instead of a heavy drop shadow, which reads as polished glass. */
 :root.dark {
   color-scheme: dark;
 
-  --page: #0A0C10;
-  --surface: #141720;
-  --inset: #0E1016;
-  --raised: #1A1E29;
-  --hover: #212634;
+  --page: #050608;
+  --surface: #0B0D11;
+  --inset: #07080B;
+  --raised: #11141A;
+  --hover: #181C23;
 
-  --line: #272C39;
-  --line-soft: #1F2430;
-  --line-strong: #3A4152;
-  --track: #2B3140;
+  --line: #1B1F27;
+  --line-soft: #12151B;
+  --line-strong: #292F3B;
+  --track: #1E232D;
 
-  --ink: #EDEFF4;
-  --body: #B6BCCB;
-  --muted: #8D94A8;
-  --faint: #6E768A;
-  --dim: rgba(237, 239, 244, 0.22);
-  --dim2: rgba(237, 239, 244, 0.38);
+  --ink: #E9EBF0;
+  --body: #A9AFBE;
+  --muted: #7F8799;
+  --faint: #656D80;
+  --dim: rgba(233, 235, 240, 0.22);
+  --dim2: rgba(233, 235, 240, 0.38);
 
   --accent: #5E6AD2;       /* white text on this passes AA */
-  --accent-hover: #7480E0;
-  --accent-soft: #AEB6F5;  /* indigo text and icons on dark */
-  --accent-tint: rgba(94, 106, 210, 0.20);
-  --ring: #8E99F0;
-  --brand-bg: rgba(94, 106, 210, 0.16);
-  --brand-band: rgba(94, 106, 210, 0.50);
-  --brand-line: rgba(122, 134, 235, 0.38);
-  --brand-ring: rgba(122, 134, 235, 0.60);
-  --brand-fg: #AEB6F5;
-  --brand-dot: #8E99F0;
+  --accent-hover: #6F7BE0;
+  --accent-soft: #A8B1F5;  /* indigo text and icons on dark */
+  --accent-tint: rgba(94, 106, 210, 0.18);
+  --ring: #8792EE;
+  --brand-bg: rgba(94, 106, 210, 0.14);
+  --brand-band: rgba(94, 106, 210, 0.45);
+  --brand-line: rgba(122, 134, 235, 0.34);
+  --brand-ring: rgba(122, 134, 235, 0.55);
+  --brand-fg: #A8B1F5;
+  --brand-dot: #8792EE;
 
-  --ok-bg: rgba(52, 190, 140, 0.12);   --ok-line: rgba(52, 190, 140, 0.32);  --ok-fg: #78DDB6;  --ok-ink: #A9E9CF;
-  --ok-icon: #78DDB6;                  --ok-solid: #3DD6A0;                  --ok-btn: #0F9F72;
-  --warn-bg: rgba(224, 168, 60, 0.12); --warn-line: rgba(224, 168, 60, 0.32); --warn-fg: #EBC672; --warn-ink: #F1D595;
-  --warn-icon: #EBC672;                --warn-solid: #F2B84B;
-  --bad-bg: rgba(236, 100, 125, 0.13); --bad-line: rgba(236, 100, 125, 0.34); --bad-fg: #F5A8B5;
-  --bad-icon: #F5A8B5;                 --bad-solid: #F27A8E;                  --bad-btn: #DB4560;
-  --info-bg: rgba(70, 170, 225, 0.12); --info-icon: #92D0F1; --info-solid: #6FC0EA; --info-btn: #1F8FD0;
-  --violet-bg: rgba(145, 120, 235, 0.13); --violet-icon: #C3B7F4;
+  --ok-bg: rgba(46, 184, 134, 0.10);   --ok-line: rgba(46, 184, 134, 0.28);  --ok-fg: #6FD8AE;  --ok-ink: #A4E6CB;
+  --ok-icon: #6FD8AE;                  --ok-solid: #36CF9B;                  --ok-btn: #0E9A6E;
+  --warn-bg: rgba(222, 165, 55, 0.10); --warn-line: rgba(222, 165, 55, 0.28); --warn-fg: #E8C06C; --warn-ink: #EFD28F;
+  --warn-icon: #E8C06C;                --warn-solid: #EFB444;
+  --bad-bg: rgba(233, 98, 122, 0.11);  --bad-line: rgba(233, 98, 122, 0.30);  --bad-fg: #F2A3B1;
+  --bad-icon: #F2A3B1;                 --bad-solid: #EF7589;                  --bad-btn: #D9425C;
+  --info-bg: rgba(66, 160, 220, 0.10); --info-line: rgba(66, 160, 220, 0.28); --info-fg: #8CCBEF;
+  --info-icon: #8CCBEF;                --info-solid: #6BBDE8;                 --info-btn: #1D8CCD;
+  --violet-bg: rgba(140, 115, 230, 0.12); --violet-line: rgba(140, 115, 230, 0.30); --violet-fg: #C0B3F2; --violet-icon: #C0B3F2;
 
-  --tick: rgba(237, 239, 244, 0.55);
-  --tick-strong: rgba(237, 239, 244, 0.65);
-  --grabber: rgba(237, 239, 244, 0.20);
-  --overlay: rgba(2, 3, 8, 0.66);
+  --tick: rgba(236, 238, 243, 0.55);
+  --tick-strong: rgba(236, 238, 243, 0.65);
+  --grabber: rgba(236, 238, 243, 0.20);
+  --overlay: rgba(0, 0, 0, 0.74);
 
-  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.02);
-  --shadow-float: 0 12px 32px -16px rgba(0, 0, 0, 0.8);
-  --shadow-pop: 0 28px 60px -20px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 10px 28px -14px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --shadow-pop: 0 28px 64px -24px rgba(0, 0, 0, 1), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 /* Elevation helpers used by components (replace the old hard-coded rgba(27,31,51,...) shadows) */
@@ -174,10 +184,17 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
+/* Dark only: a very faint indigo glow at the top of the page gives depth without any decoration */
+:root.dark body {
+  background-image: radial-gradient(1100px 480px at 50% -220px, rgba(94, 106, 210, 0.07), transparent 70%);
+  background-repeat: no-repeat;
+}
+
 ::selection {
   background: var(--accent-tint);
   color: var(--ink);
 }
+:root.dark ::selection { background: rgba(94, 106, 210, 0.38); }
 
 /* Visible keyboard focus everywhere, even where a component forgot to add one */
 :focus-visible {
@@ -327,6 +344,8 @@ input:-webkit-autofill:focus {
 .dark .border-rose-100,
 .dark .border-rose-200,
 .dark .border-red-200 { border-color: var(--bad-line); }
+.dark .border-sky-200 { border-color: var(--info-line); }
+.dark .border-violet-200 { border-color: var(--violet-line); }
 
 /* status text */
 .dark .text-emerald-600,
@@ -361,7 +380,8 @@ input:-webkit-autofill:focus {
 
 /* white-on-colour buttons: deeper fill so the white label stays readable */
 .dark .bg-emerald-500.text-white { background-color: var(--ok-btn); border-color: var(--ok-btn); }
-.dark .bg-rose-500.text-white { background-color: var(--bad-btn); border-color: var(--bad-btn); }
+.dark .bg-rose-500.text-white,
+.dark .bg-rose-600.text-white { background-color: var(--bad-btn); border-color: var(--bad-btn); }
 .dark .bg-sky-500.text-white { background-color: var(--info-btn); border-color: var(--info-btn); }
 
 /* the primary indigo button keeps its white text; calmer fill on dark */
@@ -376,7 +396,7 @@ input:-webkit-autofill:focus {
 
 /* custom select arrow (Choice component) is a grey data-URI; swap for a light one */
 .dark select.appearance-none {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238D94A8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238991A4' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
 }
 
 /* ---------- 3b. Dark styling for the shared card and button classes ----------
