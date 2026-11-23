@@ -2,11 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarPlus, Pencil, Power, Trash2 } from "lucide-react";
 import { rulesApi, subjectsApi, errMsg, toDateInput } from "../../api/endpoints";
 import { WEEKDAYS } from "../../lib/dates";
-import { Alert, Badge, Button, Card, EmptyState, Field, Modal, PageSpinner, Warnings } from "../../components/Ui";
+import { Alert, Badge, Button, Card, EmptyState, Field, Modal, PageSpinner, Warnings, cx } from "../../components/Ui";
 
 // Edit this list if your backend allows other class types.
 const CLASS_TYPES = ["lecture", "lab", "tutorial"];
 const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon..Sun
+
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1";
+
+// 44px touch target on phones, 40px from sm
+const iconBtn =
+  "w-11 h-11 sm:w-10 sm:h-10 shrink-0 rounded-xl flex items-center justify-center transition-colors motion-reduce:transition-none active:scale-[0.98] " +
+  FOCUS;
 
 const blank = (setup) => ({
   subjectId: "",
@@ -170,9 +177,9 @@ const RulesPanel = ({ setup, onChanged }) => {
   if (loading) return <PageSpinner />;
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[14px] text-[#6A6F85]">{rules.length} weekly class{rules.length === 1 ? "" : "es"}</p>
+    <div className="space-y-4 sm:space-y-5 min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[14px] text-[color:var(--muted)] tabular-nums">{rules.length} weekly class{rules.length === 1 ? "" : "es"}</p>
         {!readOnly && (
           <Button size="sm" onClick={() => openForm(null)} disabled={subjects.length === 0}>
             <CalendarPlus className="w-4 h-4" />Add weekly class
@@ -191,29 +198,35 @@ const RulesPanel = ({ setup, onChanged }) => {
       ) : (
         ORDER.filter((d) => byDay[d]?.length).map((d) => (
           <div key={d}>
-            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#6A6F85] mb-2 px-1">{WEEKDAYS[d]}</p>
-            <div className="space-y-3">
+            <p className="text-[13px] font-semibold text-[color:var(--body)] mb-2 px-1">{WEEKDAYS[d]}</p>
+            <div className="space-y-2.5">
               {byDay[d].map((r) => (
-                <Card key={r._id} className={`p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 ${r.isActive === false ? "opacity-60" : ""}`}>
-                  <div className="min-w-0">
+                <Card key={r._id} className={cx("p-3.5 min-[380px]:p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 min-w-0", r.isActive === false && "opacity-60")}>
+                  <div className="min-w-0 flex-1 basis-56">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-[15px] font-semibold text-[#161827]">{r.subjectId?.name || "Subject"}</p>
+                      <p className="text-[15px] font-semibold text-[color:var(--ink)] min-w-0 break-words">{r.subjectId?.name || "Subject"}</p>
                       {r.classType && <Badge>{r.classType}</Badge>}
                       {r.group && <Badge tone="brand">{r.group}</Badge>}
                       {r.origin === "official" && <Badge tone="green">Official</Badge>}
                       {r.isActive === false && <Badge tone="amber">Off</Badge>}
                     </div>
-                    <p className="text-[13px] text-[#6A6F85] mt-1">
+                    <p className="text-[13px] text-[color:var(--muted)] mt-1 tabular-nums break-words">
                       {r.startTime}-{r.endTime}
                       {r.room && ` - ${r.room}`}
                       {r.professor && ` - ${r.professor}`}
                     </p>
                   </div>
                   {!readOnly && (
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => toggleActive(r)} aria-label={r.isActive === false ? "Turn on" : "Turn off"} title={r.isActive === false ? "Turn on" : "Turn off"} className="w-9 h-9 rounded-full flex items-center justify-center text-[#161827]/70 hover:bg-white/80"><Power className="w-4 h-4" /></button>
-                      <button onClick={() => openForm(r)} aria-label="Edit" className="w-9 h-9 rounded-full flex items-center justify-center text-[#161827]/70 hover:bg-white/80"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => remove(r)} aria-label="Delete" className="w-9 h-9 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></button>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button type="button" onClick={() => toggleActive(r)} aria-label={r.isActive === false ? "Turn on" : "Turn off"} title={r.isActive === false ? "Turn on" : "Turn off"} className={cx(iconBtn, "text-[color:var(--body)] hover:bg-[color:var(--inset)]")}>
+                        <Power className="w-4 h-4" />
+                      </button>
+                      <button type="button" onClick={() => openForm(r)} aria-label="Edit" title="Edit" className={cx(iconBtn, "text-[color:var(--body)] hover:bg-[color:var(--inset)]")}>
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button type="button" onClick={() => remove(r)} aria-label="Delete" title="Delete" className={cx(iconBtn, "text-rose-600 hover:bg-rose-50")}>
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   )}
                 </Card>
@@ -224,7 +237,8 @@ const RulesPanel = ({ setup, onChanged }) => {
       )}
 
       <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title={editing === "new" ? "Add weekly class" : "Edit weekly class"}>
-        <form onSubmit={(e) => { e.preventDefault(); submit(false); }} className="space-y-4">
+        {/* @container: every grid below follows the width of the dialog, not the screen, so fields never overlap */}
+        <form onSubmit={(e) => { e.preventDefault(); submit(false); }} className="@container space-y-4 min-w-0">
           <Alert type="error">{formError}</Alert>
 
           {editing !== "new" && editing?.origin === "official" && (
@@ -246,7 +260,7 @@ const RulesPanel = ({ setup, onChanged }) => {
             {subjects.map((s) => <option key={s._id} value={s._id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>)}
           </Field>
 
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 @md:grid-cols-3 gap-4 min-w-0">
             <Field as="select" label="Day" value={form.weekday} onChange={set("weekday")}>
               {ORDER.map((d) => <option key={d} value={d}>{WEEKDAYS[d]}</option>)}
             </Field>
@@ -254,17 +268,19 @@ const RulesPanel = ({ setup, onChanged }) => {
             <Field label="End" type="time" value={form.endTime} onChange={set("endTime")} required />
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 @md:grid-cols-2 gap-4 min-w-0">
             <Field as="select" label="Type" value={form.classType} onChange={set("classType")}>
               {CLASS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </Field>
             <Field label="Units" type="number" min="1" max="6" value={form.attendanceUnits} onChange={set("attendanceUnits")} hint="A 2-hour lab is often 2 units." />
             <Field label="Room" value={form.room} onChange={set("room")} placeholder="LH-201" />
             <Field label="Professor" value={form.professor} onChange={set("professor")} placeholder="Dr. Sharma" />
-            <Field label="Group / batch (optional)" value={form.group} onChange={set("group")} placeholder="lab-b1" className="sm:col-span-2" />
+            <div className="@md:col-span-2 min-w-0">
+              <Field label="Group or batch (optional)" value={form.group} onChange={set("group")} placeholder="lab-b1" />
+            </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 @md:grid-cols-2 gap-4 min-w-0">
             <Field label="Runs from" type="date" value={form.effectiveStartDate} onChange={set("effectiveStartDate")} required />
             <Field label="Runs until" type="date" value={form.effectiveEndDate} onChange={set("effectiveEndDate")} required />
           </div>
@@ -273,7 +289,7 @@ const RulesPanel = ({ setup, onChanged }) => {
             <Field label="Apply changes from (optional)" type="date" value={form.effectiveFrom} onChange={set("effectiveFrom")} hint="Defaults to today. Past classes and attendance are never changed." />
           )}
 
-          <Button type="submit" loading={saving && !overlap}>{editing === "new" ? "Add class" : "Save changes"}</Button>
+          <Button type="submit" loading={saving && !overlap} className="w-full @md:w-auto">{editing === "new" ? "Add class" : "Save changes"}</Button>
         </form>
       </Modal>
     </div>

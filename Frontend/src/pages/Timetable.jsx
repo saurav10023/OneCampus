@@ -7,6 +7,7 @@ import { dayNum } from "../lib/dateui";
 import { Alert, Badge, Button, Card, EmptyState, PageHeader, cx } from "../components/Ui";
 import { FadeIn, Skeleton, Tabs } from "../components/Ux";
 import RulesPanel from "./timetable/RulesPanel";
+import "../styles/tones";
 
 /* ---------- constants & helpers ---------- */
 
@@ -16,20 +17,24 @@ const VIEWS = [
   { key: "rules", label: "Weekly classes", icon: Settings2 },
 ];
 
+// Every status is a tone (see styles/tones.js), so it looks right in light and dark mode.
 const STATUS = {
-  present: { label: "Present", pill: "bg-emerald-500/12 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
-  absent: { label: "Absent", pill: "bg-rose-500/12 text-rose-700 border-rose-200", dot: "bg-rose-500" },
-  excused: { label: "Excused", pill: "bg-sky-500/12 text-sky-700 border-sky-200", dot: "bg-sky-500" },
-  cancelled: { label: "Cancelled", pill: "bg-slate-500/12 text-slate-600 border-slate-200", dot: "bg-slate-400" },
-  pending: { label: "Not marked", pill: "bg-amber-500/12 text-amber-700 border-amber-200", dot: "bg-amber-400" },
+  present: { label: "Present", tone: "ok" },
+  absent: { label: "Absent", tone: "bad" },
+  excused: { label: "Excused", tone: "info" },
+  cancelled: { label: "Cancelled", tone: "mute" },
+  pending: { label: "Not marked", tone: "warn" },
 };
-const statusOf = (s) => STATUS[s] || (s ? { label: s, pill: "bg-slate-500/10 text-slate-600 border-slate-200", dot: "bg-slate-400" } : STATUS.pending);
+const statusOf = (s) => STATUS[s] || (s ? { label: s, tone: "mute" } : STATUS.pending);
 
 const LOCKS = {
   official_cancellation: "Cancelled by your CR",
   cancelled_by_cause: "Cancelled by a calendar event",
   outside_range: "Outside semester",
 };
+
+const FOCUS =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]";
 
 const weekdayShort = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "short", timeZone: "UTC" });
 const toMin = (t) => {
@@ -49,6 +54,7 @@ const duration = (a, b) => {
 };
 const sortClasses = (list = []) => [...list].sort((a, b) => toMin(a.plannedStartTime) - toMin(b.plannedStartTime));
 const colorOf = (c) => c.subject?.color || "#6366F1";
+const countText = (n) => `${n} class${n === 1 ? "" : "es"}`;
 
 /* ---------- day strip ---------- */
 
@@ -64,20 +70,21 @@ const DayStrip = ({ days, selected, onSelect }) => (
           aria-selected={on}
           onClick={() => onSelect(d.date)}
           className={cx(
-            "relative flex flex-col items-center gap-0.5 rounded-2xl py-2.5 sm:py-3 border transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50",
+            "relative flex flex-col items-center gap-0.5 rounded-2xl py-2.5 sm:py-3 border transition-colors active:scale-[0.98] motion-reduce:transition-none",
+            FOCUS,
             on
-              ? "text-white bg-gradient-to-b from-[#5B52EE] to-[#2B8DE0] border-transparent shadow-lg shadow-indigo-500/30 -translate-y-0.5"
-              : "bg-white/55 border-white/80 text-[#161827] hover:bg-white/85",
-            d.isToday && !on && "ring-2 ring-indigo-300"
+              ? "ac-bg border-transparent text-white shadow-sm"
+              : "bg-[color:var(--surface)] border-[color:var(--line)] text-[color:var(--ink)] hover:border-[color:var(--line-strong)]",
+            d.isToday && !on && "ring-2 ring-indigo-400/50"
           )}
         >
-          <span className={cx("text-[10.5px] sm:text-[11px] font-semibold uppercase tracking-wider", on ? "text-white/80" : "text-[#6A6F85]")}>{weekdayShort(d.date)}</span>
-          <span className="text-[18px] sm:text-[20px] font-semibold leading-none">{dayNum(d.date)}</span>
+          <span className={cx("text-[11px] sm:text-[12px] font-medium", on ? "text-white/85" : "text-[color:var(--muted)]")}>{weekdayShort(d.date)}</span>
+          <span className="text-[18px] sm:text-[20px] font-semibold leading-none tabular-nums">{dayNum(d.date)}</span>
           <span className="flex items-center justify-center gap-[3px] h-2 mt-1">
             {dots.length === 0 ? (
-              <span className={cx("w-1 h-1 rounded-full", on ? "bg-white/40" : "bg-[#161827]/15")} />
+              <span className={cx("w-1 h-1 rounded-full", on ? "bg-white/40" : "bg-[color:var(--line-strong)]")} />
             ) : (
-              dots.map((c, i) => <span key={i} className="w-1.5 h-1.5 rounded-full ring-1 ring-white/70" style={{ background: on ? "#fff" : colorOf(c) }} />)
+              dots.map((c, i) => <span key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: on ? "#fff" : colorOf(c) }} />)
             )}
           </span>
         </button>
@@ -95,26 +102,32 @@ const ClassRow = ({ c, tag }) => {
   const color = colorOf(c);
 
   return (
-    <div className="flex gap-3 sm:gap-4">
-      <div className="w-14 sm:w-16 shrink-0 pt-4 text-right">
-        <p className="text-[14.5px] font-semibold text-[#161827] leading-none">{c.plannedStartTime}</p>
-        <p className="text-[12px] text-[#6A6F85] mt-1">{c.plannedEndTime}</p>
+    <div className="flex gap-2.5 sm:gap-4">
+      <div className="w-12 sm:w-16 shrink-0 pt-4 text-right">
+        <p className="text-[14.5px] font-semibold text-[color:var(--ink)] leading-none tabular-nums">{c.plannedStartTime}</p>
+        <p className="text-[12px] text-[color:var(--muted)] mt-1 tabular-nums">{c.plannedEndTime}</p>
       </div>
 
-      <Card className={cx("relative flex-1 overflow-hidden p-0 hover:shadow-[0_24px_48px_-28px_rgba(30,32,70,0.4)] transition-shadow", tag === "now" && "ring-2 ring-indigo-300", cancelled && "opacity-70")}>
-        <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: color }} />
-        <div className="pl-5 pr-4 py-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+      <Card
+        className={cx(
+          "relative flex-1 overflow-hidden p-0 min-w-0",
+          tag === "now" && "tn tn-brand !border-[color:var(--tn-solid)] !bg-[color:var(--tn-bg)]",
+          cancelled && "opacity-70"
+        )}
+      >
+        <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color }} />
+        <div className="pl-4 sm:pl-5 pr-3.5 sm:pr-4 py-3.5 sm:py-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className={cx("text-[16px] font-semibold text-[#161827]", cancelled && "line-through decoration-[#161827]/30")}>{c.subject?.name || "Class"}</p>
+              <p className={cx("text-[16px] font-semibold text-[color:var(--ink)]", cancelled && "line-through decoration-[color:var(--faint)]")}>{c.subject?.name || "Class"}</p>
               {tag === "now" && <Badge tone="brand">Happening now</Badge>}
               {tag === "next" && <Badge tone="green">Up next</Badge>}
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px] text-[#6A6F85] mt-1.5">
+            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px] text-[color:var(--muted)] mt-1.5">
               <span>{duration(c.plannedStartTime, c.plannedEndTime)}</span>
-              {c.room && <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{c.room}</span>}
-              {c.professor && <span className="inline-flex items-center gap-1"><User className="w-3.5 h-3.5" />{c.professor}</span>}
+              {c.room && <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" aria-hidden="true" />{c.room}</span>}
+              {c.professor && <span className="inline-flex items-center gap-1"><User className="w-3.5 h-3.5" aria-hidden="true" />{c.professor}</span>}
             </div>
 
             <div className="flex flex-wrap gap-1.5 mt-2.5">
@@ -122,12 +135,12 @@ const ClassRow = ({ c, tag }) => {
               {c.group && <Badge tone="brand">{c.group}</Badge>}
               {c.oneOff && <Badge tone="amber">Extra class</Badge>}
               {c.attendanceUnits > 1 && <Badge>{c.attendanceUnits} units</Badge>}
-              {lock && <Badge tone="red"><Lock className="w-3 h-3 mr-1" />{lock}</Badge>}
+              {lock && <Badge tone="red"><Lock className="w-3 h-3 mr-1" aria-hidden="true" />{lock}</Badge>}
             </div>
           </div>
 
-          <span className={cx("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-medium shrink-0", st.pill)}>
-            <span className={cx("w-1.5 h-1.5 rounded-full", st.dot)} />
+          <span className={cx("tn tn-soft inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium shrink-0", `tn-${st.tone}`)}>
+            <span className={cx("tn tn-dot w-1.5 h-1.5 rounded-full", `tn-${st.tone}`)} aria-hidden="true" />
             {st.label}
           </span>
         </div>
@@ -227,11 +240,18 @@ const Timetable = () => {
 
   const weekEmpty = week && week.days.every((d) => !d.classes?.length);
 
+  const summary = [
+    { label: "Classes", value: stats.total, tone: null },
+    { label: "Present", value: stats.present, tone: "ok" },
+    { label: "Absent", value: stats.absent, tone: "bad" },
+    { label: "To mark", value: stats.toMark, tone: "warn" },
+  ];
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
+    <div className="max-w-5xl mx-auto px-3 min-[380px]:px-3.5 sm:px-6 py-6 sm:py-10">
       <PageHeader title="Timetable" subtitle="Your week at a glance. Tap a day to see its classes." />
 
-      <Tabs className="mb-6" value={view} onChange={setView} items={VIEWS} />
+      <Tabs className="mb-4 sm:mb-5" value={view} onChange={setView} items={VIEWS} />
 
       {view === "rules" && (
         <FadeIn>
@@ -240,12 +260,12 @@ const Timetable = () => {
       )}
 
       {view !== "rules" && (
-        <div className="space-y-5">
+        <div className="space-y-3 sm:space-y-4">
           {/* week navigation */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Button variant="glass" size="sm" onClick={() => goWeek(-1)} disabled={!week} aria-label="Previous week"><ChevronLeft className="w-4 h-4" /></Button>
-              <span className="text-[14.5px] font-semibold text-[#161827] px-1.5 min-w-[150px] text-center">
+              <span className="text-[14.5px] font-semibold text-[color:var(--ink)] px-1.5 min-w-[150px] text-center tabular-nums">
                 {week ? `${dayLabel(week.weekStart)} – ${dayLabel(week.weekEnd)}` : "Loading…"}
               </span>
               <Button variant="glass" size="sm" onClick={() => goWeek(1)} disabled={!week} aria-label="Next week"><ChevronRight className="w-4 h-4" /></Button>
@@ -256,10 +276,10 @@ const Timetable = () => {
           <Alert type="error">{error}</Alert>
 
           {loading && !week ? (
-            <div className="space-y-4" aria-busy="true">
-              <Skeleton className="h-[88px] rounded-3xl" />
-              <Skeleton className="h-28 rounded-3xl" />
-              <Skeleton className="h-28 rounded-3xl" />
+            <div className="space-y-2.5 sm:space-y-4" aria-busy="true">
+              <Skeleton className="h-[120px] rounded-2xl" />
+              <Skeleton className="h-28 rounded-2xl" />
+              <Skeleton className="h-28 rounded-2xl" />
             </div>
           ) : !week ? null : weekEmpty ? (
             <EmptyState
@@ -271,44 +291,44 @@ const Timetable = () => {
           ) : (
             <>
               {/* progress summary */}
-              <Card className="p-5">
-                <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-                  <div className="flex flex-wrap gap-x-7 gap-y-2">
-                    {[
-                      { label: "Classes", value: stats.total, cls: "text-[#161827]" },
-                      { label: "Present", value: stats.present, cls: "text-emerald-600" },
-                      { label: "Absent", value: stats.absent, cls: "text-rose-600" },
-                      { label: "To mark", value: stats.toMark, cls: "text-amber-600" },
-                    ].map((s) => (
-                      <div key={s.label}>
-                        <p className={cx("text-[24px] font-semibold leading-none", s.cls)}>{s.value}</p>
-                        <p className="text-[12px] text-[#6A6F85] mt-1">{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="w-full sm:w-56">
-                    <div className="h-2 rounded-full bg-[#161827]/10 overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-[#5B52EE] to-[#2B8DE0] transition-all duration-700" style={{ width: `${stats.pct}%` }} />
+              <Card className="p-3.5 min-[380px]:p-4 sm:p-5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {summary.map((s) => (
+                    <div key={s.label} className="rounded-xl bg-[color:var(--inset)] px-3.5 py-3">
+                      <p className={cx("text-[24px] font-semibold leading-none tabular-nums", s.tone ? `tn tn-${s.tone} tn-text` : "text-[color:var(--ink)]")}>{s.value}</p>
+                      <p className="text-[12px] text-[color:var(--muted)] mt-1.5">{s.label}</p>
                     </div>
-                    <p className="text-[12px] text-[#6A6F85] mt-1.5">{stats.pct}% of this week marked</p>
+                  ))}
+                </div>
+                <div className="mt-4">
+                  <div
+                    className="h-1.5 rounded-full bg-[color:var(--track)] overflow-hidden"
+                    role="progressbar"
+                    aria-label="Share of this week's classes marked"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={stats.pct}
+                  >
+                    <div className="h-full rounded-full ac-bg transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${stats.pct}%` }} />
                   </div>
+                  <p className="text-[12px] text-[color:var(--muted)] mt-1.5 tabular-nums">{stats.pct}% of this week marked</p>
                 </div>
               </Card>
 
               {/* DAY VIEW */}
               {view === "day" && (
-                <FadeIn className="space-y-5">
+                <FadeIn className="space-y-3 sm:space-y-4">
                   <DayStrip days={week.days} selected={selected} onSelect={setSelected} />
 
                   {day && (
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <h2 className="text-[19px] font-semibold tracking-tight text-[#161827] flex items-center gap-2">
+                          <h2 className="text-[18px] sm:text-[19px] font-semibold tracking-tight text-[color:var(--ink)] flex items-center gap-2">
                             {dayLabel(day.date, true)}
                             {day.isToday && <Badge tone="brand">Today</Badge>}
                           </h2>
-                          <p className="text-[13px] text-[#6A6F85] mt-0.5">{dayClasses.length ? `${dayClasses.length} class${dayClasses.length === 1 ? "" : "es"}` : "Nothing scheduled"}</p>
+                          <p className="text-[13px] text-[color:var(--muted)] mt-0.5 tabular-nums">{dayClasses.length ? countText(dayClasses.length) : "Nothing scheduled"}</p>
                         </div>
                         <div className="flex gap-1.5">
                           <Button variant="glass" size="sm" onClick={() => goDay(-1)} aria-label="Previous day"><ChevronLeft className="w-4 h-4" /></Button>
@@ -317,13 +337,13 @@ const Timetable = () => {
                       </div>
 
                       {dayClasses.length === 0 ? (
-                        <Card className="p-8 text-center">
-                          <span className="mx-auto w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center"><CalendarDays className="w-6 h-6" /></span>
-                          <p className="text-[15.5px] font-semibold text-[#161827] mt-3">A free day</p>
-                          <p className="text-[13.5px] text-[#6A6F85] mt-1">No classes here. Use the arrows or the strip above to look at another day.</p>
+                        <Card className="p-6 sm:p-8 text-center">
+                          <span className="tn tn-brand tn-soft mx-auto w-12 h-12 rounded-xl flex items-center justify-center"><CalendarDays className="w-6 h-6" aria-hidden="true" /></span>
+                          <p className="text-[15.5px] font-semibold text-[color:var(--ink)] mt-3">A free day</p>
+                          <p className="text-[13.5px] text-[color:var(--muted)] mt-1">No classes here. Use the arrows or the strip above to look at another day.</p>
                         </Card>
                       ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-2.5 sm:space-y-3">
                           {dayClasses.map((c, i) => (
                             <FadeIn key={c.id} delay={Math.min(i, 6) * 45}>
                               <ClassRow c={c} tag={tags[c.id]} />
@@ -339,42 +359,44 @@ const Timetable = () => {
               {/* WEEK VIEW */}
               {view === "week" && (
                 <FadeIn>
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid md:grid-cols-2 gap-2.5 sm:gap-4">
                     {week.days.map((d, i) => {
                       const list = sortClasses(d.classes);
                       return (
                         <FadeIn key={d.date} delay={i * 40}>
-                          <Card className={cx("p-0 overflow-hidden h-full", d.isToday && "ring-2 ring-indigo-300")}>
+                          <Card className={cx("p-0 overflow-hidden h-full", d.isToday && "tn tn-brand !border-[color:var(--tn-solid)]")}>
                             <button
                               onClick={() => openDay(d.date)}
-                              className="w-full flex items-center justify-between px-5 py-3.5 text-left bg-white/40 hover:bg-white/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/50"
+                              className={cx(
+                                "w-full flex items-center justify-between px-4 sm:px-5 py-3.5 text-left bg-[color:var(--inset)] hover:bg-[color:var(--line-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
+                              )}
                             >
                               <span className="flex items-center gap-2.5">
-                                <span className="text-[15px] font-semibold text-[#161827]">{dayLabel(d.date)}</span>
+                                <span className="text-[15px] font-semibold text-[color:var(--ink)]">{dayLabel(d.date)}</span>
                                 {d.isToday && <Badge tone="brand">Today</Badge>}
                               </span>
-                              <span className="flex items-center gap-1 text-[12.5px] text-[#6A6F85]">
-                                {list.length} class{list.length === 1 ? "" : "es"}<ChevronRight className="w-4 h-4" />
+                              <span className="flex items-center gap-1 text-[12.5px] text-[color:var(--muted)] tabular-nums">
+                                {countText(list.length)}<ChevronRight className="w-4 h-4" aria-hidden="true" />
                               </span>
                             </button>
 
                             {list.length ? (
-                              <ul className="px-5 py-3.5 space-y-2.5">
+                              <ul className="px-4 sm:px-5 py-3.5 space-y-2.5">
                                 {list.map((c) => {
                                   const st = statusOf(c.status);
                                   return (
                                     <li key={c.id} className="flex items-center gap-3">
-                                      <span className="w-1.5 h-8 rounded-full shrink-0" style={{ background: colorOf(c) }} />
-                                      <span className="text-[12.5px] text-[#6A6F85] w-[88px] shrink-0">{c.plannedStartTime}–{c.plannedEndTime}</span>
-                                      <span className={cx("text-[14px] text-[#161827] truncate flex-1", c.status === "cancelled" && "line-through decoration-[#161827]/30 opacity-70")}>{c.subject?.name}</span>
+                                      <span className="w-1 h-8 rounded-full shrink-0" style={{ background: colorOf(c) }} />
+                                      <span className="text-[12.5px] text-[color:var(--muted)] w-[88px] shrink-0 tabular-nums">{c.plannedStartTime}–{c.plannedEndTime}</span>
+                                      <span className={cx("text-[14px] text-[color:var(--ink)] truncate flex-1", c.status === "cancelled" && "line-through decoration-[color:var(--faint)] opacity-70")}>{c.subject?.name}</span>
                                       {c.group && <Badge tone="brand">{c.group}</Badge>}
-                                      <span className={cx("w-2.5 h-2.5 rounded-full shrink-0", st.dot)} title={st.label} />
+                                      <span className={cx("tn tn-dot w-2.5 h-2.5 rounded-full shrink-0", `tn-${st.tone}`)} title={st.label} />
                                     </li>
                                   );
                                 })}
                               </ul>
                             ) : (
-                              <p className="px-5 py-4 text-[13.5px] text-[#6A6F85]">No classes</p>
+                              <p className="px-4 sm:px-5 py-4 text-[13.5px] text-[color:var(--muted)]">No classes</p>
                             )}
                           </Card>
                         </FadeIn>
@@ -382,10 +404,10 @@ const Timetable = () => {
                     })}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-5 px-1 text-[12.5px] text-[#6A6F85]">
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 px-1 text-[12.5px] text-[color:var(--muted)]">
                     {["present", "absent", "excused", "cancelled", "pending"].map((k) => (
                       <span key={k} className="inline-flex items-center gap-1.5">
-                        <span className={cx("w-2.5 h-2.5 rounded-full", STATUS[k].dot)} />{STATUS[k].label}
+                        <span className={cx("tn tn-dot w-2.5 h-2.5 rounded-full", `tn-${STATUS[k].tone}`)} />{STATUS[k].label}
                       </span>
                     ))}
                   </div>

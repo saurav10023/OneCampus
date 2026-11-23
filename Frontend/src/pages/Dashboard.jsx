@@ -7,6 +7,81 @@ import { Alert, Badge, Button, Card, Modal, PageHeader, PageSpinner, ProgressBar
 import Ring from "../components/Ring";
 
 /* ------------------------------------------------------------------------------------------
+   Theme. Light values are exactly the old Tailwind colours; dark values are new.
+   Dark mode is detected from <html>/<body> class "dark", data-theme="dark" or data-mode="dark".
+   If your app switches themes another way, change DARK / DARK_PAGE and nothing else.
+------------------------------------------------------------------------------------------ */
+
+const DARK = ':is(.dark,[data-theme="dark"],[data-mode="dark"]) .dbd';
+const DARK_PAGE = 'html:is(.dark,[data-theme="dark"],[data-mode="dark"]) body,body:is(.dark,[data-theme="dark"],[data-mode="dark"])';
+
+const themeCss = `
+/* ---------- light (same look as before) ---------- */
+.dbd{--acc:#4F46E5;--acc-solid:#4F46E5;--ok:#047857;--warn:#B45309;--bad:#A32A42}
+.dbd .t-acc{color:var(--acc)}
+.dbd .t-ok{color:var(--ok)}
+.dbd .t-warn{color:var(--warn)}
+.dbd .t-bad{color:var(--bad)}
+.dbd .dbd-ring{--tw-ring-color:#A5B4FC}
+
+/* one set of variables per kind: bg, border, box text, chip text, solid colour, icon colour */
+.dbd .k-violet{--k-bg:#F5F3FF;--k-bd:#DDD6FE;--k-tx:#2E1065;--k-chip:#5B21B6;--k-solid:#8B5CF6;--k-on:#fff}
+.dbd .k-amber {--k-bg:#FFFBEB;--k-bd:#FDE68A;--k-tx:#78350F;--k-chip:#92400E;--k-solid:#F59E0B;--k-on:#fff}
+.dbd .k-rose  {--k-bg:#FFF1F2;--k-bd:#FECDD3;--k-tx:#A32A42;--k-chip:#A32A42;--k-solid:#F43F5E;--k-on:#fff}
+.dbd .k-indigo{--k-bg:#EEF2FF;--k-bd:#C7D2FE;--k-tx:#312E81;--k-chip:#3730A3;--k-solid:#4F46E5;--k-on:#fff}
+.dbd .k-sky   {--k-bg:#F0F9FF;--k-bd:#BAE6FD;--k-tx:#0C4A6E;--k-chip:#0369A1;--k-solid:#0EA5E9;--k-on:#fff}
+
+.dbd .kx-box{background:var(--k-bg);border-color:var(--k-bd);color:var(--k-tx)}
+.dbd .kx-soft{background:color-mix(in srgb,var(--k-bg) 70%,transparent);border-color:var(--k-bd)}
+.dbd .kx-tile{background:var(--k-solid);color:var(--k-on)}
+.dbd .kx-dot{background:var(--k-solid)}
+/* zero specificity: where a chip also has bg-[color:var(--surface)] that one still wins, as before */
+:where(.dbd .kx-chip){background:var(--k-bg);border-color:var(--k-bd);color:var(--k-chip)}
+
+/* ---------- dark ---------- */
+${DARK_PAGE}{background:#0D1018}
+${DARK}{
+  color-scheme:dark;
+  --surface:#151A26;--inset:#1B2130;--track:#2B3347;
+  --line:#2B3347;--line-soft:#232A3B;--line-strong:#46526E;
+  --ink:#F2F4FA;--body:#CDD2E1;--muted:#9BA4BA;--faint:#7F89A1;
+  --acc:#A5ACFF;--acc-solid:#5B54EA;--ok:#5EE0A8;--warn:#FBBF58;--bad:#FF8FA3;
+  color:var(--body);
+}
+${DARK} .dbd-ring{--tw-ring-color:rgba(139,147,255,.65)}
+
+${DARK} .k-violet{--k-bg:rgba(139,92,246,.17);--k-bd:rgba(167,139,250,.40);--k-tx:#EBE5FF;--k-chip:#D8CCFF;--k-solid:#8B5CF6;--k-on:#fff}
+${DARK} .k-amber {--k-bg:rgba(245,158,11,.14);--k-bd:rgba(251,191,36,.38);--k-tx:#FDEBB8;--k-chip:#FCDC93;--k-solid:#F59E0B;--k-on:#1C1300}
+${DARK} .k-rose  {--k-bg:rgba(244,63,94,.15);--k-bd:rgba(251,113,133,.42);--k-tx:#FFC9D3;--k-chip:#FFB6C3;--k-solid:#F43F5E;--k-on:#fff}
+${DARK} .k-indigo{--k-bg:rgba(99,102,241,.20);--k-bd:rgba(129,140,248,.45);--k-tx:#DEE1FF;--k-chip:#CBD0FF;--k-solid:#5B54EA;--k-on:#fff}
+${DARK} .k-sky   {--k-bg:rgba(14,165,233,.15);--k-bd:rgba(56,189,248,.40);--k-tx:#D3F0FF;--k-chip:#AEE4FF;--k-solid:#0EA5E9;--k-on:#04141F}
+
+/* skeleton, inputs, dividers */
+${DARK} .animate-pulse{opacity:.7}
+${DARK} input,${DARK} select,${DARK} textarea{background:var(--inset);color:var(--ink);border-color:var(--line)}
+${DARK} input::placeholder,${DARK} textarea::placeholder{color:var(--faint)}
+
+/* Safety net for light-only Tailwind colours used by shared components (Card, Badge, Button,
+   PageHeader, Alert, ProgressBar) that live in other files. */
+${DARK} .bg-white,${DARK} [class*="bg-white/"]{background-color:var(--surface)!important}
+${DARK} .bg-slate-50,${DARK} .bg-gray-50,${DARK} .bg-slate-100,${DARK} .bg-gray-100{background-color:var(--inset)!important}
+${DARK} .text-slate-900,${DARK} .text-slate-800,${DARK} .text-gray-900,${DARK} .text-gray-800{color:var(--ink)!important}
+${DARK} .text-slate-700,${DARK} .text-slate-600,${DARK} .text-gray-700,${DARK} .text-gray-600{color:var(--body)!important}
+${DARK} .text-slate-500,${DARK} .text-gray-500{color:var(--muted)!important}
+${DARK} .text-slate-400,${DARK} .text-gray-400{color:var(--faint)!important}
+${DARK} .border-slate-100,${DARK} .border-slate-200,${DARK} .border-gray-100,${DARK} .border-gray-200{border-color:var(--line)!important}
+${DARK} .bg-indigo-50,${DARK} .bg-indigo-100{background-color:rgba(139,147,255,.16)!important}
+${DARK} .text-indigo-600,${DARK} .text-indigo-700,${DARK} .text-indigo-800{color:#A5ACFF!important}
+${DARK} .bg-emerald-50{background-color:rgba(52,211,153,.15)!important}
+${DARK} .text-emerald-600,${DARK} .text-emerald-700,${DARK} .text-emerald-800{color:#5EE0A8!important}
+${DARK} .bg-amber-50{background-color:rgba(251,191,36,.15)!important}
+${DARK} .text-amber-600,${DARK} .text-amber-700,${DARK} .text-amber-800{color:#FBBF58!important}
+${DARK} .bg-rose-50{background-color:rgba(251,113,133,.15)!important}
+${DARK} .text-rose-600,${DARK} .text-rose-700,${DARK} .text-rose-800{color:#FF8FA3!important}
+${DARK} .border-rose-200,${DARK} .border-amber-200,${DARK} .border-indigo-200{border-color:var(--line-strong)!important}
+`;
+
+/* ------------------------------------------------------------------------------------------
    Dates. All plain YYYY-MM-DD strings in the setup's time zone, never converted by the browser.
 ------------------------------------------------------------------------------------------ */
 
@@ -40,71 +115,34 @@ const untilText = (now, start) => {
 
 /* ------------------------------------------------------------------------------------------
    What can happen to a class or a day, and how each one looks.
+   Colours carry meaning (amber = day off, rose = cancelled, sky = quiz, indigo = exam,
+   violet = mass bunk) and every kind also has a text label.
+   The actual colours live in themeCss above (one variable set per kind, light and dark).
 ------------------------------------------------------------------------------------------ */
 
+const tint = (c) => ({
+  box: `kx-box k-${c}`,
+  soft: `kx-soft k-${c}`,
+  tile: `kx-tile k-${c}`,
+  chip: `kx-chip k-${c}`,
+  dot: `kx-dot k-${c}`,
+});
+
 const KINDS = {
-  mass_bunk: {
-    label: "Mass bunk",
-    icon: PartyPopper,
-    box: "bg-gradient-to-r from-fuchsia-500/20 via-violet-500/10 to-transparent border-fuchsia-200 text-fuchsia-950",
-    soft: "bg-fuchsia-500/[0.07] border-fuchsia-200",
-    tile: "bg-fuchsia-500 text-white",
-    chip: "bg-fuchsia-500/10 border-fuchsia-200 text-fuchsia-800",
-    dot: "bg-fuchsia-500",
-  },
-  holiday: {
-    label: "Holiday",
-    icon: Sun,
-    box: "bg-gradient-to-r from-amber-400/25 via-orange-400/10 to-transparent border-amber-200 text-amber-950",
-    soft: "bg-amber-500/[0.07] border-amber-200",
-    tile: "bg-amber-500 text-white",
-    chip: "bg-amber-500/10 border-amber-200 text-amber-800",
-    dot: "bg-amber-500",
-  },
-  calendar_event: {
-    label: "Day off",
-    icon: CalendarOff,
-    box: "bg-gradient-to-r from-amber-400/25 via-orange-400/10 to-transparent border-amber-200 text-amber-950",
-    soft: "bg-amber-500/[0.07] border-amber-200",
-    tile: "bg-amber-500 text-white",
-    chip: "bg-amber-500/10 border-amber-200 text-amber-800",
-    dot: "bg-amber-500",
-  },
-  class_cancel: {
-    label: "Class cancelled",
-    icon: Ban,
-    box: "bg-gradient-to-r from-rose-500/20 via-rose-400/10 to-transparent border-rose-200 text-rose-950",
-    soft: "bg-rose-500/[0.07] border-rose-200",
-    tile: "bg-rose-500 text-white",
-    chip: "bg-rose-500/10 border-rose-200 text-rose-800",
-    dot: "bg-rose-500",
-  },
-  exam: {
-    label: "Exam",
-    icon: GraduationCap,
-    box: "bg-gradient-to-r from-indigo-500/20 via-indigo-400/10 to-transparent border-indigo-200 text-indigo-950",
-    soft: "bg-indigo-500/[0.07] border-indigo-200",
-    tile: "bg-indigo-600 text-white",
-    chip: "bg-indigo-500/10 border-indigo-200 text-indigo-800",
-    dot: "bg-indigo-500",
-  },
-  quiz: {
-    label: "Quiz",
-    icon: ClipboardList,
-    box: "bg-gradient-to-r from-sky-500/20 via-sky-400/10 to-transparent border-sky-200 text-sky-950",
-    soft: "bg-sky-500/[0.07] border-sky-200",
-    tile: "bg-sky-500 text-white",
-    chip: "bg-sky-500/10 border-sky-200 text-sky-800",
-    dot: "bg-sky-500",
-  },
+  mass_bunk: { label: "Mass bunk", icon: PartyPopper, ...tint("violet") },
+  holiday: { label: "Holiday", icon: Sun, ...tint("amber") },
+  calendar_event: { label: "Day off", icon: CalendarOff, ...tint("amber") },
+  class_cancel: { label: "Class cancelled", icon: Ban, ...tint("rose") },
+  exam: { label: "Exam", icon: GraduationCap, ...tint("indigo") },
+  quiz: { label: "Quiz", icon: ClipboardList, ...tint("sky") },
   event: {
     label: "Event",
     icon: Sparkles,
-    box: "bg-gradient-to-r from-teal-500/20 via-teal-400/10 to-transparent border-teal-200 text-teal-950",
-    soft: "bg-teal-500/[0.07] border-teal-200",
-    tile: "bg-teal-500 text-white",
-    chip: "bg-teal-500/10 border-teal-200 text-teal-800",
-    dot: "bg-teal-500",
+    box: "bg-[color:var(--inset)] border-[color:var(--line)] text-[color:var(--ink)]",
+    soft: "bg-[color:var(--inset)] border-[color:var(--line)]",
+    tile: "bg-[color:var(--muted)] text-white",
+    chip: "bg-[color:var(--inset)] border-[color:var(--line)] text-[color:var(--body)]",
+    dot: "bg-[color:var(--muted)]",
   },
 };
 
@@ -113,14 +151,14 @@ const SHORT = { mass_bunk: "Bunk", calendar_event: "Off", class_cancel: "Cancell
 
 // The server accepts only present / absent / excused from a student.
 // "Cancelled" is never a student choice: it comes from a holiday, mass bunk or CR cancellation.
+// Unmarked: surface with a hairline border. Marked: solid emerald / rose / sky.
 const STATUSES = [
   { key: "present", label: "Present", on: "bg-emerald-500 text-white border-emerald-500" },
-  { key: "absent", label: "Absent", on: "bg-rose-500 text-white border-rose-500" },
+  { key: "absent", label: "Absent", on: "bg-rose-600 text-white border-rose-600" },
   { key: "excused", label: "Excused", on: "bg-sky-500 text-white border-sky-500" },
 ];
 
-const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400";
-const GRADIENT = "text-white bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/25";
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 focus-visible:ring-offset-[color:var(--surface)]";
 const HIDE_SCROLLBAR = "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 // Banners for a day: calendar events from the server, plus mass bunks and class cancellations
@@ -257,9 +295,9 @@ const useStrip = (setupId, start) => {
 ------------------------------------------------------------------------------------------ */
 
 const Skeleton = () => (
-  <div className="space-y-3" aria-hidden="true">
+  <div className="space-y-2.5" aria-hidden="true">
     {[0, 1, 2].map((i) => (
-      <div key={i} className="h-[76px] rounded-2xl bg-[#161827]/[0.06] animate-pulse motion-reduce:animate-none" />
+      <div key={i} className="h-[76px] rounded-xl bg-[color:var(--line-soft)] animate-pulse motion-reduce:animate-none" />
     ))}
   </div>
 );
@@ -268,16 +306,16 @@ const Banner = ({ b }) => {
   const K = KINDS[b.kind] || KINDS.event;
   const Icon = K.icon;
   return (
-    <div className={cx("rounded-2xl border px-3.5 sm:px-4 py-3.5 flex items-start gap-3", K.box)} role="status">
-      <span className={cx("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm", K.tile)}>
+    <div className={cx("rounded-xl border px-3.5 sm:px-4 py-3.5 flex items-start gap-3", K.box)} role="status">
+      <span className={cx("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", K.tile)}>
         <Icon className="w-5 h-5" aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <p className="text-[15px] sm:text-[15.5px] font-semibold leading-snug break-words">{b.title}</p>
-          {b.chip && <span className={cx("inline-flex items-center h-5 px-2 rounded-full border text-[11.5px] font-medium bg-white/60", K.chip)}>{b.chip}</span>}
+          <p className="text-[15px] font-semibold leading-snug break-words">{b.title}</p>
+          {b.chip && <span className={cx("inline-flex items-center h-5 px-2 rounded-full border text-[11.5px] font-medium bg-[color:var(--surface)]", K.chip)}>{b.chip}</span>}
         </div>
-        {b.text && <p className="text-[13px] mt-0.5 leading-relaxed opacity-85">{b.text}</p>}
+        {b.text && <p className="text-[13px] mt-0.5 leading-relaxed">{b.text}</p>}
       </div>
     </div>
   );
@@ -295,18 +333,18 @@ const ClassRow = ({ c, future, busy, onMark }) => {
   const KIcon = K?.icon;
 
   return (
-    <div className={cx("rounded-2xl border px-3 sm:px-4 py-3.5", K ? K.soft : "bg-white/60 border-white/80")}>
+    <div className={cx("rounded-xl px-3 sm:px-4 py-3.5", K ? cx("border", K.soft) : "bg-[color:var(--inset)]")}>
       <div className="flex items-start gap-2.5 sm:gap-3">
         <div className="w-12 sm:w-14 shrink-0 text-right">
-          <p className={cx("text-[14.5px] sm:text-[15px] font-semibold leading-tight", cancelled ? "text-[#6A6F85]" : "text-[#161827]")}>{c.plannedStartTime}</p>
-          <p className="text-[12px] text-[#6A6F85]">{c.plannedEndTime}</p>
+          <p className={cx("text-[14.5px] sm:text-[15px] font-semibold leading-tight tabular-nums", cancelled ? "text-[color:var(--muted)]" : "text-[color:var(--ink)]")}>{c.plannedStartTime}</p>
+          <p className="text-[12px] text-[color:var(--muted)] tabular-nums">{c.plannedEndTime}</p>
         </div>
-        <span className="w-1.5 self-stretch rounded-full shrink-0" style={{ background: c.subject?.color || "#6366F1", opacity: cancelled ? 0.4 : 1 }} />
+        <span className="w-1 self-stretch rounded-full shrink-0" style={{ background: c.subject?.color || "#6366F1", opacity: cancelled ? 0.4 : 1 }} />
         <div className="min-w-0 flex-1">
-          <p className={cx("text-[15px] sm:text-[15.5px] font-semibold leading-snug break-words", cancelled ? "text-[#6A6F85]" : "text-[#161827]")}>{c.subject?.name || "Class"}</p>
+          <p className={cx("text-[15px] font-semibold leading-snug break-words", cancelled ? "text-[color:var(--muted)]" : "text-[color:var(--ink)]")}>{c.subject?.name || "Class"}</p>
           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
             {K && (
-              <span className={cx("inline-flex items-center gap-1 h-6 px-2.5 rounded-full border text-[12px] font-medium bg-white/60", K.chip)}>
+              <span className={cx("inline-flex items-center gap-1 h-6 px-2.5 rounded-full border text-[12px] font-medium bg-[color:var(--surface)]", K.chip)}>
                 <KIcon className="w-3.5 h-3.5" aria-hidden="true" />
                 {K.label}
                 {official && (
@@ -323,7 +361,7 @@ const ClassRow = ({ c, future, busy, onMark }) => {
             {c.attendanceUnits > 1 && <Badge>{c.attendanceUnits} units</Badge>}
             {c.oneOff && <Badge tone="amber">Extra class</Badge>}
           </div>
-          {cancelled && c.reason && <p className="text-[12.5px] text-[#6A6F85] mt-1.5">{c.reason}</p>}
+          {cancelled && c.reason && <p className="text-[12.5px] text-[color:var(--muted)] mt-1.5">{c.reason}</p>}
         </div>
       </div>
 
@@ -341,9 +379,9 @@ const ClassRow = ({ c, future, busy, onMark }) => {
                   aria-pressed={c.status === s.key}
                   onClick={() => onMark(c, s.key)}
                   className={cx(
-                    "h-11 sm:h-9 px-2 sm:px-4 rounded-full text-[13.5px] sm:text-[13px] font-medium border transition disabled:opacity-50 disabled:cursor-not-allowed motion-reduce:transition-none active:scale-[0.98]",
+                    "h-11 sm:h-9 px-2 sm:px-4 rounded-full text-[13.5px] sm:text-[13px] font-medium border transition-colors disabled:opacity-60 disabled:cursor-not-allowed motion-reduce:transition-none active:scale-[0.98]",
                     FOCUS,
-                    c.status === s.key ? s.on : "bg-white/70 border-white/80 text-[#161827]/75 hover:bg-white/95"
+                    c.status === s.key ? s.on : "bg-[color:var(--surface)] border-[color:var(--line)] text-[color:var(--body)] hover:border-[color:var(--line-strong)]"
                   )}
                 >
                   {s.label}
@@ -351,8 +389,8 @@ const ClassRow = ({ c, future, busy, onMark }) => {
               );
             })}
           </div>
-          {future && <p className="text-[12px] text-[#6A6F85] mt-2">This class hasn't happened yet, so it can't be marked Present.</p>}
-          {byCause && <p className="text-[12px] text-[#6A6F85] mt-2">This class was cancelled. Marking it will override the cancellation.</p>}
+          {future && <p className="text-[12px] text-[color:var(--muted)] mt-2">This class hasn't happened yet, so it can't be marked Present.</p>}
+          {byCause && <p className="text-[12px] text-[color:var(--muted)] mt-2">This class was cancelled. Marking it will override the cancellation.</p>}
         </div>
       )}
     </div>
@@ -377,27 +415,27 @@ const DayBlock = ({ variant, heading, date, state, todayStr, busyId, onMark, onJ
 
   return (
     <div>
-      <div className={cx("px-4 sm:px-6 pt-5 pb-4", isToday && "bg-gradient-to-br from-[#5B52EE]/12 via-[#2B8DE0]/8 to-transparent")}>
+      <div className="px-3.5 min-[380px]:px-4 sm:px-5 pt-4 sm:pt-5 pb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className={cx("font-semibold tracking-tight text-[#161827]", isToday ? "text-[26px] sm:text-[28px] leading-tight" : "text-[18px] sm:text-[19px]")}>{heading}</h2>
-            <p className="text-[13.5px] text-[#6A6F85] mt-0.5">{longDate(shown)}</p>
+            <h2 className={cx("font-semibold tracking-tight text-[color:var(--ink)]", isToday ? "text-[24px] sm:text-[26px] leading-tight" : "text-[17px] sm:text-[18px]")}>{heading}</h2>
+            <p className="text-[13.5px] text-[color:var(--muted)] mt-0.5">{longDate(shown)}</p>
           </div>
 
           {next && day?.now && (
-            <div className="w-full sm:w-auto rounded-2xl bg-white/70 border border-white/90 px-3.5 py-2.5 flex items-center gap-3 shadow-sm">
-              <CalendarClock className="w-5 h-5 text-indigo-600 shrink-0" aria-hidden="true" />
+            <div className="w-full sm:w-auto rounded-xl bg-[color:var(--inset)] px-3.5 py-2.5 flex items-center gap-3">
+              <CalendarClock className="w-5 h-5 t-acc shrink-0" aria-hidden="true" />
               <div className="min-w-0">
-                <p className="text-[12px] text-[#6A6F85]">Next class</p>
-                <p className="text-[14px] font-semibold text-[#161827] leading-tight break-words">
-                  {next.subject?.name || "Class"} <span className="text-indigo-600 whitespace-nowrap">{untilText(day.now, next.plannedStartTime)}</span>
+                <p className="text-[12px] text-[color:var(--muted)]">Next class</p>
+                <p className="text-[14px] font-semibold text-[color:var(--ink)] leading-tight break-words">
+                  {next.subject?.name || "Class"} <span className="t-acc whitespace-nowrap tabular-nums">{untilText(day.now, next.plannedStartTime)}</span>
                 </p>
               </div>
             </div>
           )}
 
           {!isToday && day && active.length > 0 && (
-            <p className="text-[13px] text-[#6A6F85]">
+            <p className="text-[13px] text-[color:var(--muted)] tabular-nums">
               {plural(active.length, "class")}
               {firstTime ? `, starts ${firstTime}` : ""}
             </p>
@@ -406,12 +444,12 @@ const DayBlock = ({ variant, heading, date, state, todayStr, busyId, onMark, onJ
 
         {isToday && active.length > 0 && (
           <div className="mt-4">
-            <div className="flex items-center justify-between text-[12.5px] text-[#6A6F85]">
+            <div className="flex items-center justify-between text-[12.5px] text-[color:var(--muted)] tabular-nums">
               <span>{marked} of {active.length} marked</span>
-              {marked === active.length && <span className="text-emerald-600 font-medium">All done</span>}
+              {marked === active.length && <span className="t-ok font-medium">All done</span>}
             </div>
             <div
-              className="h-1.5 rounded-full bg-[#161827]/10 mt-1.5 overflow-hidden"
+              className="h-1.5 rounded-full bg-[color:var(--track)] mt-1.5 overflow-hidden"
               role="progressbar"
               aria-label="Classes marked today"
               aria-valuemin={0}
@@ -419,16 +457,16 @@ const DayBlock = ({ variant, heading, date, state, todayStr, busyId, onMark, onJ
               aria-valuenow={marked}
             >
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#5B52EE] to-[#2B8DE0] transition-[width] duration-500 motion-reduce:transition-none"
+                className="h-full rounded-full bg-[color:var(--acc-solid)] transition-[width] duration-500 motion-reduce:transition-none"
                 style={{ width: `${(marked / active.length) * 100}%` }}
               />
             </div>
-            {marked < active.length && <p className="text-[12.5px] text-[#6A6F85] mt-2">Tap Present, Absent or Excused for each class. Tap the same one again to undo.</p>}
+            {marked < active.length && <p className="text-[12.5px] text-[color:var(--muted)] mt-2">Tap Present, Absent or Excused for each class. Tap the same one again to undo.</p>}
           </div>
         )}
       </div>
 
-      <div className="px-4 sm:px-6 pb-5 space-y-3">
+      <div className="px-3.5 min-[380px]:px-4 sm:px-5 pb-4 sm:pb-5 space-y-2.5">
         {waiting ? (
           <Skeleton />
         ) : !day ? null : (
@@ -436,16 +474,16 @@ const DayBlock = ({ variant, heading, date, state, todayStr, busyId, onMark, onJ
             {banners.map((b) => <Banner key={b.key} b={b} />)}
 
             {day && day.isWithinSetup === false && (
-              <p className="text-[13px] text-[#6A6F85]">This date is outside your semester, so classes here are not counted.</p>
+              <p className="text-[13px] text-[color:var(--muted)]">This date is outside your semester, so classes here are not counted.</p>
             )}
 
             {classes.length > 0 ? (
               classes.map((c) => <ClassRow key={c.id} c={c} future={future} busy={busyId === c.id} onMark={onMark} />)
             ) : (
-              <div className="rounded-2xl border border-dashed border-[#161827]/15 px-4 py-6 text-center">
-                <CalendarClock className="w-6 h-6 text-[#6A6F85] mx-auto" aria-hidden="true" />
-                <p className="text-[14.5px] font-semibold text-[#161827] mt-2">No classes {isToday ? "today" : variant === "tomorrow" ? "tomorrow" : "on this day"}</p>
-                <p className="text-[13px] text-[#6A6F85] mt-1">
+              <div className="rounded-xl bg-[color:var(--inset)] px-4 py-6 text-center">
+                <CalendarClock className="w-6 h-6 text-[color:var(--muted)] mx-auto" aria-hidden="true" />
+                <p className="text-[14.5px] font-semibold text-[color:var(--ink)] mt-2">No classes {isToday ? "today" : variant === "tomorrow" ? "tomorrow" : "on this day"}</p>
+                <p className="text-[13px] text-[color:var(--muted)] mt-1">
                   {day?.nextDay ? `Your next class day is ${shortDate(ymd(day.nextDay.date))} (${plural(day.nextDay.classCount, "class")}).` : "Add weekly classes in your timetable to see them here."}
                 </p>
                 {day?.nextDay ? (
@@ -459,7 +497,7 @@ const DayBlock = ({ variant, heading, date, state, todayStr, busyId, onMark, onJ
             )}
 
             {allOff && (
-              <p className="text-[12.5px] text-[#6A6F85]">Every class on this day is cancelled, so there is nothing to mark.</p>
+              <p className="text-[12.5px] text-[color:var(--muted)]">Every class on this day is cancelled, so there is nothing to mark.</p>
             )}
           </>
         )}
@@ -477,7 +515,7 @@ const DayChip = ({ date, info, selected, isToday, onSelect }) => {
 
   let sub;
   if (total === 0) {
-    sub = <span className="text-[11px] opacity-60">No class</span>;
+    sub = <span className="text-[11px] opacity-70">No class</span>;
   } else if (full) {
     sub = (
       <span className="inline-flex items-center gap-1 text-[11px] font-semibold">
@@ -502,18 +540,18 @@ const DayChip = ({ date, info, selected, isToday, onSelect }) => {
       aria-label={`${longDate(date)}${isToday ? ", today" : ""}: ${total === 0 ? "no classes" : full ? SHORT[kind] || "day off" : plural(info.active, "class")}`}
       onClick={() => onSelect(date)}
       className={cx(
-        "snap-start shrink-0 w-[72px] sm:w-[78px] rounded-2xl border px-1.5 sm:px-2 py-2.5 text-center transition motion-reduce:transition-none active:scale-[0.97]",
+        "snap-start shrink-0 w-[72px] sm:w-[78px] rounded-xl border px-1.5 sm:px-2 py-2.5 text-center transition-colors motion-reduce:transition-none active:scale-[0.98]",
         FOCUS,
         selected
-          ? `${GRADIENT} border-transparent`
+          ? "bg-[color:var(--acc-solid)] border-[color:var(--acc-solid)] text-white"
           : full && K
-          ? `${K.chip} hover:brightness-95`
-          : "bg-white/60 border-white/80 text-[#161827] hover:bg-white/90",
-        isToday && !selected && "ring-2 ring-indigo-300"
+          ? K.chip
+          : "bg-[color:var(--surface)] border-[color:var(--line)] text-[color:var(--ink)] hover:border-[color:var(--line-strong)]",
+        isToday && !selected && "ring-2 dbd-ring"
       )}
     >
-      <span className={cx("block text-[12px]", selected ? "text-white/85" : "text-[#6A6F85]", full && !selected && "text-current opacity-80")}>{isToday ? "Today" : weekdayShort(date)}</span>
-      <span className="block text-[22px] font-semibold leading-tight">{dayNumber(date)}</span>
+      <span className={cx("block text-[12px]", selected ? "text-white/85" : "text-[color:var(--muted)]", full && !selected && "text-current")}>{isToday ? "Today" : weekdayShort(date)}</span>
+      <span className="block text-[22px] font-semibold leading-tight tabular-nums">{dayNumber(date)}</span>
       <span className="mt-1 block">{sub}</span>
     </button>
   );
@@ -649,14 +687,15 @@ const Dashboard = () => {
   if (today.loading && !today.day) return <PageSpinner />;
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-10">
+    <div className="dbd max-w-5xl mx-auto px-3 min-[380px]:px-3.5 sm:px-6 py-6 sm:py-10">
+      <style>{themeCss}</style>
       <PageHeader title="Dashboard" subtitle={`${setup.name} - ${[setup.branch, setup.section].filter(Boolean).join(" ")}`} />
 
-      <Alert type="error" className="mb-4 sm:mb-5">{error}</Alert>
+      <Alert type="error" className="mb-2.5 sm:mb-4">{error}</Alert>
 
       {/* Phones: one column, attendance summary first. Large screens: two columns with a sticky side panel. */}
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-3 lg:gap-5 lg:items-start">
-        <div className="order-2 lg:order-none lg:col-span-2 space-y-4 sm:space-y-5 min-w-0">
+      <div className="flex flex-col gap-2.5 lg:grid lg:grid-cols-3 lg:gap-4 lg:items-start">
+        <div className="order-2 lg:order-none lg:col-span-2 space-y-2.5 sm:space-y-4 min-w-0">
           {/* today */}
           <Card className="overflow-hidden">
             <DayBlock variant="today" heading="Today" date={todayStr} state={today} todayStr={todayStr} busyId={busyId} onMark={mark} onJump={jumpTo} />
@@ -671,11 +710,11 @@ const Dashboard = () => {
 
           {/* day slider */}
           <Card className="overflow-hidden">
-            <div ref={browserRef} className="scroll-mt-4 px-4 sm:px-6 pt-5">
+            <div ref={browserRef} className="scroll-mt-4 px-3.5 min-[380px]:px-4 sm:px-5 pt-4 sm:pt-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-[18px] sm:text-[19px] font-semibold tracking-tight text-[#161827]">Browse other days</h2>
-                  {winStart && <p className="text-[13px] text-[#6A6F85] mt-0.5">{rangeLabel(winStart, shift(winStart, WINDOW - 1))}</p>}
+                  <h2 className="text-[17px] sm:text-[18px] font-semibold tracking-tight text-[color:var(--ink)]">Browse other days</h2>
+                  {winStart && <p className="text-[13px] text-[color:var(--muted)] mt-0.5">{rangeLabel(winStart, shift(winStart, WINDOW - 1))}</p>}
                 </div>
                 <div className="flex items-center gap-2">
                   {todayStr && winStart !== todayStr && (
@@ -690,26 +729,24 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* the strip bleeds to the card edges on phones; soft fades hint that it scrolls */}
-              <div className="relative -mx-4 sm:-mx-6">
+              {/* the strip bleeds to the card edges on phones */}
+              <div className="-mx-3.5 min-[380px]:-mx-4 sm:-mx-5">
                 <div
                   ref={stripRef}
-                  className={cx("relative flex gap-2 overflow-x-auto snap-x scroll-px-4 pb-3 pt-4 px-4 sm:px-6", HIDE_SCROLLBAR)}
+                  className={cx("flex gap-2 overflow-x-auto snap-x scroll-px-4 pb-3 pt-4 px-3.5 min-[380px]:px-4 sm:px-5", HIDE_SCROLLBAR)}
                   role="group"
                   aria-label="Days"
                 >
                   {days.length === 0 || (strip.loading && Object.keys(strip.info).length === 0)
-                    ? Array.from({ length: 7 }, (_, i) => <div key={i} className="shrink-0 w-[72px] sm:w-[78px] h-[92px] rounded-2xl bg-[#161827]/[0.06] animate-pulse motion-reduce:animate-none" />)
+                    ? Array.from({ length: 7 }, (_, i) => <div key={i} className="shrink-0 w-[72px] sm:w-[78px] h-[92px] rounded-xl bg-[color:var(--line-soft)] animate-pulse motion-reduce:animate-none" />)
                     : days.map((d) => <DayChip key={d} date={d} info={strip.info[d]} selected={d === selected} isToday={d === todayStr} onSelect={selectDate} />)}
                 </div>
-                <div className="pointer-events-none absolute inset-y-0 left-0 w-5 bg-gradient-to-r from-white/70 to-transparent sm:hidden" aria-hidden="true" />
-                <div className="pointer-events-none absolute inset-y-0 right-0 w-5 bg-gradient-to-l from-white/70 to-transparent sm:hidden" aria-hidden="true" />
               </div>
-              {strip.error && <p className="text-[12.5px] text-amber-700 pb-2">{strip.error}</p>}
+              {strip.error && <p className="text-[12.5px] t-warn pb-2">{strip.error}</p>}
             </div>
 
             {selected && (
-              <div className="border-t border-white/70">
+              <div className="border-t border-[color:var(--line-soft)]">
                 <DayBlock variant="detail" heading={selected === todayStr ? "Today" : selected === tomorrowStr ? "Tomorrow" : shortDate(selected)} date={selected} state={detail} todayStr={todayStr} busyId={busyId} onMark={mark} onJump={jumpTo} />
               </div>
             )}
@@ -717,36 +754,36 @@ const Dashboard = () => {
         </div>
 
         {/* side panel: `contents` on phones so its cards can be ordered with the main column */}
-        <aside className="contents lg:block lg:space-y-5 lg:sticky lg:top-6">
-          <Card className="order-1 lg:order-none p-4 sm:p-5">
+        <aside className="contents lg:block lg:space-y-4 lg:sticky lg:top-6">
+          <Card className="order-1 lg:order-none p-3.5 min-[380px]:p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-[16px] font-semibold text-[#161827]">Overall attendance</h2>
-              <Link to="/attendance" className="lg:hidden text-[13px] font-medium text-indigo-600 hover:underline">Details</Link>
+              <h2 className="text-[16px] font-semibold text-[color:var(--ink)]">Overall attendance</h2>
+              <Link to="/attendance" className="lg:hidden text-[13px] font-medium t-acc hover:underline">Details</Link>
             </div>
             {overall?.pct != null ? (
               <>
                 <div className="flex items-center gap-4 mt-3">
                   <Ring value={overall.pct} target={target} tone={overallTone} size={96} className="shrink-0">
-                    <span className="text-[19px] font-semibold text-[#161827] leading-none">{overall.pct}%</span>
+                    <span className="text-[19px] font-semibold text-[color:var(--ink)] leading-none tabular-nums">{overall.pct}%</span>
                   </Ring>
                   <div className="min-w-0">
-                    <p className={cx("text-[14.5px] font-semibold", { green: "text-emerald-600", amber: "text-amber-600", red: "text-rose-600", neutral: "text-[#6A6F85]" }[overallTone])}>{STATUS_META[overallStatus].label}</p>
-                    <p className="text-[12.5px] text-[#6A6F85] mt-1">Attended {overall.attended} of {overall.held} classes</p>
-                    <p className="text-[12.5px] text-[#6A6F85]">Your target is {target}%</p>
+                    <p className={cx("text-[14.5px] font-semibold", { green: "t-ok", amber: "t-warn", red: "t-bad", neutral: "text-[color:var(--muted)]" }[overallTone])}>{STATUS_META[overallStatus].label}</p>
+                    <p className="text-[12.5px] text-[color:var(--muted)] mt-1 tabular-nums">Attended {overall.attended} of {overall.held} classes</p>
+                    <p className="text-[12.5px] text-[color:var(--muted)] tabular-nums">Your target is {target}%</p>
                   </div>
                 </div>
                 <div className="mt-4"><ProgressBar value={overall.pct} target={target} /></div>
               </>
             ) : (
-              <p className="text-[14px] text-[#6A6F85] mt-2">Mark your classes to see your attendance percentage here.</p>
+              <p className="text-[14px] text-[color:var(--muted)] mt-2">Mark your classes to see your attendance percentage here.</p>
             )}
             <Link to="/attendance" className="hidden lg:inline-block mt-4"><Button variant="glass" size="sm">Subject breakdown and planner</Button></Link>
           </Card>
 
           {upcoming.length > 0 && (
-            <Card className="order-3 lg:order-none p-4 sm:p-5">
-              <h2 className="text-[16px] font-semibold text-[#161827]">Coming up</h2>
-              <p className="text-[12.5px] text-[#6A6F85] mt-0.5">Classes cancelled in the next two weeks. Tap one to view that day.</p>
+            <Card className="order-3 lg:order-none p-3.5 min-[380px]:p-4 sm:p-5">
+              <h2 className="text-[16px] font-semibold text-[color:var(--ink)]">Coming up</h2>
+              <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5">Classes cancelled in the next two weeks. Tap one to view that day.</p>
               <ul className="mt-3 space-y-2">
                 {upcoming.map((d) => {
                   const i = strip.info[d];
@@ -758,14 +795,14 @@ const Dashboard = () => {
                       <button
                         type="button"
                         onClick={() => jumpTo(d)}
-                        className={cx("w-full text-left rounded-2xl border px-3 py-2.5 flex items-center gap-3 hover:brightness-95 transition motion-reduce:transition-none", FOCUS, K.soft)}
+                        className={cx("w-full text-left rounded-xl border px-3 py-2.5 flex items-center gap-3 transition-colors hover:border-[color:var(--line-strong)] motion-reduce:transition-none", FOCUS, K.soft)}
                       >
                         <span className={cx("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", K.tile)}>
                           <Icon className="w-[18px] h-[18px]" aria-hidden="true" />
                         </span>
                         <span className="min-w-0">
-                          <span className="block text-[13.5px] font-semibold text-[#161827] truncate">{K.label}</span>
-                          <span className="block text-[12.5px] text-[#6A6F85]">
+                          <span className="block text-[13.5px] font-semibold text-[color:var(--ink)] truncate">{K.label}</span>
+                          <span className="block text-[12.5px] text-[color:var(--muted)] tabular-nums">
                             {shortDate(d)} - {full ? "all classes off" : `${plural(i.cancelled, "class")} off`}
                           </span>
                         </span>
@@ -781,7 +818,7 @@ const Dashboard = () => {
 
       <Modal open={Boolean(pendingOverride)} onClose={() => setPendingOverride(null)} title="Mark this cancelled class?">
         <div className="space-y-5">
-          <p className="text-[14px] leading-relaxed text-[#444A63]">
+          <p className="text-[14px] leading-relaxed text-[color:var(--body)]">
             This class was cancelled by one of your calendar events. If you mark it, it will count towards your attendance again.
           </p>
           <div className="flex flex-col-reverse sm:flex-row gap-3">

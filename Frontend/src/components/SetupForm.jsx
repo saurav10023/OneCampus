@@ -10,6 +10,8 @@ import { BRANCHES, SECTIONS, SEMESTERS, academicYearOptions, pickOption, withCur
 
 const TARGETS = [70, 75, 80, 85];
 
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1";
+
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
 const parseYmd = (s) => {
@@ -71,7 +73,11 @@ const build = (initial) => ({
    Small pieces
 ------------------------------------------------------------------------------------------ */
 
-const labelCls = "text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6A6F85]";
+const labelCls = "text-[13px] font-medium text-[color:var(--body)]";
+
+const chipBase = "h-11 px-4 rounded-xl border text-[14px] font-semibold transition-colors motion-reduce:transition-none active:scale-[0.98] disabled:opacity-60";
+const chipOn = "bg-[#4F46E5] border-[#4F46E5] text-white";
+const chipOff = "bg-[color:var(--surface)] border-[color:var(--line)] text-[color:var(--body)] hover:bg-[color:var(--inset)]";
 
 // A dropdown that always starts on "Select ..." so nothing is chosen by accident.
 const Choice = ({ label, value, options, onChange, disabled, hint }) => (
@@ -87,7 +93,7 @@ const Choice = ({ label, value, options, onChange, disabled, hint }) => (
 
 // One tap per option. Used for short lists such as the semester.
 const Chips = ({ id, label, value, options, onChange, disabled }) => (
-  <div>
+  <div className="min-w-0">
     <span id={id} className={cx(labelCls, "block mb-1.5 px-1")}>{label}</span>
     <div role="radiogroup" aria-labelledby={id} className="flex flex-wrap gap-2">
       {options.map((o) => {
@@ -100,13 +106,7 @@ const Chips = ({ id, label, value, options, onChange, disabled }) => (
             aria-checked={on}
             disabled={disabled}
             onClick={() => onChange(o)}
-            className={cx(
-              "min-w-[3rem] h-11 px-4 rounded-2xl border text-[14px] font-semibold transition disabled:opacity-60",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50",
-              on
-                ? "text-white border-transparent bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/30"
-                : "bg-white/70 border-white/90 text-[#444A63] shadow-[inset_0_1px_0_#fff] hover:bg-white hover:text-[#161827]"
-            )}
+            className={cx("min-w-[3rem]", chipBase, FOCUS, on ? chipOn : chipOff)}
           >
             {o}
           </button>
@@ -224,16 +224,18 @@ const SetupForm = ({ initial, ownerName, onSubmit, submitLabel = "Save", loading
     });
   };
 
+  // The @container wrapper makes every layout switch follow the width of the card or dialog
+  // this form sits in, so fields never overlap in a narrow popup.
   return (
-    <form onSubmit={submit} className="space-y-6">
+    <form onSubmit={submit} className="@container space-y-6 min-w-0">
       <Alert type="error">{error}</Alert>
 
       {/* Class: taken from the account when we already know it */}
       {classPrefilled && !editClass ? (
-        <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/60 border border-white px-4 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-[color:var(--inset)] px-4 py-3 min-w-0">
           <div className="min-w-0">
-            <p className="text-[12px] text-[#6A6F85]">Your class</p>
-            <p className="text-[15px] font-semibold text-[#161827] truncate">
+            <p className="text-[12px] text-[color:var(--muted)]">Your class</p>
+            <p className="text-[15px] font-semibold text-[color:var(--ink)] truncate">
               {form.branch} Section {form.section}
             </p>
           </div>
@@ -241,37 +243,37 @@ const SetupForm = ({ initial, ownerName, onSubmit, submitLabel = "Save", loading
             type="button"
             onClick={() => setEditClass(true)}
             disabled={disabled}
-            className="text-[13.5px] font-semibold text-indigo-600 hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
+            className={cx("h-11 px-3 shrink-0 text-[13.5px] font-semibold text-indigo-600 hover:underline rounded-lg", FOCUS)}
           >
             Change
           </button>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 @md:grid-cols-2 gap-4 min-w-0">
           <Choice label="Branch" value={form.branch} options={branches} onChange={set("branch")} disabled={disabled} />
           <Choice label="Section" value={form.section} options={sections} onChange={set("section")} disabled={disabled} />
         </div>
       )}
 
       {/* Term */}
-      <div className="space-y-4">
+      <div className="space-y-4 min-w-0">
         <Chips id="semester-label" label="Semester" value={form.semesterLabel} options={semesters} onChange={(v) => update({ semesterLabel: v })} disabled={disabled} />
-        <div className="sm:max-w-[16rem]">
+        <div className="@md:max-w-[16rem]">
           <Choice label="Academic year" value={form.academicYear} options={years} onChange={set("academicYear")} disabled={disabled} />
         </div>
       </div>
 
       {/* Dates */}
-      <fieldset className="rounded-3xl bg-white/55 border border-white/90 shadow-[inset_0_1px_0_#fff] p-4 sm:p-5" disabled={disabled}>
+      <fieldset className="rounded-xl bg-[color:var(--inset)] p-4 min-w-0" disabled={disabled}>
         <legend className="sr-only">Semester dates</legend>
 
-        <div className="flex items-center gap-2 mb-3">
-          <span className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+        <div className="flex items-center gap-3 mb-3 min-w-0">
+          <span className="w-8 h-8 shrink-0 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
             <CalendarDays className="w-4 h-4" aria-hidden="true" />
           </span>
-          <div>
-            <p className="text-[14px] font-semibold text-[#161827] leading-tight">Semester dates</p>
-            <p className="text-[12.5px] text-[#6A6F85]">Classes are counted only between these two days.</p>
+          <div className="min-w-0">
+            <p className="text-[14px] font-semibold text-[color:var(--ink)] leading-tight">Semester dates</p>
+            <p className="text-[12.5px] text-[color:var(--muted)]">Classes are counted only between these two days.</p>
           </div>
         </div>
 
@@ -286,21 +288,21 @@ const SetupForm = ({ initial, ownerName, onSubmit, submitLabel = "Save", loading
                   onClick={() => applyPreset(p)}
                   aria-pressed={on}
                   className={cx(
-                    "inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full border text-[13px] font-medium transition",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50",
-                    on ? "bg-indigo-500/10 border-indigo-300 text-indigo-700" : "bg-white/70 border-white text-[#444A63] hover:bg-white"
+                    "inline-flex items-center gap-1.5 h-11 @md:h-9 px-3.5 rounded-full border text-[13px] font-medium transition-colors motion-reduce:transition-none active:scale-[0.98]",
+                    FOCUS,
+                    on ? chipOn : chipOff
                   )}
                 >
                   {on && <Check className="w-3.5 h-3.5" aria-hidden="true" />}
                   {p.label}
-                  <span className="text-[#6A6F85] font-normal">{p.sub}</span>
+                  <span className={cx("font-normal", on ? "text-white/80" : "text-[color:var(--muted)]")}>{p.sub}</span>
                 </button>
               );
             })}
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 @sm:grid-cols-2 gap-3 @sm:gap-4 min-w-0">
           <Field label="Starts" type="date" value={form.startDate} onChange={setDate("startDate")} max={form.endDate || undefined} required disabled={disabled} />
           <Field label="Ends" type="date" value={form.endDate} onChange={setDate("endDate")} min={form.startDate || undefined} required disabled={disabled} />
         </div>
@@ -309,21 +311,21 @@ const SetupForm = ({ initial, ownerName, onSubmit, submitLabel = "Save", loading
           {dateOrderBad ? (
             <p className="text-[#A32A42]">The end date is before the start date. Swap them or pick a later end date.</p>
           ) : days ? (
-            <p className="text-[#444A63]">
-              {fmtDate(form.startDate)} to {fmtDate(form.endDate)}, about <strong className="font-semibold text-[#161827]">{weeks} weeks</strong>.
+            <p className="text-[color:var(--body)] tabular-nums">
+              {fmtDate(form.startDate)} to {fmtDate(form.endDate)}, about <strong className="font-semibold text-[color:var(--ink)]">{weeks} weeks</strong>.
             </p>
           ) : (
-            <p className="text-[#6A6F85]">Pick the first and last day of your semester.</p>
+            <p className="text-[color:var(--muted)]">Pick the first and last day of your semester.</p>
           )}
         </div>
 
         {!datesTouched && form.startDate && (
-          <p className="text-[12.5px] text-[#6A6F85] mt-1">These are typical dates for this term. Change them to match your college calendar.</p>
+          <p className="text-[12.5px] text-[color:var(--muted)] mt-1">These are typical dates for this term. Change them to match your college calendar.</p>
         )}
       </fieldset>
 
       {/* Target */}
-      <div>
+      <div className="min-w-0">
         <span id="target-label" className={cx(labelCls, "block mb-1.5 px-1")}>Attendance target</span>
         <div role="radiogroup" aria-labelledby="target-label" className="flex flex-wrap items-center gap-2">
           {TARGETS.map((t) => {
@@ -336,24 +338,18 @@ const SetupForm = ({ initial, ownerName, onSubmit, submitLabel = "Save", loading
                 aria-checked={on}
                 disabled={disabled}
                 onClick={() => setForm((f) => ({ ...f, targetPercentage: String(t) }))}
-                className={cx(
-                  "h-11 px-4 rounded-2xl border text-[14px] font-semibold transition disabled:opacity-60",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50",
-                  on
-                    ? "text-white border-transparent bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/30"
-                    : "bg-white/70 border-white/90 text-[#444A63] shadow-[inset_0_1px_0_#fff] hover:bg-white"
-                )}
+                className={cx("tabular-nums", chipBase, FOCUS, on ? chipOn : chipOff)}
               >
                 {t}%
               </button>
             );
           })}
-          <span className="text-[12.5px] text-[#6A6F85] px-1">Most colleges ask for 75%. Use More options for another value.</span>
         </div>
+        <p className="text-[12.5px] text-[color:var(--muted)] mt-2 px-1">Most colleges ask for 75%. Use More options for another value.</p>
       </div>
 
       {/* Name */}
-      <div>
+      <div className="min-w-0">
         <Field
           label="Setup name"
           value={form.name}
@@ -367,31 +363,31 @@ const SetupForm = ({ initial, ownerName, onSubmit, submitLabel = "Save", loading
           <button
             type="button"
             onClick={useSuggestedName}
-            className="mt-1.5 px-1 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-indigo-600 hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
+            className={cx("mt-1.5 px-1 min-h-11 text-left inline-flex items-center gap-1.5 text-[12.5px] font-medium text-indigo-600 hover:underline rounded-lg", FOCUS)}
           >
-            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-            Use "{suggested}"
+            <RotateCcw className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 break-words">Use "{suggested}"</span>
           </button>
         )}
       </div>
 
-      <p className="text-[12.5px] text-[#6A6F85] px-1 -mt-2">
+      <p className="text-[12.5px] text-[color:var(--muted)] px-1 -mt-2">
         Academic year, semester, branch and section decide which official schedule you can join, so pick the same ones your CR used.
       </p>
 
       {/* Rarely changed */}
-      <div>
+      <div className="min-w-0">
         <button
           type="button"
           onClick={() => setShowMore((s) => !s)}
           aria-expanded={showMore}
-          className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#444A63] hover:text-[#161827] rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
+          className={cx("inline-flex items-center gap-1.5 min-h-11 text-[13.5px] font-semibold text-[color:var(--body)] hover:text-[color:var(--ink)] rounded-lg", FOCUS)}
         >
           More options
           <ChevronDown className={cx("w-4 h-4 transition-transform motion-reduce:transition-none", showMore && "rotate-180")} aria-hidden="true" />
         </button>
         {showMore && (
-          <div className="grid sm:grid-cols-2 gap-4 mt-3">
+          <div className="grid grid-cols-1 @md:grid-cols-2 gap-4 mt-2 min-w-0">
             <Field label="Target attendance %" type="number" min="0" max="100" value={form.targetPercentage} onChange={set("targetPercentage")} disabled={disabled} />
             <Field label="Timezone" value={form.timezone} onChange={set("timezone")} hint="e.g. Asia/Kolkata" disabled={disabled} />
           </div>
@@ -399,13 +395,13 @@ const SetupForm = ({ initial, ownerName, onSubmit, submitLabel = "Save", loading
       </div>
 
       {allowArchivePrevious && (
-        <label className="flex items-start gap-2.5 text-[13.5px] text-[#161827]">
-          <input type="checkbox" checked={archivePrevious} onChange={(e) => setArchivePrevious(e.target.checked)} className="mt-0.5 w-4 h-4 accent-indigo-600" />
-          <span>Archive my previous active setup for this class if one exists.</span>
+        <label className="flex items-start gap-2.5 text-[13.5px] text-[color:var(--ink)]">
+          <input type="checkbox" checked={archivePrevious} onChange={(e) => setArchivePrevious(e.target.checked)} className="mt-0.5 w-4 h-4 shrink-0 accent-indigo-600" />
+          <span className="min-w-0">Archive my previous active setup for this class if one exists.</span>
         </label>
       )}
 
-      <Button type="submit" loading={loading} disabled={disabled} className="w-full sm:w-auto">
+      <Button type="submit" loading={loading} disabled={disabled} className="w-full @sm:w-auto">
         {submitLabel}
       </Button>
     </form>

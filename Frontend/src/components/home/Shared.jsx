@@ -12,20 +12,23 @@ export const Glass = ({ className, ...p }) => <div className={cx("lq", className
 
 export const Title = ({ children, right }) => (
   <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3">
-    <h2 className="text-[16px] sm:text-[18px] font-semibold tracking-tight text-[#161827]">{children}</h2>
+    <h2 className="text-[16px] sm:text-[17px] font-semibold tracking-tight text-[color:var(--ink)]">{children}</h2>
     {right}
   </div>
 );
 
-/* ---------- shared class strings (44px touch targets on phones, compact on desktop) ---------- */
-const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400";
+/* ---------- shared class strings (44px touch targets on phones, compact on desktop) ----------
+   Style: solid indigo for the main action, light frosted surface with a hairline border for the rest.
+   Every colour is a theme token, so light and dark both come from index.css. */
+const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-1";
+const SOFT = "bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] backdrop-blur-md border border-[color:var(--line)] text-[color:var(--ink)] hover:bg-[color:var(--surface)] hover:border-[color:var(--line-strong)] transition-colors";
 export const linkBase =
-  "inline-flex w-full min-[420px]:w-auto items-center justify-center gap-2 h-12 sm:h-11 px-6 rounded-full text-[14.5px] font-medium transition active:scale-[0.98] " + FOCUS;
-export const linkPrimary = "hm-grad hover:brightness-110";
-export const linkGlass = "lq-btn text-[#161827]";
-export const ghost = cx("lg-pill inline-flex items-center gap-1.5 h-11 sm:h-9 min-w-11 sm:min-w-10 justify-center px-3.5 rounded-full text-[13px] font-medium text-[#161827]", FOCUS);
-export const glassGhost = cx("lq-btn inline-flex items-center gap-1.5 h-11 sm:h-9 min-w-11 sm:min-w-10 justify-center px-3.5 rounded-full text-[13px] font-medium text-[#161827]", FOCUS);
-export const H2 = "text-[22px] sm:text-[30px] font-semibold tracking-tight leading-[1.15] text-[#161827]";
+  "inline-flex w-full min-[420px]:w-auto items-center justify-center gap-2 h-12 sm:h-11 px-6 rounded-xl text-[14.5px] font-medium active:scale-[0.98] " + FOCUS;
+export const linkPrimary = "bg-[color:var(--accent)] border border-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] transition-colors";
+export const linkGlass = SOFT;
+export const ghost = cx(SOFT, "inline-flex items-center gap-1.5 h-11 sm:h-9 min-w-11 sm:min-w-10 justify-center px-3.5 rounded-xl text-[13px] font-medium", FOCUS);
+export const glassGhost = ghost;
+export const H2 = "text-[22px] sm:text-[28px] font-semibold tracking-tight leading-[1.15] text-[color:var(--ink)]";
 
 /* ---------- date helpers (setup dates arrive as plain YYYY-MM-DD) ---------- */
 export const pad = (n) => String(n).padStart(2, "0");

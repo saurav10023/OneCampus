@@ -1,17 +1,17 @@
 // Shared editor for lab batches / elective groups (used when creating and editing a schedule).
-// On phones each group is a small stacked card; from sm up it is a single row.
+// Layout follows the width of the dialog it sits in (container queries), not the screen, so fields never overlap.
 import { Plus, Trash2 } from "lucide-react";
 import { GROUP_KINDS, emptyGroup, updateRow, removeRow } from "../lib/groups";
 import { Button, Field } from "./Ui";
 
-const Caption = ({ children }) => <span className="block text-[11.5px] text-[#6A6F85] mb-1 px-1">{children}</span>;
+const Caption = ({ children }) => <span className="block text-[12px] text-[color:var(--muted)] mb-1 px-1">{children}</span>;
 
 const GroupsEditor = ({ groups, setGroups, lockExisting = false }) => (
-  <div>
-    <div className="flex items-start justify-between gap-3 mb-3 px-1">
-      <div className="min-w-0">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6A6F85]">Lab batches / groups</p>
-        <p className="text-[12.5px] text-[#6A6F85] mt-0.5">Optional. Add these if some classes are only for certain batches.</p>
+  <div className="@container min-w-0">
+    <div className="flex flex-wrap items-start justify-between gap-3 mb-3 px-1">
+      <div className="min-w-0 flex-1 basis-48">
+        <p className="text-[13px] font-medium text-[color:var(--body)]">Lab batches and groups</p>
+        <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5">Optional. Add these if some classes are only for certain batches.</p>
       </div>
       <Button type="button" variant="glass" size="sm" className="shrink-0" onClick={() => setGroups((g) => [...g, emptyGroup()])}>
         <Plus className="w-4 h-4" />
@@ -21,8 +21,11 @@ const GroupsEditor = ({ groups, setGroups, lockExisting = false }) => (
 
     <div className="space-y-2.5">
       {groups.map((g, i) => (
-        <div key={i} className="rounded-2xl bg-white/50 border border-white/80 p-3 grid gap-2.5 sm:grid-cols-[1fr_1fr_130px_auto] sm:items-end">
-          <div>
+        <div
+          key={i}
+          className="rounded-xl bg-[color:var(--inset)] p-3 grid gap-2.5 min-w-0 grid-cols-1 @lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_130px_auto] @lg:items-end"
+        >
+          <div className="min-w-0">
             <Caption>Key</Caption>
             <Field
               aria-label={`Group ${i + 1} key`}
@@ -32,7 +35,7 @@ const GroupsEditor = ({ groups, setGroups, lockExisting = false }) => (
               disabled={lockExisting && g.existing}
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <Caption>Name students see</Caption>
             <Field
               aria-label={`Group ${i + 1} name`}
@@ -41,7 +44,7 @@ const GroupsEditor = ({ groups, setGroups, lockExisting = false }) => (
               placeholder="Lab Batch B1"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <Caption>Type</Caption>
             <Field as="select" aria-label={`Group ${i + 1} type`} value={g.kind} onChange={(e) => setGroups((a) => updateRow(a, i, "kind", e.target.value))}>
               {GROUP_KINDS.map((k) => (
@@ -53,22 +56,22 @@ const GroupsEditor = ({ groups, setGroups, lockExisting = false }) => (
             type="button"
             onClick={() => setGroups((a) => removeRow(a, i))}
             aria-label={`Remove group ${i + 1}`}
-            className="h-11 sm:w-11 rounded-full flex items-center justify-center gap-2 text-[13px] font-medium text-rose-600 hover:bg-rose-50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+            className="h-11 @lg:w-11 rounded-xl flex items-center justify-center gap-2 text-[13px] font-medium text-rose-600 hover:bg-rose-50 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1"
           >
             <Trash2 className="w-4 h-4" />
-            <span className="sm:hidden">Remove group</span>
+            <span className="@lg:hidden">Remove group</span>
           </button>
         </div>
       ))}
 
       {groups.length === 0 && (
-        <p className="rounded-2xl border border-dashed border-[#161827]/15 px-4 py-3.5 text-[13px] text-[#6A6F85]">
+        <p className="rounded-xl bg-[color:var(--inset)] px-4 py-3.5 text-[13px] text-[color:var(--muted)]">
           No groups yet. Every class will apply to the whole section.
         </p>
       )}
     </div>
 
-    <p className="text-[12px] leading-relaxed text-[#6A6F85] mt-2.5 px-1">
+    <p className="text-[12px] leading-relaxed text-[color:var(--muted)] mt-2.5 px-1">
       Leave the key empty to create it from the name.
       {lockExisting && " Keys of existing groups can't be renamed because weekly classes may use them, and removing a group that classes already use may be rejected."}
     </p>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Archive, ArrowLeft, BookOpen, CalendarClock, CalendarRange, Check, History, ImagePlus, Layers, Pencil, Rocket, Undo2 } from "lucide-react";
+import { Archive, ArrowLeft, BookOpen, CalendarClock, CalendarRange, History, ImagePlus, Layers, Pencil, Rocket, Undo2 } from "lucide-react";
 import { officialSchedulesApi, scheduleRolesApi, errMsg, toDateInput } from "../api/endpoints";
 import { fromApiGroups, cleanGroups } from "../lib/groups";
 import { Alert, Badge, Button, Field, PageSpinner, cx, fmtDate } from "../components/Ui";
@@ -14,7 +14,7 @@ import OfficialRules from "./cr/OfficialRules";
 import ItemsPanel from "./cr/ItemsPanel";
 import HistoryPanel from "./cr/HistoryPanel";
 
-// `short` is the label on phones, `label` from sm up.
+// `short` is the label on phones and tablets, `label` from lg up.
 const TABS = [
   { key: "subjects", label: "Subjects", short: "Subjects", icon: BookOpen },
   { key: "rules", label: "Weekly and makeup classes", short: "Weekly", icon: CalendarClock },
@@ -23,12 +23,6 @@ const TABS = [
 ];
 const tone = { published: "green", draft: "amber", archived: "neutral" };
 const statusText = { published: "Live", draft: "Draft", archived: "Archived" };
-
-const STAGES = [
-  { key: "draft", label: "Draft" },
-  { key: "published", label: "Live" },
-  { key: "archived", label: "Archived" },
-];
 
 const LIFECYCLE = {
   publish: {
@@ -51,49 +45,22 @@ const LIFECYCLE = {
   },
 };
 
-// Draft -> Live -> Archived, with the current stage highlighted.
-const Stages = ({ status }) => {
-  const current = Math.max(0, STAGES.findIndex((s) => s.key === status));
-  return (
-    <ol className="flex items-center gap-2 sm:gap-3" aria-label="Schedule stage">
-      {STAGES.map((s, i) => {
-        const done = i < current;
-        const active = i === current;
-        return (
-          <li key={s.key} className="flex items-center gap-2 sm:gap-3" aria-current={active ? "step" : undefined}>
-            <span className="flex items-center gap-1.5">
-              <span
-                className={cx(
-                  "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold",
-                  done && "bg-emerald-500 text-white",
-                  active && "text-white bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-sm shadow-indigo-500/30",
-                  !done && !active && "bg-[#161827]/10 text-[#6A6F85]"
-                )}
-              >
-                {done ? <Check className="w-3 h-3" aria-hidden="true" /> : i + 1}
-              </span>
-              <span className={cx("text-[12.5px]", active ? "font-semibold text-[#161827]" : "text-[#6A6F85]")}>{s.label}</span>
-            </span>
-            {i < STAGES.length - 1 && <span className="w-5 sm:w-8 h-px bg-[#161827]/15" aria-hidden="true" />}
-          </li>
-        );
-      })}
-    </ol>
-  );
-};
+const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1";
+const PANEL = "rounded-2xl bg-[color:var(--surface)] border border-[color:var(--line)] shadow-[0_1px_2px_rgba(27,31,51,0.04)]";
 
+// Inset block: grey, no border.
 const Fact = ({ icon: Icon, label, children }) => (
-  <div className="rounded-2xl bg-white/60 border border-white/80 shadow-[inset_0_1px_0_#fff] px-3.5 py-3 min-w-0">
-    <p className="flex items-center gap-1.5 text-[11.5px] uppercase tracking-[0.1em] text-[#6A6F85]">
+  <div className="rounded-xl bg-[color:var(--inset)] px-3.5 py-3 min-w-0">
+    <p className="flex items-center gap-1.5 text-[12px] text-[color:var(--muted)]">
       <Icon className="w-3.5 h-3.5" aria-hidden="true" />
       {label}
     </p>
-    <div className="text-[14px] font-semibold text-[#161827] mt-1 break-words">{children}</div>
+    <div className="text-[14px] font-semibold text-[color:var(--ink)] mt-1 break-words">{children}</div>
   </div>
 );
 
-// Normal in-flow tab bar (not sticky). Equal-width icon tabs on phones, pill row on larger screens.
-// Arrow keys, Home and End move between tabs.
+// Normal in-flow tab bar (not sticky). Equal-width icon tabs on phones, pill row from sm.
+// Long labels only from lg, so four tabs never run out of room. Arrow keys, Home and End move between tabs.
 const SectionTabs = ({ value, onChange }) => {
   const refs = useRef({});
   const onKeyDown = (e) => {
@@ -114,7 +81,7 @@ const SectionTabs = ({ value, onChange }) => {
       role="tablist"
       aria-label="Schedule sections"
       onKeyDown={onKeyDown}
-      className="grid grid-cols-4 sm:flex gap-1 p-1 sm:p-1.5 mb-5 rounded-3xl sm:rounded-full bg-white/55 border border-white/80 shadow-[inset_0_1px_0_#fff] sm:w-fit max-w-full"
+      className="grid grid-cols-4 sm:flex gap-1 p-1 mb-3 sm:mb-4 rounded-2xl sm:rounded-full bg-[color:var(--inset)] border border-[color:var(--line)] sm:w-fit max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {TABS.map(({ key, label, short, icon: Icon }) => {
         const on = value === key;
@@ -127,16 +94,18 @@ const SectionTabs = ({ value, onChange }) => {
             role="tab"
             aria-selected={on}
             aria-controls="schedule-panel"
+            aria-label={label}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(key)}
             className={cx(
-              "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 h-14 sm:h-10 px-1 sm:px-4 rounded-[20px] sm:rounded-full text-[11.5px] sm:text-[13.5px] font-medium transition whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
-              on ? "text-white bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/25" : "text-[#161827]/70 hover:bg-white/70"
+              "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 h-14 sm:h-10 px-1 sm:px-4 shrink-0 rounded-xl sm:rounded-full text-[11.5px] sm:text-[13.5px] font-medium transition-colors motion-reduce:transition-none whitespace-nowrap",
+              FOCUS,
+              on ? "bg-[#4F46E5] text-white" : "text-[color:var(--body)] hover:bg-[color:var(--surface)]"
             )}
           >
             <Icon className="w-[18px] h-[18px] sm:w-4 sm:h-4" aria-hidden="true" />
-            <span className="sm:hidden">{short}</span>
-            <span className="hidden sm:inline">{label}</span>
+            <span className="lg:hidden">{short}</span>
+            <span className="hidden lg:inline">{label}</span>
           </button>
         );
       })}
@@ -288,9 +257,9 @@ const CRSchedule = () => {
 
   if (!schedule) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-14 space-y-4">
+      <div className="max-w-xl mx-auto px-3 sm:px-6 py-14 space-y-4">
         <Alert type="error">{error || "We couldn't find this schedule."}</Alert>
-        <Link to="/cr-studio" className="inline-flex items-center gap-1.5 text-indigo-600 text-[14px] font-medium hover:underline">
+        <Link to="/cr-studio" className={cx("inline-flex items-center gap-1.5 text-[#4F46E5] text-[14px] font-medium hover:underline rounded", FOCUS)}>
           <ArrowLeft className="w-4 h-4" />
           Back to CR Studio
         </Link>
@@ -302,100 +271,85 @@ const CRSchedule = () => {
   const published = schedule.status === "published";
   const lifeCfg = life ? LIFECYCLE[life] : {};
   const groupList = Array.isArray(schedule.groups) ? schedule.groups : [];
+  const semesterText = [schedule.semesterLabel, schedule.academicYear].filter(Boolean).join(" · ");
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-10">
-      <Link to="/cr-studio" className="inline-flex items-center gap-1.5 h-9 text-[13.5px] text-[#6A6F85] hover:text-[#161827] mb-3 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">
-        <ArrowLeft className="w-4 h-4" />
+    <div className="max-w-6xl xl:max-w-7xl mx-auto px-3 min-[380px]:px-3.5 sm:px-6 py-4 sm:py-6">
+      <Link to="/cr-studio" className={cx("inline-flex items-center gap-1.5 min-h-11 sm:min-h-9 text-[13.5px] text-[color:var(--muted)] hover:text-[color:var(--ink)] rounded-lg", FOCUS)}>
+        <ArrowLeft className="w-4 h-4" aria-hidden="true" />
         CR Studio
       </Link>
 
-      {/* header */}
-      <section className="relative overflow-hidden rounded-[28px] border border-white/80 bg-white/55 backdrop-blur-xl shadow-[inset_0_1px_0_#fff,0_28px_56px_-32px_rgba(30,32,70,0.4)] p-4 sm:p-7 mb-5 sm:mb-6">
-        <span aria-hidden="true" className="pointer-events-none absolute -top-24 -right-16 w-64 h-64 rounded-full bg-[#5B52EE]/20 blur-3xl" />
-        <span aria-hidden="true" className="pointer-events-none absolute -bottom-28 -left-16 w-64 h-64 rounded-full bg-[#2B8DE0]/15 blur-3xl" />
-
-        <div className="relative">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <h1 className="text-[24px] sm:text-[30px] font-semibold tracking-tight text-[#161827] leading-tight break-words">
-                  {[schedule.branch, schedule.section && `Section ${schedule.section}`].filter(Boolean).join(" ") || "Schedule"}
-                </h1>
-                <Badge tone={tone[schedule.status] || "neutral"}>{statusText[schedule.status] || schedule.status}</Badge>
-              </div>
-              <p className="text-[14px] text-[#6A6F85] mt-1 break-words">{schedule.college}</p>
-              {schedule.createdByName && (
-                <p className="text-[12.5px] text-[#6A6F85] mt-0.5 break-words">
-                  Created by {schedule.mine ? "you" : schedule.createdByName}
-                </p>
-              )}
-            </div>
-
-            {!archived && (
-              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 w-full sm:w-auto">
-                {published ? (
-                  <Button variant="glass" size="sm" className="col-span-2 sm:col-span-1 !h-10 sm:!h-9" onClick={() => openLife("unpublish")}>
-                    <Undo2 className="w-4 h-4" />
-                    Move to draft
-                  </Button>
-                ) : (
-                  <Button size="sm" className="col-span-2 sm:col-span-1 sm:order-2 !h-10 sm:!h-9" onClick={() => openLife("publish")}>
-                    <Rocket className="w-4 h-4" />
-                    Publish
-                  </Button>
-                )}
-                <Button variant="glass" size="sm" className="sm:order-1 !h-10 sm:!h-9" onClick={openEdit}>
-                  <Pencil className="w-4 h-4" />
-                  Edit details
-                </Button>
-                <Button variant="glass" size="sm" className="col-span-2 sm:col-span-1 sm:order-1 !h-10 sm:!h-9" onClick={() => setImportOpen(true)}>
-                  <ImagePlus className="w-4 h-4" />
-                  Import from images
-                </Button>
-                <Button variant="ghost" size="sm" className="sm:order-3 !h-10 sm:!h-9" onClick={() => openLife("archive")}>
-                  <Archive className="w-4 h-4" />
-                  Archive
-                </Button>
-              </div>
-            )}
+      {/* compact header: title and actions on one row, one line of details, one thin meter */}
+      <section className={cx(PANEL, "p-3.5 min-[380px]:p-4 sm:p-5 mb-3 sm:mb-4")}>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 min-w-0">
+            <h1 className="text-[22px] sm:text-[26px] font-semibold tracking-tight text-[color:var(--ink)] leading-tight break-words min-w-0">
+              {[schedule.branch, schedule.section && `Section ${schedule.section}`].filter(Boolean).join(" ") || "Schedule"}
+            </h1>
+            <Badge tone={tone[schedule.status] || "neutral"}>{statusText[schedule.status] || schedule.status}</Badge>
           </div>
 
-          <div className="mt-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <Stages status={schedule.status} />
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-2.5 sm:gap-3 mt-5">
-            <Fact icon={BookOpen} label="Semester">
-              {[schedule.semesterLabel, schedule.academicYear].filter(Boolean).join(" · ") || "-"}
-            </Fact>
-            <Fact icon={CalendarRange} label="Dates">
-              {fmtDate(schedule.semesterStart)} to {fmtDate(schedule.semesterEnd)}
-            </Fact>
-            <Fact icon={Layers} label="Groups">
-              {groupList.length === 0 ? (
-                <span className="font-normal text-[#6A6F85]">Whole section</span>
+          {!archived && (
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {published ? (
+                <Button variant="glass" size="sm" className="!h-10" onClick={() => openLife("unpublish")}>
+                  <Undo2 className="w-4 h-4" />
+                  Move to draft
+                </Button>
               ) : (
-                <span className="flex flex-wrap gap-1">
-                  {groupList.map((g, i) => <Badge key={g.key || i} tone="brand">{g.label || g.key}</Badge>)}
-                </span>
+                <Button size="sm" className="!h-10" onClick={() => openLife("publish")}>
+                  <Rocket className="w-4 h-4" />
+                  Publish
+                </Button>
               )}
-            </Fact>
-          </div>
-
-          <SemesterMeter start={schedule.semesterStart} end={schedule.semesterEnd} className="mt-4" />
-
-          {!published && !archived && <Alert type="info" className="mt-4">This is a draft, so students can't see it yet. Publish it when your subjects and classes are ready.</Alert>}
-          {published && <Alert type="success" className="mt-4">This schedule is live. Every change you save below syncs to joined students automatically.</Alert>}
-          {archived && <Alert type="warning" className="mt-4">This schedule is archived and read-only.</Alert>}
+              <Button variant="glass" size="sm" className="!h-10" onClick={openEdit}>
+                <Pencil className="w-4 h-4" />
+                Edit
+              </Button>
+              <Button variant="glass" size="sm" className="!h-10" onClick={() => setImportOpen(true)}>
+                <ImagePlus className="w-4 h-4" />
+                Import
+              </Button>
+              <Button variant="ghost" size="sm" className="!h-10" onClick={() => openLife("archive")}>
+                <Archive className="w-4 h-4" />
+                Archive
+              </Button>
+            </div>
+          )}
         </div>
+
+        {/* one line of details instead of three info tiles */}
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[color:var(--muted)] mt-2 min-w-0">
+          {schedule.college && <span className="break-words">{schedule.college}</span>}
+          {semesterText && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>{semesterText}</span>
+            </>
+          )}
+          <span aria-hidden="true">·</span>
+          <span className="tabular-nums">{fmtDate(schedule.semesterStart)} to {fmtDate(schedule.semesterEnd)}</span>
+          {schedule.createdByName && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>by {schedule.mine ? "you" : schedule.createdByName}</span>
+            </>
+          )}
+          {groupList.length > 0 &&
+            groupList.map((g, i) => <Badge key={g.key || i} tone="brand">{g.label || g.key}</Badge>)}
+        </p>
+
+        <SemesterMeter start={schedule.semesterStart} end={schedule.semesterEnd} className="mt-3" />
+
+        {archived && <Alert type="warning" className="mt-3">This schedule is archived and read-only.</Alert>}
       </section>
 
-      <Alert type="error" className="mb-5">{error}</Alert>
+      <Alert type="error" className="mb-3 sm:mb-4">{error}</Alert>
 
       <SectionTabs value={tab} onChange={setTab} />
 
-      <div role="tabpanel" id="schedule-panel" aria-labelledby={`tab-${tab}`}>
+      <div role="tabpanel" id="schedule-panel" aria-labelledby={`tab-${tab}`} className="min-w-0">
         {/* key={importKey} remounts the panel after an import so it reloads its data */}
         {tab === "subjects" && <SubjectsPanel key={importKey} scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
         {tab === "rules" && <OfficialRules key={importKey} schedule={schedule} scheduleId={scheduleId} readOnly={archived} onChanged={changed} />}
@@ -427,20 +381,23 @@ const CRSchedule = () => {
         dirty={dirty}
         error={formError}
       >
-        <Alert type="info">
-          The college, academic year, semester, branch and section decide which CRs and students can see this schedule, so they can't be changed here. You can change the semester dates and groups. If the class details are wrong, archive this schedule and create a new one.
-        </Alert>
+        {/* @container: the grid follows the dialog width, so the read-only tiles and date fields never overlap */}
+        <div className="@container space-y-4 min-w-0">
+          <Alert type="info">
+            The college, academic year, semester, branch and section decide which CRs and students can see this schedule, so they can't be changed here. You can change the semester dates and groups. If the class details are wrong, archive this schedule and create a new one.
+          </Alert>
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <Fact icon={BookOpen} label="Academic year">{schedule.academicYear || "-"}</Fact>
-          <Fact icon={BookOpen} label="Semester">{schedule.semesterLabel || "-"}</Fact>
-          <Fact icon={Layers} label="Branch">{schedule.branch || "-"}</Fact>
-          <Fact icon={Layers} label="Section">{schedule.section || "-"}</Fact>
-          <Field label="Semester start" type="date" value={form.semesterStart || ""} onChange={setStart} error={errors.semesterStart} />
-          <Field label="Semester end" type="date" min={form.semesterStart || undefined} value={form.semesterEnd || ""} onChange={setF("semesterEnd")} error={errors.semesterEnd} />
+          <div className="grid grid-cols-1 @sm:grid-cols-2 gap-3 @sm:gap-4 min-w-0">
+            <Fact icon={BookOpen} label="Academic year">{schedule.academicYear || "-"}</Fact>
+            <Fact icon={BookOpen} label="Semester">{schedule.semesterLabel || "-"}</Fact>
+            <Fact icon={Layers} label="Branch">{schedule.branch || "-"}</Fact>
+            <Fact icon={Layers} label="Section">{schedule.section || "-"}</Fact>
+            <Field label="Semester start" type="date" value={form.semesterStart || ""} onChange={setStart} error={errors.semesterStart} />
+            <Field label="Semester end" type="date" min={form.semesterStart || undefined} value={form.semesterEnd || ""} onChange={setF("semesterEnd")} error={errors.semesterEnd} />
+          </div>
+
+          <GroupsEditor groups={groups} setGroups={setGroups} lockExisting />
         </div>
-
-        <GroupsEditor groups={groups} setGroups={setGroups} lockExisting />
       </FormModal>
 
       {/* publish / back to draft / archive */}

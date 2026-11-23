@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { X } from "lucide-react";
 import * as endpoints from "../api/endpoints";
 import { subjectsApi, eventsApi, errMsg, toDateInput } from "../api/endpoints";
 import { WEEKDAYS } from "../lib/dates";
 import { Alert } from "./Ui";
 import { FormModal } from "./FormKit";
+import DraftSections from "./DraftSections";
 import { ocr, parseTimetable, parseHolidays } from "../lib/imageImport";
 
 const COLORS = ["#6366F1", "#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#8B5CF6", "#14B8A6"]; // same as SubjectsTab
 const MAX_FILE_MB = 15;
-const CLASS_TYPES = ["lecture", "lab", "tutorial"];
-const ORDER = [1, 2, 3, 4, 5, 6, 0];
-const inp = "h-9 w-full rounded-xl bg-white/70 border border-white/80 px-2.5 text-[13.5px] text-[#161827] focus:outline-none focus:ring-2 focus:ring-indigo-500/40";
+
+const fileCls =
+  "block mt-1.5 w-full min-w-0 text-[13px] text-[color:var(--body)] " +
+  "file:mr-3 file:h-10 file:px-4 file:rounded-xl file:border file:border-[color:var(--line)] file:bg-[color:var(--surface)] " +
+  "file:text-[13px] file:font-medium file:text-[color:var(--ink)] hover:file:bg-[color:var(--inset)] file:cursor-pointer";
 
 /* ---------- WEEKLY CLASSES: the one place to adapt ----------
    I have not seen the student-side weekly-class API. This looks for one on api/endpoints
@@ -249,17 +251,17 @@ const ImportToSetup = ({ open, onClose, setup, onDone }) => {
               This setup follows your CR&apos;s official schedule, which already provides the subjects, classes and holidays. Only import here to add things your CR hasn&apos;t.
             </Alert>
           )}
-          <label className="block text-[14px] font-medium text-[#161827]">
+          <label className="block text-[13px] font-medium text-[color:var(--body)]">
             Class timetable image
-            <input type="file" accept="image/*" onChange={choose(setTtFile)} className="block mt-1.5 text-[13px] w-full" />
+            <input type="file" accept="image/*" onChange={choose(setTtFile)} className={fileCls} />
           </label>
-          <label className="block text-[14px] font-medium text-[#161827]">
+          <label className="block text-[13px] font-medium text-[color:var(--body)]">
             Academic holiday list image
-            <input type="file" accept="image/*" onChange={choose(setHolFile)} className="block mt-1.5 text-[13px] w-full" />
+            <input type="file" accept="image/*" onChange={choose(setHolFile)} className={fileCls} />
           </label>
           {busy && (
             <Alert type="info">
-              {status}… {Math.round(progress * 100)}%
+              <span className="tabular-nums">{status}… {Math.round(progress * 100)}%</span>
             </Alert>
           )}
           <Alert type="info">
@@ -267,99 +269,21 @@ const ImportToSetup = ({ open, onClose, setup, onDone }) => {
           </Alert>
         </>
       ) : (
-        <div className="space-y-6">
+        <>
           {notes.map((n) => (
             <Alert key={n} type="warning">{n}</Alert>
           ))}
-
-          {/* subjects */}
-          <section>
-            <p className="text-[14px] font-semibold text-[#161827] mb-2">Subjects ({draft.subjects.length})</p>
-            <div className="space-y-2">
-              {draft.subjects.map((s) => (
-                <div key={s.id} className="grid grid-cols-[1fr_80px_64px_36px] sm:grid-cols-[1fr_130px_90px_36px] gap-2 items-center">
-                  <input className={inp} value={s.name} maxLength={80} onChange={(e) => upd("subjects", s.id, { name: e.target.value })} aria-label="Subject name" />
-                  <input className={inp} value={s.code} maxLength={20} placeholder="Code" onChange={(e) => upd("subjects", s.id, { code: e.target.value })} aria-label="Subject code" />
-                  <input className={inp} type="number" min="0" max="30" value={s.credits ?? ""} placeholder="Credits" onChange={(e) => upd("subjects", s.id, { credits: e.target.value })} aria-label="Credits" />
-                  <button type="button" onClick={() => delSubject(s.id)} aria-label={`Remove ${s.name}`} className="w-9 h-9 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-50">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              {draft.subjects.length === 0 && <p className="text-[13px] text-[#6A6F85]">No subjects found.</p>}
-            </div>
-          </section>
-
-          {/* classes */}
-          <section>
-            <p className="text-[14px] font-semibold text-[#161827] mb-2">Weekly classes ({draft.classes.length})</p>
-            <div className="space-y-2">
-              {draft.classes.map((c) => (
-                <div
-                  key={c.id}
-                  className={`rounded-2xl bg-white/60 border border-white/80 p-2.5 grid grid-cols-2 sm:grid-cols-[auto_90px_1fr_104px_104px_104px_36px] gap-2 items-center ${c.on ? "" : "opacity-50"}`}
-                >
-                  <input type="checkbox" checked={c.on} onChange={(e) => upd("classes", c.id, { on: e.target.checked })} aria-label="Include this class" className="w-4 h-4 justify-self-start" />
-                  <select className={inp} value={c.weekday} onChange={(e) => upd("classes", c.id, { weekday: Number(e.target.value) })} aria-label="Day">
-                    {ORDER.map((d) => (
-                      <option key={d} value={d}>{WEEKDAYS[d]}</option>
-                    ))}
-                  </select>
-                  <select className={`${inp} col-span-2 sm:col-span-1`} value={c.subjectId} onChange={(e) => upd("classes", c.id, { subjectId: e.target.value })} aria-label="Subject">
-                    {draft.subjects.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                  <input type="time" className={inp} value={c.startTime} onChange={(e) => upd("classes", c.id, { startTime: e.target.value })} aria-label="Start" />
-                  <input type="time" className={inp} value={c.endTime} onChange={(e) => upd("classes", c.id, { endTime: e.target.value })} aria-label="End" />
-                  <select className={inp} value={c.classType} onChange={(e) => upd("classes", c.id, { classType: e.target.value })} aria-label="Type">
-                    {CLASS_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => del("classes", c.id)} aria-label="Remove class" className="w-9 h-9 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-50 justify-self-end">
-                    <X className="w-4 h-4" />
-                  </button>
-                  <input className={`${inp} sm:col-start-3 sm:col-span-2`} value={c.room || ""} maxLength={30} placeholder="Room" onChange={(e) => upd("classes", c.id, { room: e.target.value })} aria-label="Room" />
-                  <input className={`${inp} sm:col-span-3`} value={c.professor || ""} maxLength={80} placeholder="Professor" onChange={(e) => upd("classes", c.id, { professor: e.target.value })} aria-label="Professor" />
-                </div>
-              ))}
-              {draft.classes.length === 0 && <p className="text-[13px] text-[#6A6F85]">No classes found.</p>}
-            </div>
-          </section>
-
-          {/* holidays */}
-          <section>
-            <p className="text-[14px] font-semibold text-[#161827] mb-2">Holidays ({draft.holidays.length})</p>
-            <div className="space-y-2">
-              {draft.holidays.map((h) => {
-                const out = h.startDate < semStart || h.endDate > semEnd;
-                return (
-                  <div
-                    key={h.id}
-                    className={`rounded-2xl bg-white/60 border border-white/80 p-2.5 grid grid-cols-2 sm:grid-cols-[auto_1fr_140px_140px_36px] gap-2 items-center ${h.on ? "" : "opacity-50"}`}
-                  >
-                    <input type="checkbox" checked={h.on} onChange={(e) => upd("holidays", h.id, { on: e.target.checked })} aria-label="Include this holiday" className="w-4 h-4 justify-self-start" />
-                    <input className={`${inp} col-span-2 sm:col-span-1 order-last sm:order-none`} value={h.title} maxLength={120} onChange={(e) => upd("holidays", h.id, { title: e.target.value })} aria-label="Title" />
-                    <input
-                      type="date"
-                      className={inp}
-                      value={h.startDate}
-                      onChange={(e) => upd("holidays", h.id, { startDate: e.target.value, endDate: h.endDate < e.target.value ? e.target.value : h.endDate })}
-                      aria-label="Start date"
-                    />
-                    <input type="date" className={inp} min={h.startDate} value={h.endDate} onChange={(e) => upd("holidays", h.id, { endDate: e.target.value })} aria-label="End date" />
-                    <button type="button" onClick={() => del("holidays", h.id)} aria-label="Remove holiday" className="w-9 h-9 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-50 justify-self-end">
-                      <X className="w-4 h-4" />
-                    </button>
-                    {out && <p className="col-span-2 sm:col-span-5 text-[12px] text-amber-700">Outside the semester dates, so it is unchecked.</p>}
-                  </div>
-                );
-              })}
-              {draft.holidays.length === 0 && <p className="text-[13px] text-[#6A6F85]">No holidays found.</p>}
-            </div>
-          </section>
-        </div>
+          <DraftSections
+            draft={draft}
+            upd={upd}
+            del={del}
+            delSubject={delSubject}
+            semStart={semStart}
+            semEnd={semEnd}
+            withCredits
+            holidayTitleMax={120}
+          />
+        </>
       )}
     </FormModal>
   );

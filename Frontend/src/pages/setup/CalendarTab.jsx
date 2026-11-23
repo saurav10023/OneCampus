@@ -5,14 +5,15 @@ import { Alert, Badge, Button, Card, EmptyState, Field, Modal, Warnings, cx, fmt
 import { ConfirmDialog, FadeIn, Flash, SkeletonList, Tabs, useFlash } from "../../components/Ux";
 import { daysBetween, dayNum, isoOf, monthKey, monthLabel, monthShort, todayISO } from "../../lib/dateui";
 
+// Each type gets one soft tinted tile (pale background, darker icon and text). No gradients.
 const TYPES = [
-  { key: "holiday", label: "Holiday", tone: "red", icon: Sun, tile: "from-rose-400 to-rose-500" },
-  { key: "break", label: "Break", tone: "amber", icon: Coffee, tile: "from-amber-400 to-orange-500" },
-  { key: "exam", label: "Exam", tone: "brand", icon: GraduationCap, tile: "from-indigo-500 to-indigo-600" },
-  { key: "quiz", label: "Quiz", tone: "brand", icon: ClipboardCheck, tile: "from-violet-500 to-purple-600" },
-  { key: "event", label: "Event", tone: "green", icon: Sparkles, tile: "from-emerald-400 to-teal-500" },
+  { key: "holiday", label: "Holiday", tone: "red", icon: Sun, tile: "bg-rose-50 text-rose-600", date: "bg-rose-50 text-rose-700" },
+  { key: "break", label: "Break", tone: "amber", icon: Coffee, tile: "bg-amber-50 text-amber-600", date: "bg-amber-50 text-amber-700" },
+  { key: "exam", label: "Exam", tone: "brand", icon: GraduationCap, tile: "bg-indigo-50 text-indigo-600", date: "bg-indigo-50 text-indigo-700" },
+  { key: "quiz", label: "Quiz", tone: "brand", icon: ClipboardCheck, tile: "bg-violet-50 text-violet-600", date: "bg-violet-50 text-violet-700" },
+  { key: "event", label: "Event", tone: "green", icon: Sparkles, tile: "bg-emerald-50 text-emerald-600", date: "bg-emerald-50 text-emerald-700" },
 ];
-const typeInfo = (k) => TYPES.find((t) => t.key === k) || { label: k, tone: "neutral", icon: CalendarRange, tile: "from-slate-400 to-slate-500" };
+const typeInfo = (k) => TYPES.find((t) => t.key === k) || { label: k, tone: "neutral", icon: CalendarRange, tile: "bg-[color:var(--inset)] text-[color:var(--muted)]", date: "bg-[color:var(--inset)] text-[color:var(--body)]" };
 
 // Only these types may carry start and end times.
 const TIMED = ["quiz", "event"];
@@ -21,6 +22,8 @@ const blank = { title: "", type: "holiday", startDate: "", endDate: "", startTim
 
 const endOf = (ev) => isoOf(ev.endDate || ev.startDate);
 const byStart = (a, b) => isoOf(a.startDate).localeCompare(isoOf(b.startDate)) || (a.startTime || "").localeCompare(b.startTime || "");
+
+const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400";
 
 /* ---------- one event row ---------- */
 
@@ -31,34 +34,34 @@ const EventRow = ({ ev, readOnly, past, onEdit, onRemove, onConfirm }) => {
   const multi = isoOf(ev.startDate) !== endOf(ev);
 
   return (
-    <Card className={cx("p-4 sm:p-5 flex items-center gap-4 hover:shadow-[0_24px_48px_-28px_rgba(30,32,70,0.4)] transition-shadow", past && "opacity-70")}>
-      <div className={cx("w-14 shrink-0 rounded-2xl text-white text-center py-2 bg-gradient-to-br shadow-md", info.tile)} aria-hidden>
-        <p className="text-[10.5px] font-semibold uppercase tracking-wider opacity-90">{monthShort(ev.startDate)}</p>
-        <p className="text-[22px] font-semibold leading-none mt-0.5">{dayNum(ev.startDate)}</p>
+    <Card className={cx("p-3.5 sm:p-4 flex items-center gap-3.5 sm:gap-4", past && "opacity-70")}>
+      <div className={cx("w-14 shrink-0 rounded-xl text-center py-2", info.date)} aria-hidden="true">
+        <p className="text-[11px] font-medium opacity-80">{monthShort(ev.startDate)}</p>
+        <p className="text-[21px] font-semibold leading-none mt-0.5 tabular-nums">{dayNum(ev.startDate)}</p>
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[15.5px] font-semibold text-[#161827]">{ev.title}</p>
+          <p className="text-[15px] font-semibold text-[color:var(--ink)]">{ev.title}</p>
           <Badge tone={info.tone}>{info.label}</Badge>
           {draft && <Badge tone="amber">Draft</Badge>}
           {official && <Badge tone="green">Official</Badge>}
           {ev.lastAutoUpdate && <Badge tone="brand">Updated automatically</Badge>}
         </div>
 
-        <p className="text-[13px] text-[#6A6F85] mt-1">
+        <p className="text-[13px] text-[color:var(--muted)] mt-1">
           {multi ? `${fmtDate(ev.startDate)} to ${fmtDate(endOf(ev))} · ${daysBetween(ev.startDate, endOf(ev))} days` : fmtDate(ev.startDate)}
           {ev.startTime && ` · ${ev.startTime}–${ev.endTime}`}
         </p>
 
         {ev.affectsClasses && (
           <p className="inline-flex items-center gap-1.5 text-[12.5px] text-rose-600 mt-1.5">
-            <Ban className="w-3.5 h-3.5" />Cancels classes on these days
+            <Ban className="w-3.5 h-3.5" aria-hidden="true" />Cancels classes on these days
           </p>
         )}
         {draft && !official && (
           <p className="inline-flex items-center gap-1.5 text-[12.5px] text-amber-700 mt-1.5">
-            <Info className="w-3.5 h-3.5" />Not active yet. Confirm it to apply.
+            <Info className="w-3.5 h-3.5" aria-hidden="true" />Not active yet. Confirm it to apply.
           </p>
         )}
       </div>
@@ -67,11 +70,11 @@ const EventRow = ({ ev, readOnly, past, onEdit, onRemove, onConfirm }) => {
         <div className="flex items-center gap-1 shrink-0">
           {draft && !official && (
             <Button size="sm" variant="glass" onClick={() => onConfirm(ev)}>
-              <Check className="w-4 h-4" /><span className="hidden sm:inline">Confirm</span>
+              <Check className="w-4 h-4" aria-hidden="true" /><span className="hidden sm:inline">Confirm</span>
             </Button>
           )}
-          <button onClick={() => onEdit(ev)} aria-label={`Edit ${ev.title}`} className="w-9 h-9 rounded-full flex items-center justify-center text-[#161827]/65 hover:bg-white/85 hover:text-[#161827] transition-colors"><Pencil className="w-4 h-4" /></button>
-          <button onClick={() => onRemove(ev)} aria-label={`Delete ${ev.title}`} className="w-9 h-9 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+          <button type="button" onClick={() => onEdit(ev)} aria-label={`Edit ${ev.title}`} className={cx("w-9 h-9 rounded-xl flex items-center justify-center text-[color:var(--muted)] hover:bg-[color:var(--inset)] hover:text-[color:var(--ink)] transition-colors", FOCUS)}><Pencil className="w-4 h-4" aria-hidden="true" /></button>
+          <button type="button" onClick={() => onRemove(ev)} aria-label={`Delete ${ev.title}`} className={cx("w-9 h-9 rounded-xl flex items-center justify-center text-rose-600 hover:bg-rose-50 transition-colors", FOCUS)}><Trash2 className="w-4 h-4" aria-hidden="true" /></button>
         </div>
       )}
     </Card>
@@ -245,7 +248,7 @@ const CalendarTab = ({ setupId, readOnly }) => {
           onChange={setFilter}
           items={[{ key: "", label: "All", count: counts[""] }, ...TYPES.map((t) => ({ key: t.key, label: t.label, count: counts[t.key] || undefined }))]}
         />
-        {!readOnly && <Button size="sm" onClick={() => openForm(null)}><Plus className="w-4 h-4" />Add event</Button>}
+        {!readOnly && <Button size="sm" onClick={() => openForm(null)}><Plus className="w-4 h-4" aria-hidden="true" />Add event</Button>}
       </div>
 
       <Alert type="error">{error}</Alert>
@@ -264,21 +267,21 @@ const CalendarTab = ({ setupId, readOnly }) => {
           icon={CalendarRange}
           title={filter ? `No ${typeInfo(filter).label.toLowerCase()}s yet` : "No calendar events"}
           text="Add holidays, breaks, exams and quizzes. Confirmed holidays and breaks cancel the classes they cover."
-          action={!readOnly && <Button onClick={() => openForm(null)}><Plus className="w-4 h-4" />Add event</Button>}
+          action={!readOnly && <Button onClick={() => openForm(null)}><Plus className="w-4 h-4" aria-hidden="true" />Add event</Button>}
         />
       ) : (
-        <div className="space-y-7">
+        <div className="space-y-6">
           {groups.length === 0 && (
-            <Card className="p-6 text-center text-[14px] text-[#6A6F85]">Nothing coming up. Past events are below.</Card>
+            <Card className="p-6 text-center text-[14px] text-[color:var(--muted)]">Nothing coming up. Past events are below.</Card>
           )}
 
           {groups.map((g) => (
             <section key={g.key} aria-label={g.label}>
-              <h3 className="flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.16em] text-[#6A6F85] mb-3 px-1">
+              <h3 className="flex items-center gap-3 text-[13.5px] font-semibold text-[color:var(--ink)] mb-2.5 px-1">
                 {g.label}
-                <span className="flex-1 h-px bg-gradient-to-r from-[#161827]/15 to-transparent" />
+                <span aria-hidden="true" className="flex-1 h-px bg-[color:var(--line)]" />
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {g.items.map((ev, i) => (
                   <FadeIn key={ev._id} delay={Math.min(i, 6) * 40}>
                     <EventRow ev={ev} readOnly={readOnly} onEdit={openForm} onRemove={setToRemove} onConfirm={confirm} />
@@ -291,15 +294,16 @@ const CalendarTab = ({ setupId, readOnly }) => {
           {past.length > 0 && (
             <section>
               <button
+                type="button"
                 onClick={() => setShowPast((v) => !v)}
                 aria-expanded={showPast}
-                className="flex items-center gap-2 text-[13px] font-medium text-[#6A6F85] hover:text-[#161827] transition-colors px-1"
+                className={cx("flex items-center gap-2 text-[13px] font-medium text-[color:var(--muted)] hover:text-[color:var(--ink)] transition-colors px-1 rounded", FOCUS)}
               >
-                <ChevronDown className={cx("w-4 h-4 transition-transform", showPast && "rotate-180")} />
+                <ChevronDown className={cx("w-4 h-4 transition-transform", showPast && "rotate-180")} aria-hidden="true" />
                 {showPast ? "Hide" : "Show"} past events ({past.length})
               </button>
               {showPast && (
-                <div className="space-y-3 mt-3">
+                <div className="space-y-2.5 mt-3">
                   {past.map((ev) => (
                     <FadeIn key={ev._id}>
                       <EventRow ev={ev} past readOnly={readOnly} onEdit={openForm} onRemove={setToRemove} onConfirm={confirm} />
@@ -318,7 +322,7 @@ const CalendarTab = ({ setupId, readOnly }) => {
           <Alert type="error">{formError}</Alert>
 
           <div>
-            <span className="block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6A6F85] mb-2 px-1">What kind of event?</span>
+            <span className="block text-[13px] font-medium text-[color:var(--body)] mb-2">What kind of event?</span>
             <div className="grid grid-cols-5 gap-2">
               {TYPES.map((t) => {
                 const on = form.type === t.key;
@@ -330,12 +334,13 @@ const CalendarTab = ({ setupId, readOnly }) => {
                     onClick={() => applyType(t.key)}
                     aria-pressed={on}
                     className={cx(
-                      "flex flex-col items-center gap-1.5 rounded-2xl border px-1 py-3 text-[11.5px] sm:text-[12px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50",
-                      on ? "bg-indigo-500/10 border-indigo-300 text-indigo-700 shadow-sm" : "bg-white/60 border-white/80 text-[#161827]/75 hover:bg-white/90"
+                      "flex flex-col items-center gap-1.5 rounded-xl border px-1 py-3 text-[11.5px] sm:text-[12px] font-medium transition-colors",
+                      FOCUS,
+                      on ? "bg-indigo-50 border-indigo-300 text-indigo-700" : "bg-[color:var(--surface)] border-[color:var(--line)] text-[color:var(--body)] hover:bg-[color:var(--inset)]"
                     )}
                   >
-                    <span className={cx("w-8 h-8 rounded-xl flex items-center justify-center text-white bg-gradient-to-br", t.tile)}>
-                      <Icon className="w-4 h-4" />
+                    <span className={cx("w-8 h-8 rounded-lg flex items-center justify-center", t.tile)}>
+                      <Icon className="w-4 h-4" aria-hidden="true" />
                     </span>
                     {t.label}
                   </button>
@@ -402,11 +407,11 @@ const CalendarTab = ({ setupId, readOnly }) => {
       >
         {toRemove?.source === "official" ? (
           <p>
-            <span className="font-semibold text-[#161827]">{toRemove?.title}</span> will be hidden from your calendar. It will not come back when your official schedule syncs.
+            <span className="font-semibold text-[color:var(--ink)]">{toRemove?.title}</span> will be hidden from your calendar. It will not come back when your official schedule syncs.
           </p>
         ) : (
           <p>
-            <span className="font-semibold text-[#161827]">{toRemove?.title}</span> will be deleted. Any classes it cancelled will be restored.
+            <span className="font-semibold text-[color:var(--ink)]">{toRemove?.title}</span> will be deleted. Any classes it cancelled will be restored.
           </p>
         )}
       </ConfirmDialog>

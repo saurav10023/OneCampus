@@ -129,11 +129,12 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
   );
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[14px] text-[#6A6F85]">{list.length} subject{list.length === 1 ? "" : "s"}</p>
+    // @container: the subject grid follows the width of this panel, not the screen
+    <div className="@container space-y-4 sm:space-y-5 min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[14px] text-[color:var(--muted)] tabular-nums">{list.length} subject{list.length === 1 ? "" : "s"}</p>
         {!readOnly && list.length > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="glass" onClick={() => setBulkOpen(true)}>
               <ListPlus className="w-4 h-4" /><span>Add many</span>
             </Button>
@@ -148,14 +149,14 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
 
       {list.length > 6 && (
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-[#6A6F85]" aria-hidden="true" />
+          <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-[color:var(--muted)]" aria-hidden="true" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search subjects"
             aria-label="Search subjects"
-            className="w-full h-11 pl-10 pr-4 rounded-2xl bg-white/65 border border-white/80 shadow-[inset_0_1px_0_#fff] text-[16px] sm:text-[14px] text-[#161827] placeholder:text-[#6A6F85]/70 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            className="w-full min-w-0 h-11 pl-10 pr-4 rounded-xl bg-[color:var(--surface)] border border-[color:var(--line)] text-[16px] sm:text-[14px] text-[color:var(--ink)] placeholder:text-[color:var(--faint)] hover:border-[color:var(--line-strong)] focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25"
           />
         </div>
       )}
@@ -168,25 +169,25 @@ const SubjectsPanel = ({ scheduleId, readOnly, onChanged }) => {
           action={!readOnly && <div className="flex flex-wrap justify-center gap-3">{bulkBtn}{addBtn}</div>}
         />
       ) : filtered.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[#161827]/15 px-4 py-6 text-center text-[13.5px] text-[#6A6F85]">No subject matches “{query}”.</p>
+        <p className="rounded-xl bg-[color:var(--inset)] px-4 py-6 text-center text-[13.5px] text-[color:var(--muted)]">No subject matches “{query}”.</p>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 @xl:grid-cols-2 gap-2.5 sm:gap-3">
           {filtered.map((s) => {
             const w = isWithdrawn(s);
             return (
-              <Card key={idOf(s)} className={cx("p-3.5 sm:p-4 flex items-center gap-3", w && "opacity-60")}>
+              <Card key={idOf(s)} className={cx("p-3.5 sm:p-4 flex items-center gap-3 min-w-0", w && "opacity-60")}>
                 <span
                   aria-hidden="true"
                   className={cx(
-                    "w-12 h-12 rounded-2xl shrink-0 flex items-center justify-center text-[12px] font-semibold tracking-wide",
-                    w ? "bg-[#161827]/8 text-[#6A6F85]" : "bg-gradient-to-br from-[#5B52EE]/15 to-[#2B8DE0]/15 text-indigo-700"
+                    "w-12 h-12 rounded-xl shrink-0 flex items-center justify-center text-[12px] font-semibold",
+                    w ? "bg-[color:var(--inset)] text-[color:var(--muted)]" : "bg-indigo-50 text-indigo-700"
                   )}
                 >
                   {shortOf(s.name, s.code).slice(0, 5)}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold text-[#161827] truncate">{s.name}</p>
-                  <p className="text-[12.5px] text-[#6A6F85] mt-0.5 truncate">
+                  <p className="text-[15px] font-semibold text-[color:var(--ink)] truncate">{s.name}</p>
+                  <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5 truncate">
                     {s.code ? `Code ${s.code}` : "No code"}
                   </p>
                   {w && <div className="mt-1"><Badge tone="amber">Withdrawn</Badge></div>}

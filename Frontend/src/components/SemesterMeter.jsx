@@ -13,16 +13,19 @@ const SemesterMeter = ({ start, end, className }) => {
   return (
     <div className={className}>
       <div
-        className="h-1.5 rounded-full bg-[#161827]/10 overflow-hidden"
+        className="h-1.5 rounded-full bg-[color:var(--track)] overflow-hidden"
         role="progressbar"
         aria-label="Semester progress"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
       >
-        <div className={cx("h-full rounded-full bg-gradient-to-r from-[#5B52EE] to-[#2B8DE0] transition-[width] duration-700 motion-reduce:transition-none")} style={{ width: `${pct}%` }} />
+        <div
+          className={cx("h-full rounded-full bg-[#4F46E5] transition-[width] duration-700 motion-reduce:transition-none")}
+          style={{ width: `${pct}%` }}
+        />
       </div>
-      <p className="text-[12px] text-[#6A6F85] mt-1.5">{label}</p>
+      <p className="text-[12px] text-[color:var(--muted)] mt-1.5 tabular-nums">{label}</p>
     </div>
   );
 };

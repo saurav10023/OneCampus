@@ -4,6 +4,7 @@ import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.jsx";
+import "./styles/darkTheme.js";
 
 class ErrorBoundary extends Component {
   state = { error: null };

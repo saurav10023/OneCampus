@@ -18,19 +18,27 @@ import {
 } from "../lib/attendance";
 
 const MAX = 10;
-const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400";
-const GRADIENT = "text-white bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/25";
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-1";
+
+// Selected = solid indigo. Unselected = white with a hairline border.
+const SELECTED = "bg-[color:var(--accent)] border-[color:var(--accent)] text-white";
+const UNSELECTED = "bg-[color:var(--surface)] border-[color:var(--line)] text-[color:var(--body)] hover:bg-[color:var(--inset)]";
 
 const fmtPct = (n) => (n == null ? "-" : `${round1(n)}%`);
 const clamp = (v) => Math.max(0, Math.min(100, v));
 
+// Inset tile: grey block, no border.
 const Stat = ({ label, value, hint, tone = "ink", loading }) => (
-  <div className="rounded-2xl bg-white/60 border border-white/80 px-4 py-3">
-    <p className="text-[12.5px] text-[#6A6F85]">{label}</p>
-    <div className={cx("text-[26px] font-semibold leading-tight mt-0.5", toneText[tone])}>
-      {loading ? <span className="inline-block h-6 w-12 rounded-lg bg-[#161827]/10 animate-pulse align-middle motion-reduce:animate-none" /> : value}
+  <div className="rounded-xl bg-[color:var(--inset)] px-3.5 py-3 min-w-0">
+    <p className="text-[12.5px] text-[color:var(--muted)]">{label}</p>
+    <div className={cx("text-[24px] font-semibold leading-tight mt-0.5 tabular-nums", toneText[tone])}>
+      {loading ? (
+        <span className="inline-block h-6 w-12 rounded-lg bg-[color:var(--line-soft)] animate-pulse align-middle motion-reduce:animate-none" />
+      ) : (
+        value
+      )}
     </div>
-    {hint && <p className="text-[12px] text-[#6A6F85] mt-0.5">{hint}</p>}
+    {hint && <p className="text-[12px] text-[color:var(--muted)] mt-0.5">{hint}</p>}
   </div>
 );
 
@@ -47,33 +55,30 @@ const Outlook = ({ plan, now, t }) => {
       <div
         role="img"
         aria-label={`You can finish anywhere from ${fmtPct(plan.worst)} to ${fmtPct(plan.best)}. Your target is ${t}%.`}
-        className="relative h-3 rounded-full bg-[#161827]/[0.07] mt-3"
+        className="relative h-3 rounded-full bg-[color:var(--track)] mt-3"
       >
-        <div
-          className="absolute inset-y-0 rounded-full bg-gradient-to-r from-[#5B52EE] to-[#2B8DE0] opacity-80"
-          style={{ left: `${from}%`, width: `${Math.max(1.5, to - from)}%` }}
-        />
-        <div className="absolute -top-1.5 -bottom-1.5 w-0.5 rounded bg-[#161827]/70" style={{ left: `${pos(t)}%` }} />
+        <div className="absolute inset-y-0 rounded-full bg-[color:var(--accent)]" style={{ left: `${from}%`, width: `${Math.max(1.5, to - from)}%` }} />
+        <div className="absolute -top-1.5 -bottom-1.5 w-0.5 rounded bg-[color:var(--tick-strong)]" style={{ left: `${pos(t)}%` }} />
         {now != null && (
           <div
-            className="absolute top-1/2 w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-[3px] border-[#161827] shadow"
+            className="absolute top-1/2 w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[color:var(--surface)] border-[3px] border-[color:var(--ink)]"
             style={{ left: `${pos(now)}%` }}
           />
         )}
       </div>
-      <div className="flex justify-between text-[11.5px] text-[#6A6F85] mt-1.5">
+      <div className="flex justify-between text-[11.5px] text-[color:var(--muted)] mt-1.5 tabular-nums">
         <span>{lo}%</span>
         <span>100%</span>
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[12px] text-[#6A6F85]">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[12px] text-[color:var(--muted)]">
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded-full bg-white border-[3px] border-[#161827]" />You now
+          <span className="inline-block w-3 h-3 rounded-full bg-[color:var(--surface)] border-[3px] border-[color:var(--ink)]" />You now
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-0.5 h-3 rounded bg-[#161827]/70" />Target
+          <span className="inline-block w-0.5 h-3 rounded bg-[color:var(--tick-strong)]" />Target
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-4 h-2 rounded-full bg-gradient-to-r from-[#5B52EE] to-[#2B8DE0]" />Where you can finish
+          <span className="inline-block w-4 h-2 rounded-full bg-[color:var(--accent)]" />Where you can finish
         </span>
       </div>
     </div>
@@ -230,20 +235,21 @@ const AttendancePlanner = ({ rows, overall, target, selectedId, onSelect, remain
     : { label: "Classes to recover", value: Number.isFinite(need) ? need : "-" };
 
   return (
-    <Card className="p-5 sm:p-7">
+    // @container: every layout switch below follows the width of this card, not the screen
+    <Card className="@container p-4 sm:p-5 min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-[20px] font-semibold tracking-tight text-[#161827]">Attendance planner</h2>
-          <p className="text-[13.5px] text-[#6A6F85] mt-1 max-w-xl">
+        <div className="min-w-0 flex-1 basis-56">
+          <h2 className="text-[18px] font-semibold tracking-tight text-[color:var(--ink)]">Attendance planner</h2>
+          <p className="text-[13.5px] text-[color:var(--muted)] mt-1 max-w-xl">
             Thinking of skipping a class? Pick a subject and see what happens to your percentage, now and by the end of the semester.
           </p>
         </div>
         <Badge tone="brand">Target {t}%</Badge>
       </div>
 
-      {/* step 1: subject */}
-      <p className="text-[13px] font-semibold text-[#161827] mt-6 mb-2">1. Choose a subject</p>
-      <div className="flex gap-2 overflow-x-auto sm:flex-wrap pb-1 -mx-1 px-1">
+      {/* step 1: subject (a real sequence, so the numbers stay) */}
+      <p className="text-[14px] font-semibold text-[color:var(--ink)] mt-6 mb-2">1. Choose a subject</p>
+      <div className="flex gap-2 overflow-x-auto @lg:flex-wrap pb-1 -mx-1 px-1">
         {options.map((o) => {
           const on = String(o.id) === String(cur.id);
           const tone = STATUS_META[statusOf(o.pct, Number(o.target ?? target ?? 75))].tone;
@@ -254,16 +260,16 @@ const AttendancePlanner = ({ rows, overall, target, selectedId, onSelect, remain
               aria-pressed={on}
               onClick={() => onSelect(o.id)}
               className={cx(
-                "h-9 px-3.5 rounded-full text-[13px] font-medium border transition inline-flex items-center gap-2 shrink-0 motion-reduce:transition-none",
+                "h-11 @lg:h-9 px-3.5 rounded-full text-[13px] font-medium border transition-colors inline-flex items-center gap-2 shrink-0 max-w-full motion-reduce:transition-none active:scale-[0.98]",
                 FOCUS,
-                on ? `${GRADIENT} border-transparent` : "bg-white/60 border-white/80 text-[#161827]/80 hover:bg-white/90"
+                on ? SELECTED : UNSELECTED
               )}
             >
-              {o.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: o.color }} />}
+              {o.color && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: o.color }} />}
               <span className="truncate max-w-[160px]">{o.name}</span>
               {o.pct != null && (
-                <span className={cx("inline-flex items-center gap-1 text-[12px]", on ? "text-white/85" : "text-[#6A6F85]")}>
-                  <span className={cx("w-1.5 h-1.5 rounded-full", on ? "bg-white/85" : toneDot[tone])} />
+                <span className={cx("inline-flex items-center gap-1 text-[12px] tabular-nums", on ? "text-white/85" : "text-[color:var(--muted)]")}>
+                  <span className={cx("w-1.5 h-1.5 rounded-full", on ? "bg-[color-mix(in_srgb,var(--surface)_85%,transparent)]" : toneDot[tone])} />
                   {Math.round(o.pct)}%
                 </span>
               )}
@@ -273,14 +279,14 @@ const AttendancePlanner = ({ rows, overall, target, selectedId, onSelect, remain
       </div>
 
       {/* where you stand */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+      <div className="grid grid-cols-2 @2xl:grid-cols-4 gap-2.5 sm:gap-3 mt-5">
         <Stat label="Right now" value={fmtPct(now)} tone={STATUS_META[nowStatus].tone === "neutral" ? "ink" : STATUS_META[nowStatus].tone} />
         <Stat
           label="Classes counted"
           value={
             <>
               {a}
-              <span className="text-[16px] text-[#6A6F85] font-medium"> of {h}</span>
+              <span className="text-[15px] text-[color:var(--muted)] font-medium"> of {h}</span>
             </>
           }
         />
@@ -294,15 +300,17 @@ const AttendancePlanner = ({ rows, overall, target, selectedId, onSelect, remain
       </div>
 
       {remainingStatus === "error" && (
-        <p className="text-[12.5px] text-amber-700 mt-3 inline-flex items-start gap-1.5">
-          <AlertTriangle className="w-4 h-4 mt-px shrink-0" />
-          Couldn't load your upcoming classes{remainingMessage ? ` (${remainingMessage})` : ""}, so these predictions only use your current numbers.
+        <p className="text-[12.5px] text-[color:var(--warn-fg)] mt-3 inline-flex items-start gap-1.5">
+          <AlertTriangle className="w-4 h-4 mt-px shrink-0" aria-hidden="true" />
+          <span className="min-w-0">
+            Couldn't load your upcoming classes{remainingMessage ? ` (${remainingMessage})` : ""}, so these predictions only use your current numbers.
+          </span>
         </p>
       )}
 
-      <div className={cx("mt-4 rounded-2xl border px-4 py-3.5 flex gap-3", toneBox[verdict.tone])} role="status">
+      <div className={cx("mt-4 rounded-xl border px-4 py-3.5 flex gap-3 min-w-0", toneBox[verdict.tone])} role="status">
         <VerdictIcon className="w-5 h-5 mt-0.5 shrink-0" aria-hidden="true" />
-        <div>
+        <div className="min-w-0">
           <p className="text-[15px] font-semibold">{verdict.title}</p>
           <p className="text-[13.5px] mt-1 leading-relaxed">{verdict.text}</p>
         </div>
@@ -310,13 +318,13 @@ const AttendancePlanner = ({ rows, overall, target, selectedId, onSelect, remain
 
       {/* the rest of the semester */}
       {plan && left > 0 && (
-        <div className="mt-4 rounded-2xl bg-white/60 border border-white/80 px-4 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[14px] font-semibold text-[#161827] inline-flex items-center gap-2">
-              <CalendarClock className="w-4 h-4 text-indigo-600" />The rest of the semester
+        <div className="mt-4 rounded-xl bg-[color:var(--inset)] px-4 py-4 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <p className="text-[14px] font-semibold text-[color:var(--ink)] inline-flex items-center gap-2">
+              <CalendarClock className="w-4 h-4 text-[color:var(--accent-soft)]" aria-hidden="true" />The rest of the semester
             </p>
-            <p className="text-[13px] text-[#6A6F85]">
-              {plural(left, "class")} left, finishing between <b className="text-[#161827]">{fmtPct(plan.worst)}</b> and <b className="text-[#161827]">{fmtPct(plan.best)}</b>
+            <p className="text-[13px] text-[color:var(--muted)] tabular-nums">
+              {plural(left, "class")} left, finishing between <b className="text-[color:var(--ink)]">{fmtPct(plan.worst)}</b> and <b className="text-[color:var(--ink)]">{fmtPct(plan.best)}</b>
             </p>
           </div>
           <Outlook plan={plan} now={now} t={t} />
@@ -326,9 +334,10 @@ const AttendancePlanner = ({ rows, overall, target, selectedId, onSelect, remain
       {/* step 2: simulator */}
       {showSim && (
         <>
-          <p className="text-[13px] font-semibold text-[#161827] mt-7 mb-2">2. Try a scenario</p>
+          <p className="text-[14px] font-semibold text-[color:var(--ink)] mt-7 mb-2">2. Try a scenario</p>
 
-          <div className="inline-flex p-1 rounded-full bg-white/50 border border-white/70" role="group" aria-label="Scenario type">
+          {/* Scenario switch: grey track, active segment solid indigo */}
+          <div className="inline-flex p-1 rounded-full bg-[color:var(--inset)] border border-[color:var(--line)] max-w-full" role="group" aria-label="Scenario type">
             {[
               { k: "skip", l: "If I skip", icon: TrendingDown },
               { k: "attend", l: "If I attend", icon: TrendingUp },
@@ -339,24 +348,24 @@ const AttendancePlanner = ({ rows, overall, target, selectedId, onSelect, remain
                 aria-pressed={mode === k}
                 onClick={() => setMode(k)}
                 className={cx(
-                  "h-9 px-4 rounded-full text-[13.5px] font-medium inline-flex items-center gap-2 transition motion-reduce:transition-none",
+                  "h-11 @lg:h-9 px-4 rounded-full text-[13.5px] font-medium inline-flex items-center gap-2 transition-colors motion-reduce:transition-none active:scale-[0.98]",
                   FOCUS,
-                  mode === k ? GRADIENT : "text-[#161827]/70 hover:bg-white/70"
+                  mode === k ? "bg-[color:var(--accent)] text-white" : "text-[color:var(--body)] hover:bg-[color:var(--surface)]"
                 )}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4 h-4" aria-hidden="true" />
                 {l}
               </button>
             ))}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-4">
-            <div className="inline-flex items-center gap-1 rounded-full bg-white/60 border border-white/80 p-1">
-              <button type="button" aria-label="One less" onClick={() => setCountSafe(count - 1)} disabled={count <= 1} className={cx("w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/90 disabled:opacity-40", FOCUS)}>
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
+            <div className="inline-flex items-center gap-1 rounded-full bg-[color:var(--surface)] border border-[color:var(--line)] p-1 shrink-0">
+              <button type="button" aria-label="One less" onClick={() => setCountSafe(count - 1)} disabled={count <= 1} className={cx("w-11 h-11 @lg:w-9 @lg:h-9 rounded-full flex items-center justify-center hover:bg-[color:var(--inset)] disabled:opacity-40", FOCUS)}>
                 <Minus className="w-4 h-4" />
               </button>
-              <span className="min-w-[88px] text-center text-[14px] font-semibold text-[#161827]" aria-live="polite">{plural(count, "class")}</span>
-              <button type="button" aria-label="One more" onClick={() => setCountSafe(count + 1)} disabled={count >= cap} className={cx("w-9 h-9 rounded-full flex items-center justify-center hover:bg-white/90 disabled:opacity-40", FOCUS)}>
+              <span className="min-w-[88px] text-center text-[14px] font-semibold text-[color:var(--ink)] tabular-nums" aria-live="polite">{plural(count, "class")}</span>
+              <button type="button" aria-label="One more" onClick={() => setCountSafe(count + 1)} disabled={count >= cap} className={cx("w-11 h-11 @lg:w-9 @lg:h-9 rounded-full flex items-center justify-center hover:bg-[color:var(--inset)] disabled:opacity-40", FOCUS)}>
                 <Plus className="w-4 h-4" />
               </button>
             </div>
@@ -368,38 +377,40 @@ const AttendancePlanner = ({ rows, overall, target, selectedId, onSelect, remain
               disabled={cap === 1}
               onChange={(e) => setCountSafe(Number(e.target.value))}
               aria-label="Number of classes"
-              className="flex-1 min-w-[160px] accent-indigo-600"
+              className="flex-1 min-w-[140px] accent-[color:var(--accent-soft)]"
             />
           </div>
           {known && left > MAX && (
-            <p className="text-[12px] text-[#6A6F85] mt-2">Scenarios go up to {MAX} classes. Your whole semester outlook is shown above.</p>
+            <p className="text-[12px] text-[color:var(--muted)] mt-2">Scenarios go up to {MAX} classes. Your whole semester outlook is shown above.</p>
           )}
 
-          <div className="mt-5 rounded-3xl bg-white/55 border border-white/80 p-5">
+          <div className="mt-5 rounded-xl bg-[color:var(--inset)] p-4 sm:p-5 min-w-0">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <div>
-                <p className="text-[12.5px] text-[#6A6F85]">Before</p>
-                <p className="text-[30px] font-semibold text-[#161827] leading-tight">{fmtPct(now)}</p>
+                <p className="text-[12.5px] text-[color:var(--muted)]">Before</p>
+                <p className="text-[28px] font-semibold text-[color:var(--ink)] leading-tight tabular-nums">{fmtPct(now)}</p>
               </div>
-              <ArrowRight className="w-6 h-6 text-[#6A6F85]" aria-hidden="true" />
+              <ArrowRight className="w-6 h-6 text-[color:var(--faint)] shrink-0" aria-hidden="true" />
               <div>
-                <p className="text-[12.5px] text-[#6A6F85]">After</p>
-                <p className={cx("text-[30px] font-semibold leading-tight", toneText[afterTone])}>{fmtPct(after)}</p>
+                <p className="text-[12.5px] text-[color:var(--muted)]">After</p>
+                <p className={cx("text-[28px] font-semibold leading-tight tabular-nums", toneText[afterTone])}>{fmtPct(after)}</p>
               </div>
               {delta != null && (
                 <Badge tone={delta < 0 ? "red" : delta > 0 ? "green" : "neutral"}>
-                  {delta > 0 ? "+" : ""}
-                  {round1(delta)} pts
+                  <span className="tabular-nums">
+                    {delta > 0 ? "+" : ""}
+                    {round1(delta)} pts
+                  </span>
                 </Badge>
               )}
             </div>
 
             <div className="mt-4">
               <ProgressBar value={after || 0} target={t} />
-              <p className="text-[12px] text-[#6A6F85] mt-1.5">The dark tick marks your {t}% target.</p>
+              <p className="text-[12px] text-[color:var(--muted)] mt-1.5">The dark tick marks your {t}% target.</p>
             </div>
 
-            <p className="text-[14px] text-[#161827] mt-4 leading-relaxed">
+            <p className="text-[14px] text-[color:var(--ink)] mt-4 leading-relaxed tabular-nums">
               {mode === "skip" ? (
                 <>If you skip the next {plural(count, "class")}, you will have attended <b>{a}</b> of <b>{h + count}</b> = <b>{fmtPct(after)}</b>. </>
               ) : (
@@ -409,7 +420,7 @@ const AttendancePlanner = ({ rows, overall, target, selectedId, onSelect, remain
             </p>
 
             {planAfter && (
-              <p className="text-[13px] text-[#444A63] mt-2 leading-relaxed">
+              <p className="text-[13px] text-[color:var(--body)] mt-2 leading-relaxed">
                 {left - count === 0
                   ? "That would use up every remaining class."
                   : planAfter.canReach
@@ -420,40 +431,40 @@ const AttendancePlanner = ({ rows, overall, target, selectedId, onSelect, remain
           </div>
 
           {/* quick glance strip */}
-          <p className="text-[13px] font-semibold text-[#161827] mt-6 mb-2">{mode === "skip" ? "What each extra skip costs" : "How fast attending helps"}</p>
-          <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+          <p className="text-[14px] font-semibold text-[color:var(--ink)] mt-6 mb-2">{mode === "skip" ? "What each extra skip costs" : "How fast attending helps"}</p>
+          <div className="grid grid-cols-5 @2xl:grid-cols-10 gap-2">
             {strip.map(({ k, p, s }) => (
               <button
                 key={k}
                 type="button"
                 onClick={() => setCountSafe(k)}
                 className={cx(
-                  "rounded-2xl border px-1 py-2 text-center transition motion-reduce:transition-none",
+                  "rounded-xl border px-1 py-2 text-center min-w-0 transition-colors motion-reduce:transition-none",
                   FOCUS,
                   toneBox[STATUS_META[s].tone],
-                  k === count ? "ring-2 ring-indigo-400" : "hover:brightness-95"
+                  k === count ? "ring-2 ring-[color:var(--ring)]" : "hover:brightness-95"
                 )}
                 aria-label={`${plural(k, "class")}: ${fmtPct(p)}`}
                 aria-pressed={k === count}
               >
-                <span className="block text-[11px] opacity-75">{k}</span>
-                <span className="block text-[13px] font-semibold">{p == null ? "-" : `${Math.round(p)}%`}</span>
+                <span className="block text-[11px] opacity-75 tabular-nums">{k}</span>
+                <span className="block text-[13px] font-semibold tabular-nums">{p == null ? "-" : `${Math.round(p)}%`}</span>
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5 text-[12px] text-[#6A6F85]">
-            <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1.5" />At or above target</span>
-            <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 mr-1.5" />Within 3 points of it</span>
-            <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 mr-1.5" />Below target</span>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5 text-[12px] text-[color:var(--muted)]">
+            <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-[color:var(--ok-solid)] mr-1.5" />At or above target</span>
+            <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-[color:var(--warn-solid)] mr-1.5" />Within 3 points of it</span>
+            <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-[color:var(--bad-solid)] mr-1.5" />Below target</span>
           </div>
         </>
       )}
 
       <details className="mt-6 group">
-        <summary className={cx("cursor-pointer text-[13px] font-medium text-indigo-600 inline-flex items-center gap-1.5 select-none rounded", FOCUS)}>
-          <Info className="w-4 h-4" />How is this calculated?
+        <summary className={cx("cursor-pointer min-h-11 text-[13px] font-medium text-[color:var(--accent-soft)] inline-flex items-center gap-1.5 select-none rounded-lg", FOCUS)}>
+          <Info className="w-4 h-4" aria-hidden="true" />How is this calculated?
         </summary>
-        <ul className="mt-3 space-y-1.5 text-[13px] text-[#444A63] list-disc pl-5 leading-relaxed">
+        <ul className="mt-2 space-y-1.5 text-[13px] text-[color:var(--body)] list-disc pl-5 leading-relaxed">
           <li>Percentage = classes attended / classes held x 100. Counts are in class units, so a 2-unit lab counts twice.</li>
           <li>Only classes marked present or absent are counted. Pending, excused and cancelled classes do not change your percentage.</li>
           <li>Classes left = classes still pending from today to the end of the semester. Holidays and cancelled classes are already removed. A holiday saved as a draft cancels nothing until you confirm it.</li>

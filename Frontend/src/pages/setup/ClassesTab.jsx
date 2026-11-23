@@ -54,6 +54,8 @@ const durOf = (r) => Math.max(0, toMin(r.endTime) - toMin(r.startTime));
 const fmtDur = (m) => (m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`);
 const day3 = (d) => WEEKDAYS[d]?.slice(0, 3) || "";
 
+const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400";
+
 /* ---------------- small pieces ---------------- */
 
 const IconBtn = ({ label, danger, children, ...rest }) => (
@@ -62,8 +64,9 @@ const IconBtn = ({ label, danger, children, ...rest }) => (
     aria-label={label}
     title={label}
     className={cx(
-      "w-10 h-10 rounded-full flex items-center justify-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
-      danger ? "text-rose-600 hover:bg-rose-50" : "text-[#6A6F85] hover:bg-white/80 hover:text-[#161827]"
+      "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+      FOCUS,
+      danger ? "text-rose-600 hover:bg-rose-50" : "text-[color:var(--muted)] hover:bg-[color:var(--inset)] hover:text-[color:var(--ink)]"
     )}
     {...rest}
   >
@@ -72,22 +75,22 @@ const IconBtn = ({ label, danger, children, ...rest }) => (
 );
 
 const Stat = ({ icon: Icon, label, value, sub }) => (
-  <div className="rounded-2xl bg-white/60 border border-white/80 shadow-[inset_0_1px_0_#fff] px-3.5 py-3 min-w-0">
-    <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.1em] text-[#6A6F85]">
+  <div className="rounded-xl bg-[color:var(--inset)] px-3.5 py-3 min-w-0">
+    <p className="flex items-center gap-1.5 text-[12px] text-[color:var(--muted)]">
       <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
       <span className="truncate">{label}</span>
     </p>
-    <p className="text-[19px] sm:text-[21px] font-semibold text-[#161827] mt-1 leading-tight tabular-nums break-words">{value}</p>
-    {sub && <p className="text-[12px] text-[#6A6F85] mt-0.5 break-words">{sub}</p>}
+    <p className="text-[18px] sm:text-[20px] font-semibold text-[color:var(--ink)] mt-1 leading-tight tabular-nums break-words">{value}</p>
+    {sub && <p className="text-[12px] text-[color:var(--muted)] mt-0.5 break-words">{sub}</p>}
   </div>
 );
 
 const Dot = ({ color }) => (
-  <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white" style={{ background: color || "#5B52EE" }} />
+  <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color || "#4F46E5" }} />
 );
 
 const Seg = ({ value, onChange, items }) => (
-  <div role="group" aria-label="View" className="inline-flex p-1 rounded-full bg-white/55 border border-white/80 shadow-[inset_0_1px_0_#fff]">
+  <div role="group" aria-label="View" className="inline-flex p-1 gap-1 rounded-xl bg-[color:var(--inset)] border border-[color:var(--line)]">
     {items.map((it) => (
       <button
         key={it.key}
@@ -95,8 +98,9 @@ const Seg = ({ value, onChange, items }) => (
         aria-pressed={value === it.key}
         onClick={() => onChange(it.key)}
         className={cx(
-          "h-8 px-3.5 rounded-full text-[13px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
-          value === it.key ? "text-white bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-sm shadow-indigo-500/25" : "text-[#161827]/70 hover:bg-white/70"
+          "h-8 px-3.5 rounded-lg text-[13px] font-medium transition-colors",
+          FOCUS,
+          value === it.key ? "text-white bg-[#4F46E5]" : "text-[color:var(--body)] hover:bg-[color:var(--surface)] hover:text-[color:var(--ink)]"
         )}
       >
         {it.label}
@@ -111,45 +115,45 @@ const Row = ({ r, subj, lead, readOnly, isNow, onEdit, onToggle, onDelete }) => 
   return (
     <div
       className={cx(
-        "flex items-center gap-3 rounded-2xl bg-white/65 border px-3 sm:px-4 py-2.5 transition",
-        isNow ? "border-indigo-300 ring-1 ring-indigo-200 bg-white/85" : "border-white/80",
+        "flex items-center gap-3 rounded-xl border px-3 sm:px-4 py-2.5",
+        isNow ? "border-indigo-200 bg-indigo-50/60" : "border-transparent bg-[color:var(--inset)]",
         off && "opacity-60"
       )}
     >
       <div className="w-[52px] shrink-0 text-center leading-tight">
-        <p className="text-[13.5px] font-semibold text-[#161827] tabular-nums">{r.startTime}</p>
-        <p className="text-[11.5px] text-[#6A6F85] tabular-nums">{r.endTime}</p>
+        <p className="text-[13.5px] font-semibold text-[color:var(--ink)] tabular-nums">{r.startTime}</p>
+        <p className="text-[11.5px] text-[color:var(--muted)] tabular-nums">{r.endTime}</p>
       </div>
-      <span className="w-px self-stretch bg-[#161827]/10" aria-hidden="true" />
+      <span className="w-px self-stretch bg-[color:var(--line)]" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {lead === "subject" ? (
             <>
               <Dot color={subj.color} />
-              <p className="text-[14.5px] font-semibold text-[#161827]">{subj.name}</p>
+              <p className="text-[14.5px] font-semibold text-[color:var(--ink)]">{subj.name}</p>
             </>
           ) : (
-            <p className="text-[14.5px] font-semibold text-[#161827]">{WEEKDAYS[r.weekday]}</p>
+            <p className="text-[14.5px] font-semibold text-[color:var(--ink)]">{WEEKDAYS[r.weekday]}</p>
           )}
           {r.classType && <Badge>{r.classType}</Badge>}
           {isNow && <Badge tone="green">Now</Badge>}
           {r.origin === "official" && <Badge tone="brand">Official</Badge>}
           {off && <Badge tone="amber">Archived</Badge>}
         </div>
-        <p className="text-[12.5px] text-[#6A6F85] mt-0.5 break-words">{[fmtDur(durOf(r)), ...meta].join(" · ")}</p>
+        <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5 break-words">{[fmtDur(durOf(r)), ...meta].join(" · ")}</p>
       </div>
       {!readOnly && (
         <div className="flex items-center shrink-0 -mr-1.5">
           {!off && (
             <IconBtn label="Edit class" onClick={() => onEdit(r)}>
-              <Pencil className="w-4 h-4" />
+              <Pencil className="w-4 h-4" aria-hidden="true" />
             </IconBtn>
           )}
           <IconBtn label={off ? "Restore class" : "Archive class"} onClick={() => onToggle(r)}>
-            {off ? <RotateCcw className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+            {off ? <RotateCcw className="w-4 h-4" aria-hidden="true" /> : <Archive className="w-4 h-4" aria-hidden="true" />}
           </IconBtn>
           <IconBtn label="Delete class" danger onClick={() => onDelete(r)}>
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4" aria-hidden="true" />
           </IconBtn>
         </div>
       )}
@@ -165,14 +169,14 @@ const Group = ({ id, title, dot, today, count, hours, badges, open, onToggle, ch
       onClick={onToggle}
       aria-expanded={open}
       aria-controls={id}
-      className="w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 text-left hover:bg-white/50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
+      className="w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 text-left hover:bg-[#F5F6FA]/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
     >
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {dot !== undefined && <Dot color={dot} />}
-          <span className="text-[15.5px] font-semibold text-[#161827]">{title}</span>
+          <span className="text-[15px] font-semibold text-[color:var(--ink)]">{title}</span>
           {today && <Badge tone="green">Today</Badge>}
-          <span className="text-[12.5px] text-[#6A6F85]">
+          <span className="text-[12.5px] text-[color:var(--muted)]">
             {count} class{count === 1 ? "" : "es"}
             {hours > 0 ? ` · ${fmtDur(hours)}` : ""}
           </span>
@@ -184,11 +188,13 @@ const Group = ({ id, title, dot, today, count, hours, badges, open, onToggle, ch
           </span>
         )}
       </span>
-      <ChevronDown className={cx("w-5 h-5 shrink-0 text-[#6A6F85] transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
+      <ChevronDown className={cx("w-5 h-5 shrink-0 text-[color:var(--muted)] transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
     </button>
     <div id={id} className={cx("grid transition-[grid-template-rows] duration-300 motion-reduce:transition-none", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
       <div className={cx("overflow-hidden", !open && "invisible")}>
-        <div className="px-3 sm:px-4 pb-3.5 pt-0.5 space-y-2">{children}</div>
+        <div className="px-3 sm:px-4 pb-3.5 pt-0.5 space-y-2 border-t border-[color:var(--line-soft)]">
+          <div className="pt-2.5 space-y-2">{children}</div>
+        </div>
       </div>
     </div>
   </Card>
@@ -198,37 +204,37 @@ const ExtraCard = ({ a, subj, readOnly, onEdit, onRemove }) => {
   const total = a.totalCount ?? (a.attendedCount || 0) + (a.missedCount || 0);
   const pct = total > 0 ? Math.round(((a.attendedCount || 0) / total) * 100) : null;
   return (
-    <div className="rounded-2xl bg-white/65 border border-white/80 px-4 py-3.5">
+    <div className="rounded-xl bg-[color:var(--inset)] px-4 py-3.5">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Dot color={subj.color} />
-            <p className="text-[14.5px] font-semibold text-[#161827] break-words">{subj.name}</p>
+            <p className="text-[14.5px] font-semibold text-[color:var(--ink)] break-words">{subj.name}</p>
           </div>
-          <p className="text-[12.5px] text-[#6A6F85] mt-1 tabular-nums">
+          <p className="text-[12.5px] text-[color:var(--muted)] mt-1 tabular-nums">
             {a.attendedCount ?? 0} attended · {a.missedCount ?? 0} missed · {total} total
           </p>
         </div>
         {!readOnly && (
           <div className="flex items-center shrink-0 -mr-2 -mt-1.5">
             <IconBtn label="Edit extra classes" onClick={() => onEdit(a)}>
-              <Pencil className="w-4 h-4" />
+              <Pencil className="w-4 h-4" aria-hidden="true" />
             </IconBtn>
             <IconBtn label="Remove extra classes" danger onClick={() => onRemove(a)}>
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-4 h-4" aria-hidden="true" />
             </IconBtn>
           </div>
         )}
       </div>
       {pct != null && (
         <div className="mt-2.5 flex items-center gap-2.5">
-          <div className="h-1.5 flex-1 rounded-full bg-[#161827]/10 overflow-hidden" role="img" aria-label={`${pct}% attended`}>
-            <div className="h-full rounded-full bg-gradient-to-r from-[#5B52EE] to-[#2B8DE0]" style={{ width: `${pct}%` }} />
+          <div className="h-1.5 flex-1 rounded-full bg-[color:var(--line)] overflow-hidden" role="img" aria-label={`${pct}% attended`}>
+            <div className="h-full rounded-full bg-[#4F46E5]" style={{ width: `${pct}%` }} />
           </div>
-          <span className="text-[12px] font-medium text-[#161827] tabular-nums w-9 text-right">{pct}%</span>
+          <span className="text-[12px] font-medium text-[color:var(--ink)] tabular-nums w-9 text-right">{pct}%</span>
         </div>
       )}
-      {a.note && <p className="text-[12.5px] text-[#6A6F85] mt-2 break-words">{a.note}</p>}
+      {a.note && <p className="text-[12.5px] text-[color:var(--muted)] mt-2 break-words">{a.note}</p>}
     </div>
   );
 };
@@ -661,7 +667,7 @@ const ClassesTab = ({ setupId, setup, readOnly }) => {
         return {
           key: id,
           title: s.name,
-          dot: s.color || "#5B52EE",
+          dot: s.color || "#4F46E5",
           rows,
           hours: rows.filter((r) => r.isActive !== false).reduce((n, r) => n + durOf(r), 0),
           badges: days.map(day3),
@@ -685,7 +691,7 @@ const ClassesTab = ({ setupId, setup, readOnly }) => {
   const spot = stats.spot;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7 sm:space-y-8">
       <Alert type="error">{error}</Alert>
       {notice && (
         <Alert type="success">
@@ -730,12 +736,12 @@ const ClassesTab = ({ setupId, setup, readOnly }) => {
       <section className="space-y-4" aria-labelledby="weekly-h">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 id="weekly-h" className="text-[17px] font-semibold text-[#161827]">Weekly classes</h2>
-            <p className="text-[13.5px] text-[#6A6F85]">Repeats every week for the whole semester.</p>
+            <h2 id="weekly-h" className="text-[16px] sm:text-[17px] font-semibold text-[color:var(--ink)]">Weekly classes</h2>
+            <p className="text-[13.5px] text-[color:var(--muted)]">Repeats every week for the whole semester.</p>
           </div>
           {!readOnly && (
             <Button size="sm" onClick={() => openRule(null)} disabled={noSubjects}>
-              <CalendarPlus className="w-4 h-4" />Add class
+              <CalendarPlus className="w-4 h-4" aria-hidden="true" />Add class
             </Button>
           )}
         </div>
@@ -751,14 +757,14 @@ const ClassesTab = ({ setupId, setup, readOnly }) => {
                   <button
                     type="button"
                     onClick={() => setShowArchived((v) => !v)}
-                    className="h-9 px-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#6A6F85] hover:text-[#161827] rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                    className={cx("h-9 px-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-[color:var(--muted)] hover:text-[color:var(--ink)] rounded-lg", FOCUS)}
                   >
-                    {showArchived ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showArchived ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                     {showArchived ? "Hide" : "Show"} archived ({archivedCount})
                   </button>
                 )}
                 {groups.length > 1 && (
-                  <button type="button" onClick={() => setAll(!allOpen)} className="h-9 px-2 text-[13px] font-medium text-indigo-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded-full">
+                  <button type="button" onClick={() => setAll(!allOpen)} className={cx("h-9 px-2 text-[13px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline rounded-lg", FOCUS)}>
                     {allOpen ? "Collapse all" : "Expand all"}
                   </button>
                 )}
@@ -768,7 +774,7 @@ const ClassesTab = ({ setupId, setup, readOnly }) => {
             {groups.length === 0 ? (
               <EmptyState icon={Archive} title="Nothing to show" text="All your classes are archived. Show archived classes to restore them." />
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5 sm:space-y-3">
                 {groups.map((g) => (
                   <Group
                     key={`${view}-${g.key}`}
@@ -801,9 +807,9 @@ const ClassesTab = ({ setupId, setup, readOnly }) => {
                         onClick={() =>
                           openRule(null, view === "subject" ? { subjectId: String(g.key) } : undefined)
                         }
-                        className="w-full h-10 rounded-2xl border border-dashed border-[#161827]/15 text-[13px] font-medium text-indigo-600 hover:bg-white/60 transition flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                        className={cx("w-full h-10 rounded-xl border border-dashed border-[color:var(--line-strong)] text-[13px] font-medium text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-300 transition-colors flex items-center justify-center gap-1.5", FOCUS)}
                       >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-4 h-4" aria-hidden="true" />
                         {view === "subject" ? `Add another ${g.title} class` : "Add class"}
                       </button>
                     )}
@@ -819,16 +825,16 @@ const ClassesTab = ({ setupId, setup, readOnly }) => {
       <section className="space-y-4" aria-labelledby="extra-h">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 id="extra-h" className="text-[17px] font-semibold text-[#161827]">Extra classes</h2>
-            <p className="text-[13.5px] text-[#6A6F85] max-w-xl">Classes that aren't in your timetable, or an earlier balance, added to your attendance totals.</p>
+            <h2 id="extra-h" className="text-[16px] sm:text-[17px] font-semibold text-[color:var(--ink)]">Extra classes</h2>
+            <p className="text-[13.5px] text-[color:var(--muted)] max-w-xl">Classes that aren't in your timetable, or an earlier balance, added to your attendance totals.</p>
           </div>
           {!readOnly && (
             <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
               <Button variant="glass" size="sm" onClick={openMatch} disabled={noSubjects}>
-                <Scale className="w-4 h-4" />Match college
+                <Scale className="w-4 h-4" aria-hidden="true" />Match college
               </Button>
               <Button size="sm" onClick={() => openExtra(null)} disabled={noSubjects}>
-                <Plus className="w-4 h-4" />Add extra
+                <Plus className="w-4 h-4" aria-hidden="true" />Add extra
               </Button>
             </div>
           )}
@@ -870,8 +876,8 @@ const ClassesTab = ({ setupId, setup, readOnly }) => {
         <div>
           <FormLabel
             right={creating && (
-              <button type="button" onClick={addSlot} className="h-9 px-2 text-[13px] text-indigo-600 font-medium hover:underline flex items-center gap-1">
-                <Plus className="w-3.5 h-3.5" />Add another slot
+              <button type="button" onClick={addSlot} className={cx("h-9 px-2 text-[13px] text-indigo-600 font-medium hover:text-indigo-700 hover:underline flex items-center gap-1 rounded-lg", FOCUS)}>
+                <Plus className="w-3.5 h-3.5" aria-hidden="true" />Add another slot
               </button>
             )}
           >
@@ -880,12 +886,12 @@ const ClassesTab = ({ setupId, setup, readOnly }) => {
 
           <div className="space-y-3">
             {slots.map((s, i) => (
-              <div key={i} className="rounded-2xl bg-white/60 border border-white/80 p-3 sm:p-4">
+              <div key={i} className="rounded-xl bg-[color:var(--inset)] p-3 sm:p-4">
                 <div className="flex items-center justify-between mb-2 min-h-8">
-                  <span className="text-[13px] font-semibold text-[#161827]">{creating && slots.length > 1 ? `Slot ${i + 1}` : "Weekly class"}</span>
+                  <span className="text-[13px] font-semibold text-[color:var(--ink)]">{creating && slots.length > 1 ? `Slot ${i + 1}` : "Weekly class"}</span>
                   {creating && slots.length > 1 && (
-                    <button type="button" onClick={() => removeSlot(i)} aria-label={`Remove slot ${i + 1}`} className="w-10 h-10 -mr-2 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-50">
-                      <X className="w-4 h-4" />
+                    <button type="button" onClick={() => removeSlot(i)} aria-label={`Remove slot ${i + 1}`} className={cx("w-10 h-10 -mr-2 rounded-xl flex items-center justify-center text-rose-600 hover:bg-rose-50", FOCUS)}>
+                      <X className="w-4 h-4" aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -925,7 +931,7 @@ const ClassesTab = ({ setupId, setup, readOnly }) => {
           <Field label="Attended" type="number" inputMode="numeric" min="0" step="1" value={xf.attendedCount} onChange={setX("attendedCount")} error={xErrors.attendedCount} />
           <Field label="Missed" type="number" inputMode="numeric" min="0" step="1" value={xf.missedCount} onChange={setX("missedCount")} error={xErrors.missedCount} />
         </div>
-        <p className="text-[12.5px] text-[#6A6F85]">
+        <p className="text-[12.5px] text-[color:var(--muted)]">
           Total extra classes: {(validCount(xf.attendedCount) ? toInt(xf.attendedCount) : 0) + (validCount(xf.missedCount) ? toInt(xf.missedCount) : 0)}
         </p>
         <Field label="Note (optional)" value={xf.note} onChange={setX("note")} maxLength={200} placeholder="Makeup labs" />

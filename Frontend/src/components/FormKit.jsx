@@ -5,6 +5,8 @@ import { Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { errMsg } from "../api/endpoints";
 import { Alert, Button, Field, Modal, cx } from "./Ui";
 
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1";
+
 // Moves the keyboard/screen to the first field that failed validation.
 export const focusFirstInvalid = () =>
   setTimeout(() => {
@@ -17,6 +19,7 @@ export const focusFirstInvalid = () =>
 //  - validation is ours (noValidate), so no browser pop-ups hidden behind the keyboard
 //  - the error banner sits in the footer, so it is always visible
 //  - closing with unsaved changes asks first (backdrop tap, Esc and Cancel all go through it)
+//  - footer buttons wrap and the submit label wraps, so a long label never overflows
 export const FormModal = ({ open, onClose, title, onSubmit, submitLabel, saving, dirty, error, extra, size, children }) => {
   const formId = useId();
   const [discard, setDiscard] = useState(false);
@@ -32,27 +35,34 @@ export const FormModal = ({ open, onClose, title, onSubmit, submitLabel, saving,
   };
 
   const footer = discard ? (
-    <div className="space-y-3">
+    <div className="space-y-3 min-w-0">
       <Alert type="warning">You have unsaved changes. Discard them?</Alert>
-      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-        <Button variant="danger" onClick={onClose}>Discard changes</Button>
-        <Button variant="glass" onClick={() => setDiscard(false)}>Keep editing</Button>
+      <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:justify-end gap-3">
+        <Button variant="danger" onClick={onClose} className="w-full sm:w-auto">Discard changes</Button>
+        <Button variant="glass" onClick={() => setDiscard(false)} className="w-full sm:w-auto">Keep editing</Button>
       </div>
     </div>
   ) : (
-    <div className="space-y-3">
+    <div className="space-y-3 min-w-0">
       <Alert type="error">{error}</Alert>
-      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-        <Button variant="glass" disabled={saving} onClick={requestClose}>Cancel</Button>
+      <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:justify-end gap-3">
+        <Button variant="glass" disabled={saving} onClick={requestClose} className="w-full sm:w-auto">Cancel</Button>
         {extra}
-        <Button type="submit" form={formId} loading={saving}>{submitLabel}</Button>
+        <Button
+          type="submit"
+          form={formId}
+          loading={saving}
+          className="w-full sm:w-auto h-auto min-h-11 py-2 whitespace-normal text-center"
+        >
+          {submitLabel}
+        </Button>
       </div>
     </div>
   );
 
   return (
     <Modal open={open} onClose={requestClose} title={title} footer={footer} size={size}>
-      <form id={formId} onSubmit={onSubmit} noValidate autoComplete="off" className="space-y-4 pt-1">
+      <form id={formId} onSubmit={onSubmit} noValidate autoComplete="off" className="space-y-4 pt-1 min-w-0">
         {children}
       </form>
     </Modal>
@@ -71,17 +81,19 @@ export const NoteDialog = ({ open, title, message, confirmLabel = "Confirm", ton
       onClose={() => !busy && onClose()}
       title={title}
       footer={
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           <Alert type="error">{error}</Alert>
-          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-            <Button variant="glass" disabled={busy} onClick={onClose}>Cancel</Button>
-            <Button variant={tone} loading={busy} onClick={() => onConfirm(note.trim())}>{confirmLabel}</Button>
+          <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:justify-end gap-3">
+            <Button variant="glass" disabled={busy} onClick={onClose} className="w-full sm:w-auto">Cancel</Button>
+            <Button variant={tone} loading={busy} onClick={() => onConfirm(note.trim())} className="w-full sm:w-auto h-auto min-h-11 py-2 whitespace-normal text-center">
+              {confirmLabel}
+            </Button>
           </div>
         </div>
       }
     >
-      <div className="space-y-4 pt-1">
-        {message && <p className="text-[14px] leading-relaxed text-[#444A63]">{message}</p>}
+      <div className="space-y-4 pt-1 min-w-0">
+        {message && <p className="text-[14px] leading-relaxed text-[color:var(--body)]">{message}</p>}
         <Field label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="Shown in the history" />
       </div>
     </Modal>
@@ -127,7 +139,7 @@ export const useNoteDialog = () => {
   return [ask, dialog];
 };
 
-// 40px touch targets
+// 44px touch targets on phones, 40px from sm
 export const IconBtn = ({ label, danger, onClick, children }) => (
   <button
     type="button"
@@ -135,8 +147,9 @@ export const IconBtn = ({ label, danger, onClick, children }) => (
     aria-label={label}
     title={label}
     className={cx(
-      "w-10 h-10 rounded-full flex items-center justify-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50",
-      danger ? "text-rose-600 hover:bg-rose-50" : "text-[#161827]/70 hover:bg-white/80"
+      "w-11 h-11 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors motion-reduce:transition-none active:scale-[0.98]",
+      FOCUS,
+      danger ? "text-rose-600 hover:bg-rose-50" : "text-[color:var(--body)] hover:bg-[color:var(--inset)]"
     )}
   >
     {children}
@@ -152,9 +165,10 @@ export const RowActions = ({ withdrawn, onEdit, onToggle }) => (
   </div>
 );
 
+// Sentence-case form label (no all-caps, no tracking)
 export const FormLabel = ({ children, right }) => (
-  <div className="flex items-center justify-between mb-2 px-1">
-    <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6A6F85]">{children}</span>
+  <div className="flex items-center justify-between gap-2 mb-1.5 px-1">
+    <span className="text-[13px] font-medium text-[color:var(--body)]">{children}</span>
     {right}
   </div>
 );

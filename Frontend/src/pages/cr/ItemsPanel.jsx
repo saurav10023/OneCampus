@@ -8,6 +8,8 @@ import { FormLabel, FormModal, RowActions, focusFirstInvalid, shortOf, useNoteDi
 const CLASS_TYPES = ["lecture", "lab", "tutorial"]; // edit if your backend allows more
 const api = officialSchedulesApi.items;
 
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1";
+
 const idOf = (x) => x?._id || x?.id; // works whether the backend returns `_id` or `id`
 const keyOf = (s) => s.key || idOf(s);
 
@@ -28,13 +30,19 @@ const blank = { kind: "holiday", title: "", startDate: "", endDate: "", startTim
 
 const ymdLocal = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-// Small calendar tile: "12 / Nov"
+// Small calendar tile: "12 / Nov". Sentence case, no all-caps.
 const DateTile = ({ ymd, past }) => {
   const d = new Date(`${ymd}T00:00:00Z`);
   return (
-    <span aria-hidden="true" className={cx("w-12 shrink-0 rounded-2xl py-1.5 text-center leading-none border", past ? "bg-[#161827]/5 border-white/80 text-[#6A6F85]" : "bg-indigo-500/10 border-indigo-200 text-indigo-700")}>
-      <span className="block text-[17px] font-semibold">{d.getUTCDate()}</span>
-      <span className="block text-[10.5px] uppercase tracking-wide mt-1">{d.toLocaleDateString("en-IN", { month: "short", timeZone: "UTC" })}</span>
+    <span
+      aria-hidden="true"
+      className={cx(
+        "w-12 shrink-0 rounded-xl py-1.5 text-center leading-none border",
+        past ? "bg-[color:var(--surface)] border-[color:var(--line)] text-[color:var(--muted)]" : "bg-indigo-50 border-indigo-200 text-indigo-700"
+      )}
+    >
+      <span className="block text-[17px] font-semibold tabular-nums">{d.getUTCDate()}</span>
+      <span className="block text-[11px] mt-1">{d.toLocaleDateString("en-IN", { month: "short", timeZone: "UTC" })}</span>
     </span>
   );
 };
@@ -47,13 +55,13 @@ const Group = ({ id, title, tone, count, next, chips, open, onToggle, children }
       onClick={onToggle}
       aria-expanded={open}
       aria-controls={id}
-      className="w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 text-left hover:bg-white/50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
+      className={cx("w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 min-h-11 text-left hover:bg-[color:var(--inset)] transition-colors motion-reduce:transition-none", FOCUS)}
     >
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-[15.5px] font-semibold text-[#161827]">{title}</span>
+          <span className="text-[15.5px] font-semibold text-[color:var(--ink)]">{title}</span>
           <Badge tone={tone}>{count}</Badge>
-          {next && <span className="text-[12.5px] text-[#6A6F85]">Next: {next}</span>}
+          {next && <span className="text-[12.5px] text-[color:var(--muted)] tabular-nums">Next: {next}</span>}
         </span>
         {chips.length > 0 && (
           <span className="flex flex-wrap gap-1 mt-1.5">
@@ -62,7 +70,7 @@ const Group = ({ id, title, tone, count, next, chips, open, onToggle, children }
           </span>
         )}
       </span>
-      <ChevronDown className={cx("w-5 h-5 shrink-0 text-[#6A6F85] transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
+      <ChevronDown className={cx("w-5 h-5 shrink-0 text-[color:var(--faint)] transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
     </button>
     <div id={id} className={cx("grid transition-[grid-template-rows] duration-300 motion-reduce:transition-none", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
       <div className={cx("overflow-hidden", !open && "invisible")}>
@@ -299,12 +307,12 @@ const ItemsPanel = ({ schedule, scheduleId: scheduleIdProp, readOnly, onChanged 
   const setAll = (v) => setOpenKinds(Object.fromEntries(groupsList.map((g) => [g.key, v])));
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[14px] text-[#6A6F85]">{items.length} item{items.length === 1 ? "" : "s"}</p>
-        <div className="flex items-center gap-1">
+    <div className="space-y-4 sm:space-y-5 min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[14px] text-[color:var(--muted)] tabular-nums">{items.length} item{items.length === 1 ? "" : "s"}</p>
+        <div className="flex flex-wrap items-center gap-1">
           {groupsList.length > 1 && (
-            <button type="button" onClick={() => setAll(!allOpen)} className="h-9 px-2 text-[13px] font-medium text-indigo-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded-full">
+            <button type="button" onClick={() => setAll(!allOpen)} className={cx("min-h-11 sm:min-h-9 px-3 text-[13px] font-medium text-indigo-600 hover:underline rounded-lg", FOCUS)}>
               {allOpen ? "Collapse all" : "Expand all"}
             </button>
           )}
@@ -317,7 +325,7 @@ const ItemsPanel = ({ schedule, scheduleId: scheduleIdProp, readOnly, onChanged 
       {groupsList.length === 0 ? (
         <EmptyState icon={CalendarRange} title="Nothing here yet" text="Declare quizzes, exams, holidays, mass bunks and single-class cancellations for your section." />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5 sm:space-y-3">
           {groupsList.map(({ key, k, rows }) => {
             const live = rows.filter((r) => !isWithdrawn(r));
             const shorts = [...new Set(live.map(shortOfItem).filter(Boolean))];
@@ -348,17 +356,17 @@ const ItemsPanel = ({ schedule, scheduleId: scheduleIdProp, readOnly, onChanged 
                     it.group,
                   ].filter(Boolean);
                   return (
-                    <div key={idOf(it)} className={cx("flex items-center gap-3 rounded-2xl bg-white/65 border border-white/80 px-3 sm:px-4 py-2.5", (w || past) && "opacity-60")}>
+                    <div key={idOf(it)} className={cx("flex items-center gap-3 rounded-xl bg-[color:var(--inset)] px-3 sm:px-4 py-2.5 min-w-0", (w || past) && "opacity-60")}>
                       <DateTile ymd={toDateInput(it.startDate)} past={past || w} />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <p className="text-[14.5px] font-semibold text-[#161827] break-words">{it.title}</p>
+                          <p className="text-[14.5px] font-semibold text-[color:var(--ink)] break-words min-w-0">{it.title}</p>
                           {short && <Badge tone="brand">{short}</Badge>}
                           {it.slotKey && <Badge>{it.slotKey}</Badge>}
                           {past && !w && <Badge>Past</Badge>}
                           {w && <Badge tone="amber">Withdrawn</Badge>}
                         </div>
-                        {meta.length > 0 && <p className="text-[12.5px] text-[#6A6F85] mt-0.5 break-words">{meta.join(" · ")}</p>}
+                        {meta.length > 0 && <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5 break-words tabular-nums">{meta.join(" · ")}</p>}
                       </div>
                       {!readOnly && <RowActions withdrawn={w} onEdit={() => open(it)} onToggle={() => toggle(it)} />}
                     </div>
@@ -380,67 +388,70 @@ const ItemsPanel = ({ schedule, scheduleId: scheduleIdProp, readOnly, onChanged 
         dirty={dirty}
         error={formError}
         extra={
-          <Button type="button" variant="glass" loading={previewing} disabled={saving} onClick={runPreview}>
+          <Button type="button" variant="glass" loading={previewing} disabled={saving} onClick={runPreview} className="w-full sm:w-auto">
             <Eye className="w-4 h-4" />Preview impact
           </Button>
         }
       >
-        <Field as="select" label="Kind" value={form.kind} onChange={setKind} disabled={!creating} hint={cfg.help}>
-          {Object.entries(KINDS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </Field>
-        <Field label="Title" value={form.title} onChange={set("title")} error={errors.title} placeholder="OS lecture cancelled" maxLength={100} autoCapitalize="sentences" enterKeyHint="next" />
-
-        {cfg.slots && (
-          <Field as="select" label="Which one" value={form.slotKey} onChange={set("slotKey")} error={errors.slotKey}>
-            <option value="">Choose…</option>
-            {cfg.slots.map((s) => <option key={s} value={s}>{s}</option>)}
+        {/* @container: grids follow the dialog width, so date, time and select fields never overlap */}
+        <div className="@container space-y-4 min-w-0">
+          <Field as="select" label="Kind" value={form.kind} onChange={setKind} disabled={!creating} hint={cfg.help}>
+            {Object.entries(KINDS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </Field>
-        )}
+          <Field label="Title" value={form.title} onChange={set("title")} error={errors.title} placeholder="OS lecture cancelled" maxLength={100} autoCapitalize="sentences" enterKeyHint="next" />
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <Field label={singleDate ? "Date" : "Start date"} type="date" value={form.startDate} onChange={setStartDate} error={errors.startDate} />
-          {!singleDate && <Field label="End date" type="date" min={form.startDate || undefined} value={form.endDate} onChange={set("endDate")} error={errors.endDate} />}
+          {cfg.slots && (
+            <Field as="select" label="Which one" value={form.slotKey} onChange={set("slotKey")} error={errors.slotKey}>
+              <option value="">Choose…</option>
+              {cfg.slots.map((s) => <option key={s} value={s}>{s}</option>)}
+            </Field>
+          )}
+
+          <div className="grid grid-cols-1 @sm:grid-cols-2 gap-3 @sm:gap-4 min-w-0">
+            <Field label={singleDate ? "Date" : "Start date"} type="date" value={form.startDate} onChange={setStartDate} error={errors.startDate} />
+            {!singleDate && <Field label="End date" type="date" min={form.startDate || undefined} value={form.endDate} onChange={set("endDate")} error={errors.endDate} />}
+          </div>
+
+          {cfg.subject && (
+            <Field as="select" label={cfg.subject === true ? "Subject" : "Subject (optional)"} value={form.subjectKey} onChange={set("subjectKey")} error={errors.subjectKey} hint={cfg.subject === "optional" ? "Leave on “All subjects” to cover everything." : undefined}>
+              <option value="">{cfg.subject === true ? "Choose a subject…" : "All subjects"}</option>
+              {subjects.map((s) => <option key={idOf(s)} value={keyOf(s)}>{s.name}</option>)}
+            </Field>
+          )}
+
+          {cfg.times && (
+            <div className="grid grid-cols-1 @sm:grid-cols-2 gap-3 @sm:gap-4 min-w-0">
+              <Field label={cfg.times === true ? "Start time" : "Start (optional)"} type="time" value={form.startTime} onChange={set("startTime")} error={errors.startTime} />
+              <Field label={cfg.times === true ? "End time" : "End (optional)"} type="time" value={form.endTime} onChange={set("endTime")} error={errors.endTime} />
+            </div>
+          )}
+
+          {(cfg.classType || cfg.group) && (
+            <div className="grid grid-cols-1 @md:grid-cols-2 gap-4 min-w-0">
+              {cfg.classType && (
+                <Field as="select" label="Class type" value={form.classType} onChange={set("classType")}>
+                  <option value="">Any</option>
+                  {CLASS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </Field>
+              )}
+              {cfg.group && (
+                <Field as="select" label="Group (optional)" value={form.group} onChange={set("group")}>
+                  <option value="">Whole section</option>
+                  {(schedule?.groups || []).map((g) => <option key={g.key} value={g.key}>{g.label || g.key}</option>)}
+                </Field>
+              )}
+            </div>
+          )}
+
+          <Field label="Note (optional)" value={form.note} onChange={set("note")} placeholder="Professor is out of station" maxLength={200} />
+
+          {preview && (
+            <div ref={previewRef} className="min-w-0">
+              <FormLabel>Impact on joined students</FormLabel>
+              <Summary data={preview} />
+            </div>
+          )}
         </div>
-
-        {cfg.subject && (
-          <Field as="select" label={cfg.subject === true ? "Subject" : "Subject (optional)"} value={form.subjectKey} onChange={set("subjectKey")} error={errors.subjectKey} hint={cfg.subject === "optional" ? "Leave on “All subjects” to cover everything." : undefined}>
-            <option value="">{cfg.subject === true ? "Choose a subject…" : "All subjects"}</option>
-            {subjects.map((s) => <option key={idOf(s)} value={keyOf(s)}>{s.name}</option>)}
-          </Field>
-        )}
-
-        {cfg.times && (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            <Field label={cfg.times === true ? "Start time" : "Start (optional)"} type="time" value={form.startTime} onChange={set("startTime")} error={errors.startTime} />
-            <Field label={cfg.times === true ? "End time" : "End (optional)"} type="time" value={form.endTime} onChange={set("endTime")} error={errors.endTime} />
-          </div>
-        )}
-
-        {(cfg.classType || cfg.group) && (
-          <div className="grid sm:grid-cols-2 gap-4">
-            {cfg.classType && (
-              <Field as="select" label="Class type" value={form.classType} onChange={set("classType")}>
-                <option value="">Any</option>
-                {CLASS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </Field>
-            )}
-            {cfg.group && (
-              <Field as="select" label="Group (optional)" value={form.group} onChange={set("group")}>
-                <option value="">Whole section</option>
-                {(schedule?.groups || []).map((g) => <option key={g.key} value={g.key}>{g.label || g.key}</option>)}
-              </Field>
-            )}
-          </div>
-        )}
-
-        <Field label="Note (optional)" value={form.note} onChange={set("note")} placeholder="Professor is out of station" maxLength={200} />
-
-        {preview && (
-          <div ref={previewRef}>
-            <FormLabel>Impact on joined students</FormLabel>
-            <Summary data={preview} />
-          </div>
-        )}
       </FormModal>
       {noteDialog}
     </div>

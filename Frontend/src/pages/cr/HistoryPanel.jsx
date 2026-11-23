@@ -53,7 +53,8 @@ const HistoryPanel = ({ scheduleId, isAdmin, readOnly, version, onChanged }) => 
   if (loading) return <PageSpinner />;
 
   return (
-    <div className="space-y-4">
+    // @container: the row switches from stacked to side-by-side by the width of this panel
+    <div className="@container space-y-3 sm:space-y-4 min-w-0">
       <Alert type="error">{error}</Alert>
 
       {list.length === 0 ? (
@@ -66,15 +67,15 @@ const HistoryPanel = ({ scheduleId, isAdmin, readOnly, version, onChanged }) => 
           const reached = Number(a.affectedStudents);
           const hasActions = !readOnly && (canUndo || canRedo || isAdmin);
           return (
-            <Card key={aid} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="min-w-0">
+            <Card key={aid} className="p-3.5 min-[380px]:p-4 sm:p-5 flex flex-col @xl:flex-row @xl:items-center justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <p className="text-[14.5px] font-semibold text-[#161827] break-words">{a.summary || "Change"}</p>
+                  <p className="text-[14.5px] font-semibold text-[color:var(--ink)] break-words min-w-0">{a.summary || "Change"}</p>
                   {a.op && <Badge tone={opTone[a.op] || "neutral"}>{a.op}</Badge>}
                   {a.undoneBy && <Badge tone="amber">Undone</Badge>}
                   {a.actorRole && <Badge>{a.actorRole}</Badge>}
                 </div>
-                <p className="text-[12.5px] text-[#6A6F85] mt-1 break-words">
+                <p className="text-[12.5px] text-[color:var(--muted)] mt-1 break-words tabular-nums">
                   {[
                     when(a.createdAt),
                     Number.isFinite(reached) && a.affectedStudents != null && `reached ${reached} student${reached === 1 ? "" : "s"}`,
@@ -83,7 +84,7 @@ const HistoryPanel = ({ scheduleId, isAdmin, readOnly, version, onChanged }) => 
                 </p>
               </div>
               {hasActions && (
-                <div className="flex flex-wrap gap-2 shrink-0">
+                <div className="flex flex-wrap gap-2 @xl:shrink-0">
                   {canUndo && (
                     <Button size="sm" variant="glass" onClick={() => act(api.undo, a, { title: "Undo change", message: "This change will be reversed for joined students.", confirmLabel: "Undo", tone: "primary" })}>
                       <Undo2 className="w-4 h-4" />Undo

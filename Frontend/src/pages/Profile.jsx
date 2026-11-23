@@ -24,6 +24,9 @@ const avatarOf = (u) => (typeof u?.avatar === "string" ? u.avatar : u?.avatar?.u
 
 const roleLabel = { student: "Student", cr: "Class Representative", moderator: "Moderator", admin: "Admin" };
 
+const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1";
+const CARD_PAD = "p-3.5 min-[380px]:p-4 sm:p-5";
+
 // ---------------------------------------------------------------------------
 
 const Profile = () => {
@@ -168,17 +171,17 @@ const Profile = () => {
   const name = user?.fullName || user?.username || "Student";
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10">
+    <div className="max-w-3xl mx-auto px-3 min-[380px]:px-3.5 sm:px-6 py-6 sm:py-10">
       <PageHeader title="Your account" subtitle="Update your details, photo and password." />
 
-      <div className="space-y-6">
+      <div className="space-y-2.5 sm:space-y-4">
         {/* identity */}
-        <Card className="p-6 flex flex-col sm:flex-row sm:items-center gap-5">
+        <Card className={`${CARD_PAD} flex flex-col sm:flex-row sm:items-center gap-5`}>
           <div className="relative shrink-0 self-start">
             {shownAvatar ? (
-              <img src={shownAvatar} alt="" className="w-24 h-24 rounded-full object-cover ring-4 ring-white shadow-lg" />
+              <img src={shownAvatar} alt="" className="w-24 h-24 rounded-full object-cover border border-[color:var(--line)]" />
             ) : (
-              <span className="w-24 h-24 rounded-full bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] text-white text-[34px] font-semibold flex items-center justify-center uppercase ring-4 ring-white shadow-lg">
+              <span className="w-24 h-24 rounded-full bg-[#4F46E5] text-white text-[34px] font-semibold flex items-center justify-center uppercase">
                 {name.charAt(0)}
               </span>
             )}
@@ -186,7 +189,7 @@ const Profile = () => {
               type="button"
               onClick={() => fileRef.current?.click()}
               aria-label="Change photo"
-              className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-[#161827] text-white flex items-center justify-center shadow-md hover:brightness-125 transition"
+              className={`absolute -bottom-1 -right-1 w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-[color:var(--ink)] text-white border-2 border-white flex items-center justify-center hover:bg-[color:var(--body)] transition-colors ${FOCUS}`}
             >
               <Camera className="w-4 h-4" />
             </button>
@@ -194,8 +197,8 @@ const Profile = () => {
           </div>
 
           <div className="min-w-0 flex-1">
-            <h2 className="text-[22px] font-semibold tracking-tight text-[#161827] truncate">{name}</h2>
-            <p className="text-[14px] text-[#6A6F85]">@{user?.username}</p>
+            <h2 className="text-[22px] font-semibold tracking-tight text-[color:var(--ink)] truncate">{name}</h2>
+            <p className="text-[14px] text-[color:var(--muted)]">@{user?.username}</p>
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <Badge tone="brand">{roleLabel[user?.role] || "Student"}</Badge>
               {user?.college && (
@@ -213,13 +216,13 @@ const Profile = () => {
                   setAvatarFile(null);
                   setRemoveAvatar(true);
                 }}
-                className="mt-3 text-[13px] text-rose-600 hover:underline"
+                className={`mt-3 text-[13px] text-[#A32A42] hover:underline rounded ${FOCUS}`}
               >
                 Remove photo
               </button>
             )}
             {removeAvatar && (
-              <button type="button" onClick={() => setRemoveAvatar(false)} className="mt-3 text-[13px] text-indigo-600 hover:underline">
+              <button type="button" onClick={() => setRemoveAvatar(false)} className={`mt-3 text-[13px] text-[#4F46E5] hover:underline rounded ${FOCUS}`}>
                 Keep current photo
               </button>
             )}
@@ -228,14 +231,14 @@ const Profile = () => {
 
         {/* admin tools (admins only) */}
         {user?.role === "admin" && (
-          <Card className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <Card className={`${CARD_PAD} flex flex-col sm:flex-row sm:items-center justify-between gap-4`}>
             <div className="flex items-start gap-3">
-              <span className="w-10 h-10 rounded-xl bg-[#EEEDFD] text-[#5B52EE] flex items-center justify-center shrink-0">
+              <span className="w-10 h-10 rounded-xl bg-indigo-50 text-[#4F46E5] flex items-center justify-center shrink-0">
                 <ShieldCheck className="w-5 h-5" />
               </span>
               <div>
-                <h2 className="text-[17px] font-semibold text-[#161827]">Admin tools</h2>
-                <p className="text-[13.5px] text-[#6A6F85]">
+                <h2 className="text-[17px] font-semibold text-[color:var(--ink)]">Admin tools</h2>
+                <p className="text-[13.5px] text-[color:var(--muted)]">
                   Search users, change roles, reset passwords and manage account access.
                 </p>
               </div>
@@ -247,9 +250,9 @@ const Profile = () => {
         )}
 
         {/* details */}
-        <Card className="p-6">
-          <h2 className="text-[17px] font-semibold text-[#161827] mb-1">Personal details</h2>
-          <p className="text-[13.5px] text-[#6A6F85] mb-5">Your college cannot be changed here.</p>
+        <Card className={CARD_PAD}>
+          <h2 className="text-[17px] font-semibold text-[color:var(--ink)] mb-1">Personal details</h2>
+          <p className="text-[13.5px] text-[color:var(--muted)] mb-5">Your college cannot be changed here.</p>
 
           <form onSubmit={saveProfile} className="space-y-4">
             <Alert type={msg.type || "info"}>{msg.text}</Alert>
@@ -285,9 +288,9 @@ const Profile = () => {
         </Card>
 
         {/* password */}
-        <Card className="p-6">
-          <h2 className="text-[17px] font-semibold text-[#161827] mb-1">Change password</h2>
-          <p className="text-[13.5px] text-[#6A6F85] mb-5">At least 8 characters. Your other devices will be signed out.</p>
+        <Card className={CARD_PAD}>
+          <h2 className="text-[17px] font-semibold text-[color:var(--ink)] mb-1">Change password</h2>
+          <p className="text-[13.5px] text-[color:var(--muted)] mb-5">At least 8 characters. Your other devices will be signed out.</p>
 
           <form onSubmit={savePassword} className="space-y-4 max-w-md">
             <Alert type={pwMsg.type || "info"}>{pwMsg.text}</Alert>
@@ -301,12 +304,12 @@ const Profile = () => {
         </Card>
 
         {/* danger */}
-        <Card className="p-6 border-rose-200/80">
-          <div className="flex items-center gap-2 text-rose-600 mb-1">
+        <Card className={`${CARD_PAD} border-rose-200`}>
+          <div className="flex items-center gap-2 text-[#A32A42] mb-1">
             <Trash2 className="w-5 h-5" />
             <h2 className="text-[17px] font-semibold">Delete account</h2>
           </div>
-          <p className="text-[13.5px] text-[#6A6F85] mb-4 max-w-xl">
+          <p className="text-[13.5px] text-[color:var(--muted)] mb-4 max-w-xl">
             Your account is deactivated right away. If you log in again within the grace period, it is restored with your data.
           </p>
           <Button variant="danger" onClick={() => { setDelConfirm(""); setDelError(""); setDelOpen(true); }}>
@@ -317,8 +320,8 @@ const Profile = () => {
 
       <Modal open={delOpen} onClose={() => !deleting && setDelOpen(false)} title="Delete your account?">
         <div className="space-y-4">
-          <p className="text-[14px] text-[#444A63]">
-            Type your username <span className="font-semibold text-[#161827]">{user?.username}</span> to confirm.
+          <p className="text-[14px] text-[color:var(--body)]">
+            Type your username <span className="font-semibold text-[color:var(--ink)]">{user?.username}</span> to confirm.
           </p>
           <Alert type="error">{delError}</Alert>
           <Field value={delConfirm} onChange={(e) => setDelConfirm(e.target.value)} placeholder={user?.username} />

@@ -1,5 +1,6 @@
 // Shared confirm dialog with an optional note box. Replaces window.confirm / window.prompt,
 // which look out of place and are awkward to use on phones.
+// No hard-coded colours here: the dialog, text and buttons all come from Ui.jsx and the theme tokens.
 import { useEffect, useState } from "react";
 import { Alert, Button, Field, Modal } from "./Ui";
 
@@ -30,10 +31,10 @@ const ActionDialog = ({
           e.preventDefault();
           onConfirm(note.trim());
         }}
-        className="space-y-4"
+        className="space-y-4 min-w-0"
       >
         <Alert type="error">{error}</Alert>
-        {children && <div className="text-[14px] leading-relaxed text-[#444A63]">{children}</div>}
+        {children && <div className="text-[14px] leading-relaxed text-[color:var(--body)]">{children}</div>}
         {noteLabel && (
           <Field
             as="textarea"
@@ -45,7 +46,7 @@ const ActionDialog = ({
             className="!h-24 !py-3 resize-none"
           />
         )}
-        <div className="flex flex-col-reverse sm:flex-row gap-3">
+        <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap gap-3">
           <Button type="button" variant="glass" disabled={busy} onClick={onClose} className="w-full sm:w-auto">
             {cancelLabel}
           </Button>

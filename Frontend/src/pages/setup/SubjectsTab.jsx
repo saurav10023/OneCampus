@@ -26,10 +26,11 @@ const initials = (name = "") =>
 
 const IconBtn = ({ children, tone = "neutral", ...rest }) => (
   <button
+    type="button"
     {...rest}
     className={cx(
-      "w-9 h-9 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50",
-      tone === "danger" ? "text-rose-600 hover:bg-rose-50" : "text-[#161827]/65 hover:bg-white/85 hover:text-[#161827]"
+      "w-9 h-9 rounded-xl flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
+      tone === "danger" ? "text-rose-600 hover:bg-rose-50" : "text-[color:var(--muted)] hover:bg-[color:var(--inset)] hover:text-[color:var(--ink)]"
     )}
   >
     {children}
@@ -170,22 +171,22 @@ const SubjectsTab = ({ setupId, readOnly }) => {
         <Tabs size="sm" value={view} onChange={setView} items={VIEWS} />
         <div className="flex items-center gap-2 flex-1 sm:flex-none justify-end">
           <div className="relative flex-1 sm:w-56 sm:flex-none">
-            <Search className="w-4 h-4 text-[#6A6F85] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-[color:var(--muted)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search subjects"
               aria-label="Search subjects"
-              className="w-full h-10 pl-10 pr-3 rounded-full bg-white/60 border border-white/80 shadow-[inset_0_1px_0_#fff] text-[13.5px] text-[#161827] placeholder:text-[#6A6F85]/70 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              className="w-full h-10 pl-10 pr-3 rounded-xl bg-[color:var(--surface)] border border-[color:var(--line)] text-[16px] sm:text-[13.5px] text-[color:var(--ink)] placeholder:text-[#636A82]/70 hover:border-[color:var(--line-strong)] focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25 transition-colors"
             />
           </div>
           {canAdd && (
             <>
               <Button size="sm" variant="glass" className="h-10" onClick={() => setBulkOpen(true)}>
-                <ListPlus className="w-4 h-4" />Add many
+                <ListPlus className="w-4 h-4" aria-hidden="true" />Add many
               </Button>
               <Button size="sm" className="h-10" onClick={() => openForm(null)}>
-                <Plus className="w-4 h-4" />Add subject
+                <Plus className="w-4 h-4" aria-hidden="true" />Add subject
               </Button>
             </>
           )}
@@ -197,7 +198,7 @@ const SubjectsTab = ({ setupId, readOnly }) => {
       <Warnings data={result} />
 
       {loading ? (
-        <SkeletonCards count={4} height="h-[120px]" cols="sm:grid-cols-2" />
+        <SkeletonCards count={4} height="h-[104px]" cols="sm:grid-cols-2" />
       ) : shown.length === 0 ? (
         <EmptyState
           icon={query ? Search : BookOpen}
@@ -213,60 +214,59 @@ const SubjectsTab = ({ setupId, readOnly }) => {
             canAdd &&
             !query && (
               <div className="flex flex-wrap justify-center gap-3">
-                <Button onClick={() => setBulkOpen(true)}><ListPlus className="w-4 h-4" />Add all at once</Button>
-                <Button variant="glass" onClick={() => openForm(null)}><Plus className="w-4 h-4" />Add one subject</Button>
+                <Button onClick={() => setBulkOpen(true)}><ListPlus className="w-4 h-4" aria-hidden="true" />Add all at once</Button>
+                <Button variant="glass" onClick={() => openForm(null)}><Plus className="w-4 h-4" aria-hidden="true" />Add one subject</Button>
               </div>
             )
           }
         />
       ) : (
         <>
-          <p className="text-[13px] text-[#6A6F85] px-1">{shown.length} subject{shown.length === 1 ? "" : "s"}</p>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <p className="text-[13px] text-[color:var(--muted)] px-1">{shown.length} subject{shown.length === 1 ? "" : "s"}</p>
+          <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
             {shown.map((s, i) => {
               const c = s.color || "#6366F1";
               const archived = s.isActive === false;
               return (
                 <FadeIn key={s._id} delay={Math.min(i, 8) * 40}>
-                  <Card className={cx("overflow-hidden p-0 hover:shadow-[0_24px_48px_-28px_rgba(30,32,70,0.45)] transition-shadow", archived && "opacity-80")}>
-                    <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${c}, ${c}88)` }} />
-                    <div className="p-5 flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3.5 min-w-0">
-                        <span
-                          className="w-11 h-11 rounded-2xl flex items-center justify-center text-white text-[15px] font-semibold shrink-0 shadow-md"
-                          style={{ background: c }}
-                          aria-hidden
-                        >
-                          {initials(s.name)}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-[15.5px] font-semibold text-[#161827] truncate">{s.name}</p>
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
-                            {s.code && <Badge tone="brand">{s.code}</Badge>}
-                            {s.credits != null && <Badge>{s.credits} credits</Badge>}
-                            {s.targetPercentage != null && <Badge>{s.targetPercentage}% target</Badge>}
-                            {s.origin === "official" && <Badge tone="green">Official</Badge>}
-                            {archived && <Badge tone="amber">Archived</Badge>}
-                          </div>
+                  <Card className={cx("relative overflow-hidden p-4 sm:p-5 flex items-start justify-between gap-3", archived && "opacity-75")}>
+                    {/* thin bar in the subject colour (the only per-subject colour on the card) */}
+                    <span aria-hidden="true" className="absolute left-0 inset-y-0 w-1" style={{ background: c }} />
+                    <div className="flex items-start gap-3.5 min-w-0 pl-1">
+                      <span
+                        className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-[15px] font-semibold shrink-0"
+                        style={{ background: c }}
+                        aria-hidden="true"
+                      >
+                        {initials(s.name)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-semibold text-[color:var(--ink)] truncate">{s.name}</p>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {s.code && <Badge tone="brand">{s.code}</Badge>}
+                          {s.credits != null && <Badge>{s.credits} credits</Badge>}
+                          {s.targetPercentage != null && <Badge>{s.targetPercentage}% target</Badge>}
+                          {s.origin === "official" && <Badge tone="green">Official</Badge>}
+                          {archived && <Badge tone="amber">Archived</Badge>}
                         </div>
                       </div>
-
-                      {!readOnly && (
-                        <div className="flex gap-0.5 shrink-0 -mr-1">
-                          {!archived && (
-                            <IconBtn onClick={() => openForm(s)} aria-label={`Edit ${s.name}`} title="Edit">
-                              <Pencil className="w-4 h-4" />
-                            </IconBtn>
-                          )}
-                          <IconBtn onClick={() => toggleArchive(s)} aria-label={archived ? `Restore ${s.name}` : `Archive ${s.name}`} title={archived ? "Restore" : "Archive (keeps history)"}>
-                            {archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                          </IconBtn>
-                          <IconBtn tone="danger" onClick={() => askDelete(s)} aria-label={`Delete ${s.name}`} title="Delete">
-                            <Trash2 className="w-4 h-4" />
-                          </IconBtn>
-                        </div>
-                      )}
                     </div>
+
+                    {!readOnly && (
+                      <div className="flex gap-0.5 shrink-0 -mr-1">
+                        {!archived && (
+                          <IconBtn onClick={() => openForm(s)} aria-label={`Edit ${s.name}`} title="Edit">
+                            <Pencil className="w-4 h-4" aria-hidden="true" />
+                          </IconBtn>
+                        )}
+                        <IconBtn onClick={() => toggleArchive(s)} aria-label={archived ? `Restore ${s.name}` : `Archive ${s.name}`} title={archived ? "Restore" : "Archive (keeps history)"}>
+                          {archived ? <ArchiveRestore className="w-4 h-4" aria-hidden="true" /> : <Archive className="w-4 h-4" aria-hidden="true" />}
+                        </IconBtn>
+                        <IconBtn tone="danger" onClick={() => askDelete(s)} aria-label={`Delete ${s.name}`} title="Delete">
+                          <Trash2 className="w-4 h-4" aria-hidden="true" />
+                        </IconBtn>
+                      </div>
+                    )}
                   </Card>
                 </FadeIn>
               );
@@ -280,13 +280,13 @@ const SubjectsTab = ({ setupId, readOnly }) => {
           <Alert type="error">{formError}</Alert>
 
           {/* live preview */}
-          <div className="flex items-center gap-3 rounded-2xl bg-white/60 border border-white/80 p-3">
-            <span className="w-11 h-11 rounded-2xl flex items-center justify-center text-white text-[15px] font-semibold shadow-md transition-colors" style={{ background: form.color }}>
+          <div className="flex items-center gap-3 rounded-xl bg-[color:var(--inset)] p-3">
+            <span className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-[15px] font-semibold transition-colors" style={{ background: form.color }}>
               {initials(form.name)}
             </span>
             <div className="min-w-0">
-              <p className="text-[14.5px] font-semibold text-[#161827] truncate">{form.name.trim() || "Subject name"}</p>
-              <p className="text-[12.5px] text-[#6A6F85]">{form.code.trim() || "Code"}</p>
+              <p className="text-[14.5px] font-semibold text-[color:var(--ink)] truncate">{form.name.trim() || "Subject name"}</p>
+              <p className="text-[12.5px] text-[color:var(--muted)]">{form.code.trim() || "Code"}</p>
             </div>
           </div>
 
@@ -298,7 +298,7 @@ const SubjectsTab = ({ setupId, readOnly }) => {
           </div>
 
           <div>
-            <span className="block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6A6F85] mb-2 px-1">Colour</span>
+            <span className="block text-[13px] font-medium text-[color:var(--body)] mb-2">Colour</span>
             <div className="flex flex-wrap gap-2.5">
               {COLORS.map((c) => {
                 const on = form.color === c;
@@ -309,10 +309,10 @@ const SubjectsTab = ({ setupId, readOnly }) => {
                     onClick={() => setForm((f) => ({ ...f, color: c }))}
                     aria-label={`Colour ${c}`}
                     aria-pressed={on}
-                    className={cx("w-9 h-9 rounded-full flex items-center justify-center text-white transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500", on ? "scale-110 shadow-lg ring-2 ring-white" : "hover:scale-105")}
+                    className={cx("w-9 h-9 rounded-full flex items-center justify-center text-white transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2", on ? "ring-2 ring-offset-2 ring-[#1B1F33]/70" : "hover:ring-2 hover:ring-offset-2 hover:ring-[#1B1F33]/20")}
                     style={{ background: c }}
                   >
-                    {on && <Check className="w-4 h-4" strokeWidth={3} />}
+                    {on && <Check className="w-4 h-4" strokeWidth={3} aria-hidden="true" />}
                   </button>
                 );
               })}
@@ -351,9 +351,9 @@ const SubjectsTab = ({ setupId, readOnly }) => {
           {impactRows.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {impactRows.map(([k, v]) => (
-                <div key={k} className="rounded-2xl bg-white/60 border border-white/80 px-3 py-2">
-                  <p className="text-[17px] font-semibold text-[#161827] leading-none">{v}</p>
-                  <p className="text-[11px] text-[#6A6F85] mt-1">{k.replace(/([A-Z])/g, " $1").toLowerCase()}</p>
+                <div key={k} className="rounded-xl bg-[color:var(--inset)] px-3 py-2">
+                  <p className="text-[17px] font-semibold text-[color:var(--ink)] leading-none tabular-nums">{v}</p>
+                  <p className="text-[11px] text-[color:var(--muted)] mt-1">{k.replace(/([A-Z])/g, " $1").toLowerCase()}</p>
                 </div>
               ))}
             </div>

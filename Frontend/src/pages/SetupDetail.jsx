@@ -24,6 +24,7 @@ import SettingsTab from "./setup/SettingsTab";
 import OfficialJoin from "../components/OfficialJoin";
 import ImportToSetup from "../components/ImportToSetup";
 import { FadeIn, Flash, SemesterBar, Skeleton, useFlash } from "../components/Ux";
+import "../styles/tones";
 
 // `short` is the label under the icon on phones, `label` shows from sm up.
 const TABS = [
@@ -33,6 +34,9 @@ const TABS = [
   { key: "official", label: "Official schedule", short: "Official", icon: Link2 },
   { key: "settings", label: "Settings", short: "Settings", icon: Settings },
 ];
+
+const FOCUS =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]";
 
 /* Days between today and a date (negative once it has passed). */
 const daysUntil = (d) => {
@@ -54,15 +58,16 @@ const semesterNote = (setup) => {
   return `${toEnd} day${toEnd === 1 ? "" : "s"} left`;
 };
 
+// Inset tile with a small tinted icon.
 const Fact = ({ icon: Icon, label, note, children }) => (
-  <div className="flex items-start gap-3 px-4 sm:px-5 py-3.5 min-w-0">
-    <span className="mt-0.5 w-8 h-8 shrink-0 rounded-xl bg-[#5B52EE]/10 text-[#4F46E5] flex items-center justify-center" aria-hidden="true">
+  <div className="flex items-start gap-3 rounded-2xl bg-[color:var(--inset)] border border-[color:var(--line-soft)] px-3.5 py-3 min-w-0">
+    <span className="tn tn-brand tn-soft mt-0.5 w-8 h-8 shrink-0 rounded-lg flex items-center justify-center" aria-hidden="true">
       <Icon className="w-4 h-4" />
     </span>
     <div className="min-w-0">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6A6F85]">{label}</p>
-      <p className="text-[14px] font-medium text-[#161827] mt-0.5 break-words">{children}</p>
-      {note && <p className="text-[12.5px] text-[#6A6F85] mt-0.5">{note}</p>}
+      <p className="text-[12px] text-[color:var(--muted)]">{label}</p>
+      <p className="text-[14px] font-medium text-[color:var(--ink)] mt-0.5 break-words tabular-nums">{children}</p>
+      {note && <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5">{note}</p>}
     </div>
   </div>
 );
@@ -86,12 +91,12 @@ const SectionTabs = ({ value, onChange }) => {
   };
 
   return (
-    <div className="mb-5 sm:mb-6 sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden">
+    <div className="mb-4 sm:mb-5 sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden">
       <div
         role="tablist"
         aria-label="Setup sections"
         onKeyDown={onKeyDown}
-        className="grid grid-cols-5 sm:inline-flex gap-1 p-1 sm:p-1.5 rounded-3xl sm:rounded-full bg-white/55 border border-white/80 shadow-[inset_0_1px_0_#fff] max-w-full"
+        className="grid grid-cols-5 sm:inline-flex gap-1 p-1 rounded-2xl sm:rounded-full bg-[color:var(--inset)] border border-[color:var(--line)] max-w-full"
       >
         {TABS.map(({ key, label, short, icon: Icon }) => {
           const on = value === key;
@@ -107,8 +112,9 @@ const SectionTabs = ({ value, onChange }) => {
               tabIndex={on ? 0 : -1}
               onClick={() => onChange(key)}
               className={cx(
-                "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 h-14 sm:h-10 px-0.5 sm:px-4 rounded-[20px] sm:rounded-full text-[10.5px] min-[400px]:text-[11.5px] sm:text-[13.5px] font-medium transition whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
-                on ? "text-white bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/25" : "text-[#161827]/70 hover:bg-white/70"
+                "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 h-14 sm:h-10 px-0.5 sm:px-4 rounded-xl sm:rounded-full text-[10.5px] min-[400px]:text-[11.5px] sm:text-[13.5px] font-medium transition-colors whitespace-nowrap",
+                FOCUS,
+                on ? "ac-bg text-white shadow-sm" : "text-[color:var(--body)] hover:bg-[color:var(--surface)]"
               )}
             >
               <Icon className="w-[18px] h-[18px] sm:w-4 sm:h-4" aria-hidden="true" />
@@ -122,14 +128,9 @@ const SectionTabs = ({ value, onChange }) => {
   );
 };
 
-const Chip = ({ children, tone = "light" }) => (
-  <span
-    className={cx(
-      "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium border",
-      tone === "light" && "bg-white/20 border-white/30 text-white",
-      tone === "amber" && "bg-amber-300/90 border-amber-200 text-amber-950 font-semibold"
-    )}
-  >
+// Soft tag. Brand for neutral facts, warn for the archived notice.
+const Chip = ({ children, tone = "brand" }) => (
+  <span className={cx("tn tn-soft inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium", tone === "amber" ? "tn-warn" : "tn-brand")}>
     {children}
   </span>
 );
@@ -183,21 +184,21 @@ const SetupDetail = () => {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-10 space-y-4 sm:space-y-5" aria-busy="true" aria-label="Loading setup">
-        <Skeleton className="h-9 w-28 rounded-full" />
-        <Skeleton className="h-60 sm:h-52 rounded-[28px] sm:rounded-[32px]" />
-        <Skeleton className="h-16 sm:h-12 w-full sm:w-[34rem] rounded-3xl sm:rounded-full" />
-        <Skeleton className="h-40 rounded-3xl" />
+      <div className="max-w-5xl mx-auto px-3 min-[380px]:px-3.5 sm:px-6 py-6 sm:py-10 space-y-2.5 sm:space-y-4" aria-busy="true" aria-label="Loading setup">
+        <Skeleton className="h-9 w-28 rounded-xl" />
+        <Skeleton className="h-60 sm:h-52 rounded-2xl" />
+        <Skeleton className="h-16 sm:h-12 w-full sm:w-[34rem] rounded-2xl" />
+        <Skeleton className="h-40 rounded-2xl" />
       </div>
     );
   }
 
   if (error && !setup) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-14 space-y-4">
+      <div className="max-w-xl mx-auto px-3 sm:px-6 py-14 space-y-4">
         <Alert type="error">{error || "Setup not found."}</Alert>
-        <Link to="/setups" className="inline-flex items-center gap-1.5 h-9 text-indigo-600 text-[14px] font-medium hover:underline">
-          <ArrowLeft className="w-4 h-4" />Back to setups
+        <Link to="/setups" className={cx("ac-tx inline-flex items-center gap-1.5 h-9 text-[14px] font-medium hover:underline rounded", FOCUS)}>
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />Back to setups
         </Link>
       </div>
     );
@@ -211,73 +212,71 @@ const SetupDetail = () => {
   const note = semesterNote(setup);
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-10">
+    <div className="max-w-5xl mx-auto px-3 min-[380px]:px-3.5 sm:px-6 py-6 sm:py-10">
       <Link
         to="/setups"
-        className="inline-flex items-center gap-1.5 h-9 text-[13.5px] text-[#6A6F85] hover:text-[#161827] mb-3 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        className={cx("inline-flex items-center gap-1.5 h-9 text-[13.5px] text-[color:var(--muted)] hover:text-[color:var(--ink)] mb-3 rounded-lg transition-colors", FOCUS)}
       >
-        <ArrowLeft className="w-4 h-4" />All setups
+        <ArrowLeft className="w-4 h-4" aria-hidden="true" />All setups
       </Link>
 
       <FadeIn>
-        <Card className="overflow-hidden p-0 mb-5 sm:mb-6">
-          <div className="relative px-4 sm:px-8 pt-5 sm:pt-7 pb-5 sm:pb-6 text-white bg-gradient-to-br from-[#4F46E5] via-[#5B52EE] to-[#0EA5E9]">
-            <span aria-hidden="true" className="pointer-events-none absolute -right-14 -top-20 w-72 h-72 rounded-full bg-white/20 blur-3xl" />
-            <span aria-hidden="true" className="pointer-events-none absolute -left-16 -bottom-24 w-64 h-64 rounded-full bg-sky-300/20 blur-3xl" />
+        <Card className="relative overflow-hidden p-3.5 min-[380px]:p-4 sm:p-6 mb-4 sm:mb-5">
+          {/* 3px bar: indigo for the current setup, grey otherwise */}
+          <span aria-hidden="true" className={cx("absolute left-0 top-0 bottom-0 w-[3px]", isCurrent ? "ac-bg" : "bg-[color:var(--line-strong)]")} />
 
-            <div className="relative flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
-              <div className="min-w-0">
-                {(isCurrent || readOnly || setup.officialScheduleId) && (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {isCurrent && (
-                      <Chip>
-                        <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />Current setup
-                      </Chip>
-                    )}
-                    {readOnly && <Chip tone="amber">Archived</Chip>}
-                    {setup.officialScheduleId && (
-                      <Chip>
-                        <Link2 className="w-3.5 h-3.5" aria-hidden="true" />Official schedule
-                      </Chip>
-                    )}
-                  </div>
-                )}
-                <h1 className="text-[24px] sm:text-[30px] font-semibold tracking-tight leading-tight break-words">{setup.name}</h1>
-                {scope && <p className="text-[13.5px] sm:text-[14px] text-white/80 mt-1 break-words">{scope}</p>}
-              </div>
-
-              {/* actions: full-width stacked on phones, inline from sm up */}
-              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap gap-2 w-full lg:w-auto lg:justify-end shrink-0">
-                {!readOnly && (
-                  <Button variant="glass" className="w-full sm:w-auto" onClick={() => setImportOpen(true)}>
-                    <ImagePlus className="w-4 h-4" />Import from images
-                  </Button>
-                )}
-                {isCurrent ? (
-                  <Link
-                    to="/dashboard"
-                    className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full bg-white text-[#3B33C9] text-[14px] font-semibold shadow-lg hover:bg-white/90 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                  >
-                    Today&apos;s classes <ArrowRight className="w-4 h-4" />
-                  </Link>
-                ) : (
-                  !readOnly && (
-                    <Button variant="glass" className="w-full sm:w-auto" loading={activating} onClick={makeCurrent}>
-                      <CheckCircle2 className="w-4 h-4" />Make current
-                    </Button>
-                  )
-                )}
-              </div>
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+            <div className="min-w-0">
+              {(isCurrent || readOnly || setup.officialScheduleId) && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {isCurrent && (
+                    <Chip>
+                      <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />Current setup
+                    </Chip>
+                  )}
+                  {readOnly && <Chip tone="amber">Archived</Chip>}
+                  {setup.officialScheduleId && (
+                    <Chip>
+                      <Link2 className="w-3.5 h-3.5" aria-hidden="true" />Official schedule
+                    </Chip>
+                  )}
+                </div>
+              )}
+              <h1 className="text-[26px] sm:text-[32px] font-semibold tracking-tight leading-tight text-[color:var(--ink)] break-words">{setup.name}</h1>
+              {scope && <p className="text-[13.5px] sm:text-[14px] text-[color:var(--muted)] mt-1 break-words">{scope}</p>}
             </div>
 
-            {!readOnly && (
-              <div className="relative mt-5 sm:mt-6 max-w-md">
-                <SemesterBar start={setup.startDate} end={setup.endDate} dark />
-              </div>
-            )}
+            {/* actions: full-width stacked on phones, inline from sm up */}
+            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap gap-2 w-full lg:w-auto lg:justify-end shrink-0">
+              {!readOnly && (
+                <Button variant="glass" className="w-full sm:w-auto" onClick={() => setImportOpen(true)}>
+                  <ImagePlus className="w-4 h-4" />Import from images
+                </Button>
+              )}
+              {isCurrent ? (
+                <Link
+                  to="/dashboard"
+                  className={cx("ac-btn inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl text-[14px] font-medium transition-colors active:scale-[0.98]", FOCUS)}
+                >
+                  Today&apos;s classes <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                </Link>
+              ) : (
+                !readOnly && (
+                  <Button variant="glass" className="w-full sm:w-auto" loading={activating} onClick={makeCurrent}>
+                    <CheckCircle2 className="w-4 h-4" />Make current
+                  </Button>
+                )
+              )}
+            </div>
           </div>
 
-          <div className="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#161827]/10 bg-white/40">
+          {!readOnly && (
+            <div className="mt-5 max-w-md">
+              <SemesterBar start={setup.startDate} end={setup.endDate} />
+            </div>
+          )}
+
+          <div className="grid sm:grid-cols-3 gap-2.5 sm:gap-3 mt-5">
             <Fact icon={Timer} label="Semester" note={note}>
               {fmtDate(setup.startDate)} → {fmtDate(setup.endDate)}
             </Fact>
@@ -292,7 +291,7 @@ const SetupDetail = () => {
       </FadeIn>
 
       {(error || flashMsg || readOnly) && (
-        <div className="space-y-3 sm:space-y-4 mb-5 sm:mb-6" aria-live="polite">
+        <div className="space-y-2.5 sm:space-y-4 mb-4 sm:mb-5" aria-live="polite">
           <Alert type="error">{error}</Alert>
           <Flash message={flashMsg} />
           {readOnly && <Alert type="warning">This setup is archived and read-only. You can look around, but changes are turned off.</Alert>}

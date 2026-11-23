@@ -10,6 +10,13 @@
       html, body, #root { background: #F4F6FF; min-height: 100%; }
     </style>
     <script>
+      try {
+        var t = localStorage.getItem("oc-theme");
+        if (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches))
+          document.documentElement.classList.add("dark");
+      } catch (e) {}
+    </script>
+    <script>
       // Shows any startup error on the page, so it can be read on the phone
       window.addEventListener("error", function (e) {
         var d = document.createElement("pre");

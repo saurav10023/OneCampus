@@ -9,6 +9,8 @@ import { FormLabel, FormModal, RowActions, focusFirstInvalid, shortOf, useNoteDi
 const CLASS_TYPES = ["lecture", "lab", "tutorial"]; // edit if your backend allows more
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1";
+
 const idOf = (x) => x?._id || x?.id; // works whether the backend returns `_id` or `id`
 const keyOf = (s) => s.key || idOf(s);
 
@@ -21,24 +23,25 @@ const plusHour = (t) => {
   return h >= 23 ? "23:59" : `${String(h + 1).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 };
 
+// Quiet row: grey inset block, no border
 const Row = ({ r, name, readOnly, showDate, onEdit, onToggle }) => {
   const w = isWithdrawn(r);
   const meta = [showDate && fmtDate(r.effectiveStartDate), r.room, r.professor].filter(Boolean);
   return (
-    <div className={cx("flex items-center gap-3 rounded-2xl bg-white/65 border border-white/80 px-3 sm:px-4 py-2.5", w && "opacity-60")}>
+    <div className={cx("flex items-center gap-3 rounded-xl bg-[color:var(--inset)] px-3 sm:px-4 py-2.5 min-w-0", w && "opacity-60")}>
       <div className="w-[52px] shrink-0 text-center leading-tight">
-        <p className="text-[13.5px] font-semibold text-[#161827] tabular-nums">{r.startTime}</p>
-        <p className="text-[11.5px] text-[#6A6F85] tabular-nums">{r.endTime}</p>
+        <p className="text-[13.5px] font-semibold text-[color:var(--ink)] tabular-nums">{r.startTime}</p>
+        <p className="text-[12px] text-[color:var(--muted)] tabular-nums">{r.endTime}</p>
       </div>
-      <span className="w-px self-stretch bg-[#161827]/10" aria-hidden="true" />
+      <span className="w-px self-stretch bg-[color:var(--line)]" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <p className="text-[14.5px] font-semibold text-[#161827]">{name}</p>
+          <p className="text-[14.5px] font-semibold text-[color:var(--ink)] break-words min-w-0">{name}</p>
           {r.classType && <Badge>{r.classType}</Badge>}
           {r.group && <Badge tone="brand">{r.group}</Badge>}
           {w && <Badge tone="amber">Withdrawn</Badge>}
         </div>
-        {meta.length > 0 && <p className="text-[12.5px] text-[#6A6F85] mt-0.5 break-words">{meta.join(" · ")}</p>}
+        {meta.length > 0 && <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5 break-words tabular-nums">{meta.join(" · ")}</p>}
       </div>
       {!readOnly && <RowActions withdrawn={w} onEdit={() => onEdit(r)} onToggle={() => onToggle(r)} />}
     </div>
@@ -53,13 +56,13 @@ const DayGroup = ({ id, title, count, shorts, today, open, onToggle, children })
       onClick={onToggle}
       aria-expanded={open}
       aria-controls={id}
-      className="w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 text-left hover:bg-white/50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400"
+      className={cx("w-full flex items-center gap-3 px-4 sm:px-5 py-3.5 min-h-11 text-left hover:bg-[color:var(--inset)] transition-colors motion-reduce:transition-none", FOCUS)}
     >
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-[15.5px] font-semibold text-[#161827]">{title}</span>
+          <span className="text-[15.5px] font-semibold text-[color:var(--ink)]">{title}</span>
           {today && <Badge tone="green">Today</Badge>}
-          <span className="text-[12.5px] text-[#6A6F85]">{count} class{count === 1 ? "" : "es"}</span>
+          <span className="text-[12.5px] text-[color:var(--muted)] tabular-nums">{count} class{count === 1 ? "" : "es"}</span>
         </span>
         {shorts.length > 0 && (
           <span className="flex flex-wrap gap-1 mt-1.5">
@@ -68,7 +71,7 @@ const DayGroup = ({ id, title, count, shorts, today, open, onToggle, children })
           </span>
         )}
       </span>
-      <ChevronDown className={cx("w-5 h-5 shrink-0 text-[#6A6F85] transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
+      <ChevronDown className={cx("w-5 h-5 shrink-0 text-[color:var(--faint)] transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
     </button>
     <div id={id} className={cx("grid transition-[grid-template-rows] duration-300 motion-reduce:transition-none", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
       <div className={cx("overflow-hidden", !open && "invisible")}>
@@ -343,9 +346,9 @@ const OfficialRules = ({ schedule, scheduleId: scheduleIdProp, readOnly, onChang
   const setAll = (v) => setOpenDays(Object.fromEntries(groupsList.map((g) => [g.key, v])));
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[14px] text-[#6A6F85]">{weekly.length} weekly · {makeups.length} makeup</p>
+    <div className="space-y-4 sm:space-y-5 min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[14px] text-[color:var(--muted)] tabular-nums">{weekly.length} weekly · {makeups.length} makeup</p>
         {!readOnly && <Button size="sm" onClick={() => open(null)} disabled={subjects.length === 0}><CalendarPlus className="w-4 h-4" />Add class</Button>}
       </div>
 
@@ -358,12 +361,12 @@ const OfficialRules = ({ schedule, scheduleId: scheduleIdProp, readOnly, onChang
         <>
           {groupsList.length > 1 && (
             <div className="flex justify-end -mb-2">
-              <button type="button" onClick={() => setAll(!allOpen)} className="h-9 px-2 text-[13px] font-medium text-indigo-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded-full">
+              <button type="button" onClick={() => setAll(!allOpen)} className={cx("min-h-11 sm:min-h-9 px-3 text-[13px] font-medium text-indigo-600 hover:underline rounded-lg", FOCUS)}>
                 {allOpen ? "Collapse all" : "Expand all"}
               </button>
             </div>
           )}
-          <div className="space-y-3">
+          <div className="space-y-2.5 sm:space-y-3">
             {groupsList.map((g) => (
               <DayGroup
                 key={g.key}
@@ -395,67 +398,74 @@ const OfficialRules = ({ schedule, scheduleId: scheduleIdProp, readOnly, onChang
         dirty={dirty}
         error={formError}
       >
-        <Field as="select" label="Subject" value={form.subjectKey} onChange={set("subjectKey")} error={errors.subjectKey}>
-          <option value="">Choose a subject…</option>
-          {subjects.map((s) => <option key={idOf(s)} value={keyOf(s)}>{s.name}{s.code ? ` (${s.code})` : ""}</option>)}
-        </Field>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field as="select" label="Kind" value={form.entryType} onChange={set("entryType")} disabled={!creating} hint={!creating ? "To change this, withdraw the class and add a new one." : undefined}>
-            <option value="weekly">Weekly class</option>
-            <option value="makeup">Makeup class (one day)</option>
+        {/* @container: every grid below follows the width of the dialog, so fields never overlap */}
+        <div className="@container space-y-4 min-w-0">
+          <Field as="select" label="Subject" value={form.subjectKey} onChange={set("subjectKey")} error={errors.subjectKey}>
+            <option value="">Choose a subject…</option>
+            {subjects.map((s) => <option key={idOf(s)} value={keyOf(s)}>{s.name}{s.code ? ` (${s.code})` : ""}</option>)}
           </Field>
-          <Field label="Attendance units" type="number" inputMode="numeric" min="1" max="6" step="1" value={form.attendanceUnits} onChange={set("attendanceUnits")} error={errors.attendanceUnits} />
-          <Field as="select" label="Group (optional)" value={form.group} onChange={set("group")} hint="Leave on “Whole section” for everyone.">
-            <option value="">Whole section</option>
-            {(schedule?.groups || []).map((g) => <option key={g.key} value={g.key}>{g.label || g.key}</option>)}
-          </Field>
-          <Field label="Professor (optional)" value={form.professor} onChange={set("professor")} placeholder="Dr. Sharma" autoCapitalize="words" maxLength={80} />
-        </div>
 
-        <div>
-          <FormLabel
-            right={creating && (
-              <button type="button" onClick={addSlot} className="h-9 px-2 text-[13px] text-indigo-600 font-medium hover:underline flex items-center gap-1">
-                <Plus className="w-3.5 h-3.5" />Add another slot
-              </button>
-            )}
-          >
-            {creating ? `Time slots (${slots.length})` : "Time slot"}
-          </FormLabel>
-
-          <div className="space-y-3">
-            {slots.map((s, i) => (
-              <div key={i} className="rounded-2xl bg-white/60 border border-white/80 p-3 sm:p-4">
-                <div className="flex items-center justify-between mb-2 min-h-8">
-                  <span className="text-[13px] font-semibold text-[#161827]">{creating && slots.length > 1 ? `Slot ${i + 1}` : isMakeup ? "Makeup class" : "Weekly class"}</span>
-                  {creating && slots.length > 1 && (
-                    <button type="button" onClick={() => removeSlot(i)} aria-label={`Remove slot ${i + 1}`} className="w-10 h-10 -mr-2 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-50">
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {isMakeup ? (
-                    <Field label="Date" type="date" value={s.date} onChange={setSlot(i, "date")} error={errors[`${i}.date`]} className="col-span-2 sm:col-span-1" />
-                  ) : (
-                    <Field as="select" label="Day" value={s.weekday} onChange={setSlot(i, "weekday")} className="col-span-2 sm:col-span-1">
-                      {ORDER.map((d) => <option key={d} value={d}>{WEEKDAYS[d]}</option>)}
-                    </Field>
-                  )}
-                  <Field label="Start" type="time" value={s.startTime} onChange={setSlot(i, "startTime")} error={errors[`${i}.startTime`]} />
-                  <Field label="End" type="time" value={s.endTime} onChange={setSlot(i, "endTime")} error={errors[`${i}.endTime`]} />
-                  <Field as="select" label="Type" value={s.classType} onChange={setSlot(i, "classType")}>
-                    {CLASS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </Field>
-                  <Field label="Room (optional)" value={s.room} onChange={setSlot(i, "room")} placeholder="LH-201" maxLength={30} />
-                </div>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 @md:grid-cols-2 gap-4 min-w-0">
+            <Field as="select" label="Kind" value={form.entryType} onChange={set("entryType")} disabled={!creating} hint={!creating ? "To change this, withdraw the class and add a new one." : undefined}>
+              <option value="weekly">Weekly class</option>
+              <option value="makeup">Makeup class (one day)</option>
+            </Field>
+            <Field label="Attendance units" type="number" inputMode="numeric" min="1" max="6" step="1" value={form.attendanceUnits} onChange={set("attendanceUnits")} error={errors.attendanceUnits} />
+            <Field as="select" label="Group (optional)" value={form.group} onChange={set("group")} hint="Leave on “Whole section” for everyone.">
+              <option value="">Whole section</option>
+              {(schedule?.groups || []).map((g) => <option key={g.key} value={g.key}>{g.label || g.key}</option>)}
+            </Field>
+            <Field label="Professor (optional)" value={form.professor} onChange={set("professor")} placeholder="Dr. Sharma" autoCapitalize="words" maxLength={80} />
           </div>
-        </div>
 
-        <Field label="Note for the history (optional)" value={form.note} onChange={set("note")} maxLength={200} />
+          <div className="min-w-0">
+            <FormLabel
+              right={creating && (
+                <button type="button" onClick={addSlot} className={cx("min-h-11 sm:min-h-9 px-2 text-[13px] text-indigo-600 font-medium hover:underline flex items-center gap-1 rounded-lg", FOCUS)}>
+                  <Plus className="w-3.5 h-3.5" aria-hidden="true" />Add another slot
+                </button>
+              )}
+            >
+              {creating ? `Time slots (${slots.length})` : "Time slot"}
+            </FormLabel>
+
+            <div className="space-y-3">
+              {slots.map((s, i) => (
+                <div key={i} className="@container rounded-xl bg-[color:var(--inset)] p-3 sm:p-4 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-2 min-h-8">
+                    <span className="text-[13px] font-semibold text-[color:var(--ink)]">{creating && slots.length > 1 ? `Slot ${i + 1}` : isMakeup ? "Makeup class" : "Weekly class"}</span>
+                    {creating && slots.length > 1 && (
+                      <button type="button" onClick={() => removeSlot(i)} aria-label={`Remove slot ${i + 1}`} className={cx("w-11 h-11 sm:w-10 sm:h-10 -mr-2 rounded-xl flex items-center justify-center text-rose-600 hover:bg-rose-50", FOCUS)}>
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 @md:grid-cols-3 gap-3 min-w-0">
+                    <div className="col-span-2 @md:col-span-1 min-w-0">
+                      {isMakeup ? (
+                        <Field label="Date" type="date" value={s.date} onChange={setSlot(i, "date")} error={errors[`${i}.date`]} />
+                      ) : (
+                        <Field as="select" label="Day" value={s.weekday} onChange={setSlot(i, "weekday")}>
+                          {ORDER.map((d) => <option key={d} value={d}>{WEEKDAYS[d]}</option>)}
+                        </Field>
+                      )}
+                    </div>
+                    <Field label="Start" type="time" value={s.startTime} onChange={setSlot(i, "startTime")} error={errors[`${i}.startTime`]} />
+                    <Field label="End" type="time" value={s.endTime} onChange={setSlot(i, "endTime")} error={errors[`${i}.endTime`]} />
+                    <Field as="select" label="Type" value={s.classType} onChange={setSlot(i, "classType")}>
+                      {CLASS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </Field>
+                    <div className="col-span-2 min-w-0">
+                      <Field label="Room (optional)" value={s.room} onChange={setSlot(i, "room")} placeholder="LH-201" maxLength={30} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Field label="Note for the history (optional)" value={form.note} onChange={set("note")} maxLength={200} />
+        </div>
       </FormModal>
       {noteDialog}
     </div>

@@ -33,15 +33,15 @@ const SectionTitle = ({ icon: Icon, title, text, tone = "indigo" }) => (
   <div className="flex items-start gap-3.5 mb-5">
     <span
       className={cx(
-        "w-11 h-11 rounded-2xl flex items-center justify-center shrink-0",
-        tone === "rose" ? "bg-rose-500/10 text-rose-600" : "bg-indigo-500/10 text-indigo-600"
+        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+        tone === "rose" ? "bg-rose-50 text-rose-600" : "bg-indigo-50 text-indigo-600"
       )}
     >
-      <Icon className="w-5 h-5" />
+      <Icon className="w-5 h-5" aria-hidden="true" />
     </span>
     <div>
-      <h2 className="text-[17px] font-semibold text-[#161827]">{title}</h2>
-      {text && <p className="text-[13.5px] text-[#6A6F85] mt-0.5">{text}</p>}
+      <h2 className="text-[16px] sm:text-[17px] font-semibold text-[color:var(--ink)]">{title}</h2>
+      {text && <p className="text-[13.5px] text-[color:var(--muted)] mt-0.5">{text}</p>}
     </div>
   </div>
 );
@@ -131,9 +131,9 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
   const impactRows = impact ? Object.entries(impact).filter(([, v]) => ["number", "boolean"].includes(typeof v)) : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* ---------- details ---------- */}
-      <Card className="p-6 sm:p-7">
+      <Card className="p-5 sm:p-7">
         <SectionTitle
           icon={SlidersHorizontal}
           title="Setup details"
@@ -142,8 +142,8 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
 
         <div className="space-y-4">
           {setup.officialScheduleId && !readOnly && (
-            <div className="flex items-start gap-3 rounded-2xl bg-indigo-500/8 border border-indigo-200/70 px-4 py-3 text-[13.5px] text-[#2F3FA3]">
-              <Lock className="w-4 h-4 mt-0.5 shrink-0" />
+            <div className="flex items-start gap-3 rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3 text-[13.5px] text-indigo-900">
+              <Lock className="w-4 h-4 mt-0.5 shrink-0 text-indigo-600" aria-hidden="true" />
               <p>
                 This setup follows your CR&apos;s official schedule, so branch, section, semester and year are locked. You can still rename it or change dates,
                 timezone and your target. Changing the locked ones means leaving the schedule first.
@@ -153,7 +153,7 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
 
           <Alert type="error">{error}</Alert>
           {saved && (
-            <div role="status" className="oc-fade-up rounded-2xl border border-emerald-200 bg-emerald-50/85 text-emerald-800 px-4 py-3 text-[13.5px]">
+            <div role="status" className="oc-fade-up rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-3 text-[13.5px]">
               Changes saved.
             </div>
           )}
@@ -179,29 +179,30 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
       </Card>
 
       {/* ---------- danger zone (collapsed by default) ---------- */}
-      <Card className="p-0 overflow-hidden border-rose-200/80">
+      <Card className="p-0 overflow-hidden !border-rose-200">
         <button
           type="button"
           onClick={() => setDangerOpen((v) => !v)}
           aria-expanded={dangerOpen}
-          className="w-full flex items-center justify-between gap-3 px-6 sm:px-7 py-5 text-left hover:bg-rose-50/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60 focus-visible:ring-inset"
+          aria-controls="danger-zone"
+          className="w-full flex items-center justify-between gap-3 px-5 sm:px-7 py-4 sm:py-5 text-left hover:bg-rose-50/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-inset"
         >
           <span className="flex items-center gap-3.5">
-            <span className="w-11 h-11 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-5 h-5" />
+            <span className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5" aria-hidden="true" />
             </span>
             <span>
-              <span className="block text-[17px] font-semibold text-[#161827]">Danger zone</span>
-              <span className="block text-[13.5px] text-[#6A6F85]">Delete this setup permanently</span>
+              <span className="block text-[16px] sm:text-[17px] font-semibold text-[color:var(--ink)]">Danger zone</span>
+              <span className="block text-[13.5px] text-[color:var(--muted)]">Delete this setup permanently</span>
             </span>
           </span>
-          <ChevronDown className={cx("w-5 h-5 text-[#6A6F85] transition-transform duration-300", dangerOpen && "rotate-180")} />
+          <ChevronDown className={cx("w-5 h-5 shrink-0 text-[color:var(--muted)] transition-transform duration-300 motion-reduce:transition-none", dangerOpen && "rotate-180")} aria-hidden="true" />
         </button>
 
         {dangerOpen && (
           <FadeIn>
-            <div className="px-6 sm:px-7 pb-7 pt-1 border-t border-rose-100">
-              <p className="text-[13.5px] text-[#6A6F85] mt-4 mb-4">
+            <div id="danger-zone" className="px-5 sm:px-7 pb-6 sm:pb-7 pt-1 border-t border-rose-100">
+              <p className="text-[13.5px] text-[color:var(--muted)] mt-4 mb-4">
                 This removes the setup and everything inside it. It cannot be undone. If you only want it out of the way, archive it from the Setups page instead.
               </p>
 
@@ -212,9 +213,9 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
               {impactRows.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
                   {impactRows.map(([k, v]) => (
-                    <div key={k} className="rounded-2xl bg-white/60 border border-white/80 px-3.5 py-2.5">
-                      <p className="text-[18px] font-semibold text-[#161827] leading-none">{typeof v === "boolean" ? (v ? "Yes" : "No") : v}</p>
-                      <p className="text-[11.5px] text-[#6A6F85] mt-1">{pretty(k)}</p>
+                    <div key={k} className="rounded-xl bg-[color:var(--inset)] px-3.5 py-2.5">
+                      <p className="text-[18px] font-semibold text-[color:var(--ink)] leading-none tabular-nums">{typeof v === "boolean" ? (v ? "Yes" : "No") : v}</p>
+                      <p className="text-[11.5px] text-[color:var(--muted)] mt-1">{pretty(k)}</p>
                     </div>
                   ))}
                 </div>
@@ -222,13 +223,13 @@ const SettingsTab = ({ setup, onUpdated, readOnly }) => {
 
               <div className="space-y-4 max-w-md">
                 {published && (
-                  <fieldset className="space-y-2.5 rounded-2xl bg-amber-500/10 border border-amber-300/60 p-4">
-                    <legend className="px-1 text-[13px] font-semibold text-[#161827]">This setup is published for classmates. What should happen to the listing?</legend>
-                    <label className="flex items-start gap-2.5 text-[13.5px] text-[#161827] cursor-pointer">
+                  <fieldset className="space-y-2.5 rounded-xl bg-amber-50 border border-amber-200 p-4">
+                    <legend className="px-1 text-[13px] font-semibold text-[color:var(--ink)]">This setup is published for classmates. What should happen to the listing?</legend>
+                    <label className="flex items-start gap-2.5 text-[13.5px] text-[color:var(--ink)] cursor-pointer">
                       <input type="radio" name="alsoUnpublish" checked={alsoUnpublish === true} onChange={() => setAlsoUnpublish(true)} className="mt-0.5 accent-indigo-600" />
                       <span>Take the listing down (copies people already made keep working)</span>
                     </label>
-                    <label className="flex items-start gap-2.5 text-[13.5px] text-[#161827] cursor-pointer">
+                    <label className="flex items-start gap-2.5 text-[13.5px] text-[color:var(--ink)] cursor-pointer">
                       <input type="radio" name="alsoUnpublish" checked={alsoUnpublish === false} onChange={() => setAlsoUnpublish(false)} className="mt-0.5 accent-indigo-600" />
                       <span>Keep it listed (it can no longer be refreshed)</span>
                     </label>

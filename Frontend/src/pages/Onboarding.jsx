@@ -14,16 +14,16 @@ const STEPS = [
 
 // Step tracker: a progress bar with "Step X of Y" on phones, numbered dots with labels from sm up.
 const Progress = ({ step }) => (
-  <nav aria-label="Setup progress" className="mb-6 sm:mb-8">
+  <nav aria-label="Setup progress" className="mb-5 sm:mb-6">
     {/* phones */}
     <div className="sm:hidden">
       <div className="flex items-center justify-between text-[13px]">
-        <span className="font-semibold text-[#161827]">{STEPS[step].title}</span>
-        <span className="text-[#6A6F85]">Step {step + 1} of {STEPS.length}</span>
+        <span className="font-semibold text-[color:var(--ink)]">{STEPS[step].title}</span>
+        <span className="text-[color:var(--muted)] tabular-nums">Step {step + 1} of {STEPS.length}</span>
       </div>
       <div className="flex gap-1.5 mt-2" aria-hidden="true">
         {STEPS.map((s, i) => (
-          <span key={s.title} className={cx("h-1.5 flex-1 rounded-full transition-colors", i <= step ? "bg-gradient-to-r from-[#5B52EE] to-[#2B8DE0]" : "bg-[#161827]/10")} />
+          <span key={s.title} className={cx("h-1.5 flex-1 rounded-full transition-colors", i <= step ? "bg-[#4F46E5]" : "bg-[color:var(--track)]")} />
         ))}
       </div>
     </div>
@@ -34,14 +34,14 @@ const Progress = ({ step }) => (
         <li key={s.title} className="flex items-center gap-2 text-[13.5px] font-medium" aria-current={i === step ? "step" : undefined}>
           <span
             className={cx(
-              "w-7 h-7 rounded-full flex items-center justify-center text-[12px]",
-              i < step ? "bg-emerald-500 text-white" : i === step ? "bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] text-white" : "bg-white/70 text-[#6A6F85] border border-white"
+              "w-7 h-7 rounded-full flex items-center justify-center text-[12px] tabular-nums",
+              i < step ? "bg-emerald-500 text-white" : i === step ? "bg-[#4F46E5] text-white" : "bg-[color:var(--surface)] text-[color:var(--muted)] border border-[color:var(--line)]"
             )}
           >
             {i < step ? <Check className="w-4 h-4" aria-hidden="true" /> : i + 1}
           </span>
-          <span className={i === step ? "text-[#161827]" : "text-[#6A6F85]"}>{s.title}</span>
-          {i < STEPS.length - 1 && <span className="w-8 h-px bg-[#161827]/15 mx-1" aria-hidden="true" />}
+          <span className={i === step ? "text-[color:var(--ink)]" : "text-[color:var(--muted)]"}>{s.title}</span>
+          {i < STEPS.length - 1 && <span className="w-8 h-px bg-[color:var(--line)] mx-1" aria-hidden="true" />}
         </li>
       ))}
     </ol>
@@ -89,11 +89,11 @@ const Onboarding = () => {
   const finish = () => navigate("/dashboard", { replace: true });
 
   return (
-    <div className="max-w-3xl mx-auto px-3 sm:px-4 py-6 sm:py-10">
+    <div className="max-w-3xl mx-auto px-3 min-[380px]:px-3.5 sm:px-6 py-6 sm:py-10">
       {returning && step === 0 && (
         <Link
           to="/setups"
-          className="inline-flex items-center gap-1.5 mb-4 text-[13.5px] font-medium text-[#6A6F85] hover:text-[#161827] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 rounded-full"
+          className="inline-flex items-center gap-1.5 h-9 mb-3 text-[13.5px] font-medium text-[color:var(--muted)] hover:text-[color:var(--ink)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 rounded-lg"
         >
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />Back to setups
         </Link>
@@ -111,7 +111,7 @@ const Onboarding = () => {
       <Progress step={step} />
 
       {step === 0 && (
-        <Card className="p-4 sm:p-7">
+        <Card className="p-3.5 min-[380px]:p-4 sm:p-6">
           <Alert type="error" className="mb-4">{error}</Alert>
           <SetupForm
             initial={{ branch: user?.branch, section: user?.section }}
@@ -124,13 +124,12 @@ const Onboarding = () => {
       )}
 
       {step === 1 && (
-        
-        <div className="space-y-5 sm:space-y-6">
+        <div className="space-y-2.5 sm:space-y-4">
           <OfficialJoin setupId={setupId} onJoined={finish} autoContinue />
           <Alert type="success">Your setup is ready. Next, add your classes.</Alert>
           <OfficialJoin setupId={setupId} onJoined={finish} />
-          <div className="border-t border-white/70 pt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <p className="text-[13px] text-[#6A6F85]">No schedule for your class? You can add subjects and classes yourself.</p>
+          <div className="border-t border-[color:var(--line)] pt-4 sm:pt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-[13px] text-[color:var(--muted)]">No schedule for your class? You can add subjects and classes yourself.</p>
             <Button variant="glass" className="w-full sm:w-auto" onClick={finish}>
               Skip for now
             </Button>

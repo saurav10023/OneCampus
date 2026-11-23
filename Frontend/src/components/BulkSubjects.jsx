@@ -46,10 +46,11 @@ export const parseSubjects = (text) =>
       return { name: nameBits.join(" ").trim(), code: code.toUpperCase(), credits };
     });
 
+// min-w-0 lets inputs shrink inside flex and grid rows instead of pushing their neighbours
 const inputCls =
-  "h-11 w-full rounded-xl bg-white/70 border border-white/90 shadow-[inset_0_1px_0_#fff] px-3 " +
-  "text-[16px] sm:text-[14px] text-[#161827] placeholder:text-[#6A6F85]/60 " +
-  "focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:bg-white disabled:opacity-60";
+  "h-11 w-full min-w-0 rounded-xl bg-[color:var(--surface)] border border-[color:var(--line)] px-3 " +
+  "text-[16px] sm:text-[14px] text-[color:var(--ink)] placeholder:text-[color:var(--faint)] hover:border-[color:var(--line-strong)] " +
+  "focus:outline-none focus:border-[color:var(--ring)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--ring)_25%,transparent)] disabled:bg-[color:var(--inset)] disabled:opacity-60";
 
 const BulkSubjects = ({ open, onClose, existing = [], createOne, onDone, withCredits = false, maxTotal, activeCount = 0 }) => {
   const [text, setText] = useState("");
@@ -141,11 +142,11 @@ const BulkSubjects = ({ open, onClose, existing = [], createOne, onDone, withCre
 
   return (
     <Modal open={open} onClose={() => !saving && onClose()} title="Add many subjects">
-      <div className="space-y-5">
+      <div className="@container space-y-5 min-w-0">
         <Alert type="error">{error}</Alert>
 
         <div>
-          <label htmlFor="bulk-paste" className="block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6A6F85] mb-1.5 px-1">
+          <label htmlFor="bulk-paste" className="block text-[13px] font-medium text-[color:var(--body)] mb-1.5 px-1">
             Paste or type your subjects
           </label>
           <textarea
@@ -159,10 +160,10 @@ const BulkSubjects = ({ open, onClose, existing = [], createOne, onDone, withCre
             autoCapitalize="words"
           />
           <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
-            <p className="text-[12.5px] text-[#6A6F85] px-1">
+            <p className="text-[12.5px] text-[color:var(--muted)] px-1 min-w-0 flex-1 basis-48">
               One subject per line. A code{withCredits ? " and credits" : ""} after a comma or dash is picked up for you.
             </p>
-            <Button type="button" size="sm" variant="glass" onClick={addFromText} disabled={saving || !text.trim()}>
+            <Button type="button" size="sm" variant="glass" onClick={addFromText} disabled={saving || !text.trim()} className="shrink-0">
               <ListPlus className="w-4 h-4" />Add to list
             </Button>
           </div>
@@ -170,39 +171,39 @@ const BulkSubjects = ({ open, onClose, existing = [], createOne, onDone, withCre
 
         {rows.length > 0 && (
           <div className="space-y-2.5">
-            <p className="text-[13px] font-semibold text-[#161827] px-1">
+            <p className="text-[14px] font-semibold text-[color:var(--ink)] px-1 tabular-nums">
               {rows.length} to add
-              {skipped > 0 && <span className="font-normal text-[#A32A42]"> ({skipped} need a fix)</span>}
+              {skipped > 0 && <span className="font-normal text-[color:var(--bad-fg)]"> ({skipped} need a fix)</span>}
             </p>
 
             <ul className="space-y-2.5 max-h-[42vh] overflow-y-auto pr-1">
               {rows.map((r, i) => {
                 const msg = issues[r.id] || r.serverError;
                 return (
-                  <li key={r.id} className={cx("rounded-2xl border p-2.5 bg-white/50", msg ? "border-[#F3B8C2]" : "border-white/90")}>
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 text-center text-[12px] text-[#6A6F85] shrink-0" aria-hidden="true">{i + 1}</span>
+                  <li key={r.id} className={cx("rounded-xl p-2.5 min-w-0", msg ? "bg-[color:var(--bad-bg)] border border-[color:var(--bad-line)]" : "bg-[color:var(--inset)]")}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-6 text-center text-[12px] text-[color:var(--muted)] shrink-0 tabular-nums" aria-hidden="true">{i + 1}</span>
                       <input value={r.name} onChange={edit(r.id, "name")} disabled={saving} placeholder="Subject name" aria-label={`Subject ${i + 1} name`} maxLength={80} className={inputCls} />
                       <button
                         type="button"
                         onClick={() => removeRow(r.id)}
                         disabled={saving}
                         aria-label={`Remove subject ${i + 1}`}
-                        className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-[#6A6F85] hover:bg-white hover:text-rose-600 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
+                        className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-[color:var(--muted)] hover:bg-[color:var(--surface)] hover:text-[color:var(--bad-icon)] transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-1"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                    <div className={cx("grid gap-2 mt-2 pl-8", withCredits ? "grid-cols-[1fr_5.5rem]" : "grid-cols-1")}>
+                    <div className={cx("grid gap-2 mt-2 pl-8 min-w-0", withCredits ? "grid-cols-1 @sm:grid-cols-[minmax(0,1fr)_6rem]" : "grid-cols-1")}>
                       <input value={r.code} onChange={edit(r.id, "code")} disabled={saving} placeholder="Code (optional)" aria-label={`Subject ${i + 1} code`} maxLength={20} autoCapitalize="characters" className={inputCls} />
                       {withCredits && (
                         <input type="number" min="0" max="30" value={r.credits} onChange={edit(r.id, "credits")} disabled={saving} placeholder="Credits" aria-label={`Subject ${i + 1} credits`} className={inputCls} />
                       )}
                     </div>
                     {msg && (
-                      <p className="flex items-start gap-1.5 text-[12.5px] text-[#A32A42] mt-2 pl-8" role="alert">
+                      <p className="flex items-start gap-1.5 text-[12.5px] text-[color:var(--bad-fg)] mt-2 pl-8" role="alert">
                         <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
-                        {msg}
+                        <span className="min-w-0">{msg}</span>
                       </p>
                     )}
                   </li>
@@ -218,14 +219,14 @@ const BulkSubjects = ({ open, onClose, existing = [], createOne, onDone, withCre
           </Alert>
         )}
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" loading={saving} disabled={!valid.length || overLimit} onClick={saveAll}>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+          <Button type="button" loading={saving} disabled={!valid.length || overLimit} onClick={saveAll} className="w-full sm:w-auto">
             {saving ? "Adding..." : valid.length ? `Add ${valid.length} subject${valid.length === 1 ? "" : "s"}` : "Add subjects"}
           </Button>
-          <Button type="button" variant="glass" disabled={saving || rows.length >= MAX_ROWS} onClick={addBlank}>
+          <Button type="button" variant="glass" disabled={saving || rows.length >= MAX_ROWS} onClick={addBlank} className="w-full sm:w-auto">
             <Plus className="w-4 h-4" />Add a row
           </Button>
-          <Button type="button" variant="glass" disabled={saving} onClick={onClose}>Close</Button>
+          <Button type="button" variant="glass" disabled={saving} onClick={onClose} className="w-full sm:w-auto">Close</Button>
         </div>
       </div>
     </Modal>

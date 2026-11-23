@@ -124,18 +124,18 @@ export const plural = (n, word) => `${n} ${n === 1 ? word : /(s|x|ch|sh)$/.test(
 
 // Shared tone classes so the page and the planner always match.
 export const toneText = {
-  ink: "text-[#161827]",
+  ink: "text-[color:var(--ink)]",
   green: "text-emerald-600",
   amber: "text-amber-600",
   red: "text-rose-600",
-  neutral: "text-[#6A6F85]",
+  neutral: "text-[color:var(--muted)]",
 };
 
 export const toneBox = {
   green: "bg-emerald-500/10 border-emerald-200 text-emerald-800",
   amber: "bg-amber-500/10 border-amber-200 text-amber-800",
   red: "bg-rose-500/10 border-rose-200 text-rose-800",
-  neutral: "bg-white/60 border-white/80 text-[#444A63]",
+  neutral: "bg-[color-mix(in_srgb,var(--surface)_60%,transparent)] border-white/80 text-[color:var(--body)]",
 };
 
 export const toneDot = {

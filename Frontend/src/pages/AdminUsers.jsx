@@ -17,8 +17,11 @@ const scheduleRoleText = (r) => {
   return `${kind}${scope}${isActiveRole(r) ? "" : " (pending)"}`;
 };
 
-const selectCls =
-  "h-10 rounded-xl border border-[#E3E5EF] bg-white px-3 text-[14px] text-[#161827] outline-none focus:border-[#5B52EE]";
+// Flat theme: white input, hairline border, 12px radius, indigo focus ring.
+// 16px text on phones (stops iOS zoom), 14px from sm.
+const fieldCls =
+  "h-11 rounded-xl border border-[color:var(--line)] bg-[color:var(--surface)] px-3 text-[16px] sm:text-[14px] text-[color:var(--ink)] outline-none transition-colors " +
+  "hover:border-[color:var(--line-strong)] focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/25 disabled:bg-[color:var(--inset)] disabled:opacity-60";
 
 const copyText = async (text) => {
   try {
@@ -189,46 +192,59 @@ const AdminUsers = () => {
     : [];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10">
+    <div className="max-w-6xl xl:max-w-7xl mx-auto px-3 min-[380px]:px-3.5 sm:px-6 py-6 sm:py-10">
       <PageHeader title="Manage users" subtitle="Search accounts, change roles, reset passwords and control access." />
 
-      <div className="space-y-6">
+      <div className="space-y-2.5 sm:space-y-4">
         {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-4">
             {statCards.map(([label, value]) => (
-              <Card key={label} className="p-4">
-                <p className="text-[12.5px] text-[#6A6F85]">{label}</p>
-                <p className="text-[24px] font-semibold text-[#161827] leading-tight">{value}</p>
+              <Card key={label} className="p-3.5 min-[380px]:p-4 sm:p-5">
+                <p className="text-[12.5px] text-[color:var(--muted)]">{label}</p>
+                <p className="mt-0.5 text-[24px] font-semibold text-[color:var(--ink)] leading-tight tabular-nums">{value}</p>
               </Card>
             ))}
           </div>
         )}
 
-        <Card className="p-4 space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
+        <Card className="p-3.5 min-[380px]:p-4 sm:p-5 space-y-4">
+          {/* filters */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             <div className="relative flex-1 min-w-[220px]">
-              <Search className="w-4 h-4 text-[#9AA0B8] absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-[color:var(--faint)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search name, username, mobile, email or roll no"
-                className={`${selectCls} w-full pl-9`}
+                aria-label="Search users"
+                className={`${fieldCls} w-full pl-9`}
               />
             </div>
-            <select value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }} className={selectCls}>
+            <select
+              value={role}
+              onChange={(e) => { setRole(e.target.value); setPage(1); }}
+              aria-label="Filter by role"
+              className={fieldCls}
+            >
               <option value="">All roles</option>
               {ROLES.map((r) => (
                 <option key={r} value={r}>{roleLabel[r]}</option>
               ))}
             </select>
-            <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectCls}>
+            <select
+              value={status}
+              onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+              aria-label="Filter by status"
+              className={fieldCls}
+            >
               <option value="">Any status</option>
               <option value="true">Active</option>
               <option value="false">Inactive</option>
             </select>
-            <label className="flex items-center gap-2 text-[14px] text-[#444A63] select-none">
+            <label className="flex items-center gap-2 min-h-[44px] sm:min-h-0 text-[14px] text-[color:var(--body)] select-none cursor-pointer">
               <input
                 type="checkbox"
+                className="w-4 h-4 rounded accent-[#4F46E5] focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1"
                 checked={deleted}
                 onChange={(e) => { setDeleted(e.target.checked); setPage(1); }}
               />
@@ -238,16 +254,17 @@ const AdminUsers = () => {
 
           <Alert type={flash.type || "info"}>{flash.text}</Alert>
 
+          {/* table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[14px]">
               <thead>
-                <tr className="text-[12.5px] uppercase tracking-wide text-[#6A6F85] border-b border-[#EEF0F6]">
-                  <th className="py-2 pr-3 font-medium">User</th>
-                  <th className="py-2 pr-3 font-medium">Class</th>
-                  <th className="py-2 pr-3 font-medium">Role</th>
-                  <th className="py-2 pr-3 font-medium">Status</th>
-                  <th className="py-2 pr-3 font-medium">Last login</th>
-                  <th className="py-2 font-medium text-right">Actions</th>
+                <tr className="text-[12.5px] text-[color:var(--muted)] border-b border-[color:var(--line-soft)]">
+                  <th className="py-2.5 pr-3 font-medium">User</th>
+                  <th className="py-2.5 pr-3 font-medium">Class</th>
+                  <th className="py-2.5 pr-3 font-medium">Role</th>
+                  <th className="py-2.5 pr-3 font-medium">Status</th>
+                  <th className="py-2.5 pr-3 font-medium">Last login</th>
+                  <th className="py-2.5 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -256,25 +273,25 @@ const AdminUsers = () => {
                   const protectedAdmin = u.role === "admin" && !self;
                   const rowBusy = busy.endsWith(`-${u.username}`);
                   return (
-                    <tr key={u._id || u.username} className="border-b border-[#F3F4F9] align-middle">
+                    <tr key={u._id || u.username} className="border-b border-[color:var(--line-soft)] last:border-0 align-middle hover:bg-[#F5F6FA]/60 transition-colors">
                       <td className="py-3 pr-3">
                         <div className="flex items-center gap-3 min-w-[200px]">
                           {typeof u.avatar === "string" && u.avatar ? (
                             <img src={u.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
                           ) : (
-                            <span className="w-9 h-9 rounded-full bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] text-white text-[14px] font-semibold flex items-center justify-center uppercase">
+                            <span className="w-9 h-9 rounded-full bg-[#4F46E5] text-white text-[14px] font-semibold flex items-center justify-center uppercase">
                               {(u.fullName || u.username || "?").charAt(0)}
                             </span>
                           )}
                           <div className="min-w-0">
-                            <p className="font-medium text-[#161827] truncate">{u.fullName}{self && " (you)"}</p>
-                            <p className="text-[12.5px] text-[#6A6F85] truncate">@{u.username} · {u.mobile}</p>
+                            <p className="font-medium text-[color:var(--ink)] truncate">{u.fullName}{self && " (you)"}</p>
+                            <p className="text-[12.5px] text-[color:var(--muted)] truncate tabular-nums">@{u.username} · {u.mobile}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 pr-3 text-[#444A63] whitespace-nowrap">
+                      <td className="py-3 pr-3 text-[color:var(--body)] whitespace-nowrap">
                         {u.branch} {u.section}
-                        {u.rollNo && <span className="block text-[12.5px] text-[#6A6F85]">{u.rollNo}</span>}
+                        {u.rollNo && <span className="block text-[12.5px] text-[color:var(--muted)] tabular-nums">{u.rollNo}</span>}
                       </td>
                       <td className="py-3 pr-3">
                         {u.isDeleted || self ? (
@@ -284,7 +301,8 @@ const AdminUsers = () => {
                             value={u.role}
                             disabled={rowBusy}
                             onChange={(e) => changeRole(u, e.target.value)}
-                            className={`${selectCls} h-9`}
+                            aria-label={`Role for ${u.username}`}
+                            className={`${fieldCls} h-9 rounded-lg`}
                           >
                             {ROLES.map((r) => (
                               <option key={r} value={r}>{roleLabel[r]}</option>
@@ -295,7 +313,7 @@ const AdminUsers = () => {
                         {(u.scheduleRoles || []).length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {u.scheduleRoles.map((r) => (
-                              <Badge key={r._id} tone={isActiveRole(r) ? "brand" : undefined}>
+                              <Badge key={r._id} tone={isActiveRole(r) ? "brand" : "amber"}>
                                 {scheduleRoleText(r)}
                               </Badge>
                             ))}
@@ -304,14 +322,14 @@ const AdminUsers = () => {
                       </td>
                       <td className="py-3 pr-3 whitespace-nowrap">
                         {u.isDeleted ? (
-                          <Badge>Deleted {u.deletedAt ? fmtDate(u.deletedAt) : ""}</Badge>
+                          <Badge tone="red">Deleted {u.deletedAt ? fmtDate(u.deletedAt) : ""}</Badge>
                         ) : u.isActive ? (
-                          <Badge tone="brand">Active</Badge>
+                          <Badge tone="green">Active</Badge>
                         ) : (
                           <Badge>Inactive</Badge>
                         )}
                       </td>
-                      <td className="py-3 pr-3 text-[#6A6F85] whitespace-nowrap">
+                      <td className="py-3 pr-3 text-[color:var(--muted)] whitespace-nowrap tabular-nums">
                         {u.lastLoginAt ? fmtDate(u.lastLoginAt) : "Never"}
                       </td>
                       <td className="py-3 text-right">
@@ -324,10 +342,10 @@ const AdminUsers = () => {
                             !self &&
                             !protectedAdmin && (
                               <>
-                                <Button variant="glass" disabled={rowBusy} onClick={() => openReset(u)} title="Reset password">
+                                <Button variant="glass" disabled={rowBusy} onClick={() => openReset(u)} title="Reset password" aria-label={`Reset password for ${u.username}`}>
                                   <KeyRound className="w-4 h-4" />
                                 </Button>
-                                <Button variant="glass" disabled={rowBusy} onClick={() => forceLogout(u)} title="Sign out everywhere">
+                                <Button variant="glass" disabled={rowBusy} onClick={() => forceLogout(u)} title="Sign out everywhere" aria-label={`Sign ${u.username} out everywhere`}>
                                   <LogOut className="w-4 h-4" />
                                 </Button>
                                 <Button
@@ -335,6 +353,7 @@ const AdminUsers = () => {
                                   disabled={rowBusy}
                                   onClick={() => toggleActive(u)}
                                   title={u.isActive ? "Deactivate" : "Activate"}
+                                  aria-label={`${u.isActive ? "Deactivate" : "Activate"} ${u.username}`}
                                 >
                                   {u.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                                 </Button>
@@ -346,18 +365,26 @@ const AdminUsers = () => {
                     </tr>
                   );
                 })}
-                {!loading && users.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="py-10 text-center text-[#6A6F85]">No users found.</td>
-                  </tr>
-                )}
               </tbody>
             </table>
-            {loading && <p className="py-6 text-center text-[#6A6F85]">Loading...</p>}
+
+            {!loading && users.length === 0 && (
+              <div className="mt-2 rounded-xl bg-[color:var(--inset)] py-10 text-center text-[14px] text-[color:var(--muted)]">
+                No users found.
+              </div>
+            )}
+            {loading && (
+              <div className="mt-2 space-y-2" role="status" aria-label="Loading users">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-14 rounded-xl bg-[color:var(--line-soft)]" />
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* pagination */}
           <div className="flex items-center justify-between gap-3 pt-1">
-            <p className="text-[13px] text-[#6A6F85]">
+            <p className="text-[13px] text-[color:var(--muted)] tabular-nums">
               {pagination.total} user{pagination.total === 1 ? "" : "s"} · page {pagination.page} of {pagination.totalPages}
             </p>
             <div className="flex gap-2">
@@ -379,7 +406,7 @@ const AdminUsers = () => {
               <>
                 <Alert type="success">Password reset. Share this temporary password with the user. It is not shown again.</Alert>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 rounded-xl bg-[#F3F4F9] px-3 py-2.5 text-[16px] tracking-wide text-[#161827] select-all">
+                  <code className="flex-1 rounded-xl bg-[color:var(--inset)] px-3 py-2.5 text-[16px] tracking-wide text-[color:var(--ink)] select-all">
                     {resetResult.temporaryPassword}
                   </code>
                   <Button
@@ -397,7 +424,7 @@ const AdminUsers = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-[14px] text-[#444A63]">
+            <p className="text-[14px] text-[color:var(--body)] leading-relaxed">
               Leave the field empty to generate a random temporary password. The user is signed out on all devices.
             </p>
             <Alert type="error">{resetError}</Alert>

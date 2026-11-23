@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Archive,
   BookOpen,
   CalendarClock,
   CalendarRange,
   ChevronRight,
-  FileText,
   Inbox,
-  Megaphone,
   Plus,
   RefreshCw,
   Rocket,
@@ -35,10 +32,11 @@ const statusLabel = { approved: "Approved", active: "Approved", pending: "Awaiti
 const roleName = { cr: "Class Representative", admin: "College Admin" };
 const schedTone = { published: "green", draft: "amber", archived: "neutral" };
 const schedLabel = { published: "Live", draft: "Draft", archived: "Archived" };
+// Thin solid status bar on top of a schedule card (colour always paired with the status badge).
 const schedAccent = {
-  published: "bg-gradient-to-r from-emerald-400 to-emerald-500",
-  draft: "bg-gradient-to-r from-amber-300 to-amber-500",
-  archived: "bg-[#161827]/20",
+  published: "bg-emerald-500",
+  draft: "bg-amber-500",
+  archived: "bg-[color:var(--line-strong)]",
 };
 const isApproved = (r) => r.status === "approved" || r.status === "active";
 
@@ -72,8 +70,8 @@ const STATUS_FILTERS = [
 
 const OWNER_FILTERS = [
   { key: "all", label: "Everyone" },
-  { key: "mine", label: "Created by me" },
-  { key: "others", label: "Created by classmates" },
+  { key: "mine", label: "Mine" },
+  { key: "others", label: "Classmates" },
 ];
 
 const SORTS = [
@@ -83,29 +81,30 @@ const SORTS = [
   { key: "name", label: "Branch and section" },
 ];
 
-const selectCls =
-  "h-10 rounded-full bg-white/70 border border-white/80 shadow-[inset_0_1px_0_#fff] px-3.5 text-[13.5px] text-[#161827] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400";
+const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1";
 
-const StatTile = ({ icon: Icon, value, label, tint }) => (
-  <div className="rounded-2xl bg-white/60 border border-white/80 shadow-[inset_0_1px_0_#fff] px-3 sm:px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
-    <span className={cx("w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0", tint)}>
-      <Icon className="w-[18px] h-[18px]" aria-hidden="true" />
-    </span>
-    <div className="min-w-0">
-      <p className="text-[22px] font-semibold text-[#161827] leading-none">{value}</p>
-      <p className="text-[12px] sm:text-[12.5px] text-[#6A6F85] mt-1 truncate">{label}</p>
-    </div>
-  </div>
+// Flat input: white, hairline border, 12px radius, 44px on phones. 16px text on phones, 14px from sm.
+const selectCls =
+  "h-11 sm:h-10 min-w-0 rounded-xl border border-[color:var(--line)] bg-[color:var(--surface)] px-3 text-[16px] sm:text-[14px] text-[color:var(--ink)] outline-none transition-colors " +
+  "hover:border-[color:var(--line-strong)] focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/25";
+
+// Compact status chip for the header: a coloured dot always comes with a text label.
+const StatChip = ({ dot, value, label }) => (
+  <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-[color:var(--surface)] border border-[color:var(--line)] text-[12.5px] text-[color:var(--body)] whitespace-nowrap">
+    <span className={cx("w-1.5 h-1.5 rounded-full", dot)} aria-hidden="true" />
+    <span className="font-semibold text-[color:var(--ink)] tabular-nums">{value}</span>
+    {label}
+  </span>
 );
 
 const SectionTitle = ({ icon: Icon, title, text, action }) => (
-  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3">
     <div className="min-w-0">
-      <h2 className="text-[17px] font-semibold text-[#161827] flex items-center gap-2">
-        {Icon && <Icon className="w-5 h-5 text-indigo-600 shrink-0" aria-hidden="true" />}
+      <h2 className="text-[16px] font-semibold text-[color:var(--ink)] flex items-center gap-2">
+        {Icon && <Icon className="w-[18px] h-[18px] text-[#4F46E5] shrink-0" aria-hidden="true" />}
         {title}
       </h2>
-      {text && <p className="text-[13px] text-[#6A6F85] mt-0.5">{text}</p>}
+      {text && <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5">{text}</p>}
     </div>
     {action}
   </div>
@@ -113,27 +112,27 @@ const SectionTitle = ({ icon: Icon, title, text, action }) => (
 
 // Small count shown on a schedule card: icon, number, label.
 const Count = ({ icon: Icon, value, label }) => (
-  <span className="flex items-center gap-1.5 text-[12.5px] text-[#444A63] min-w-0">
-    <Icon className="w-3.5 h-3.5 text-[#6A6F85] shrink-0" aria-hidden="true" />
-    <span className="font-semibold text-[#161827]">{value}</span>
-    <span className="text-[#6A6F85] truncate">{label}</span>
+  <span className="flex items-center gap-1.5 text-[12.5px] text-[color:var(--body)] min-w-0">
+    <Icon className="w-3.5 h-3.5 text-[color:var(--muted)] shrink-0" aria-hidden="true" />
+    <span className="font-semibold text-[color:var(--ink)] tabular-nums">{value}</span>
+    <span className="text-[color:var(--muted)] truncate">{label}</span>
   </span>
 );
 
+// Selected chip: solid indigo. Unselected: white with a hairline border.
 const FilterChip = ({ active, onClick, children, count }) => (
   <button
     type="button"
     onClick={onClick}
     aria-pressed={active}
     className={cx(
-      "h-9 px-3.5 rounded-full text-[13px] font-medium whitespace-nowrap transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
-      active
-        ? "text-white bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] shadow-md shadow-indigo-500/25"
-        : "text-[#161827]/70 bg-white/60 border border-white/80 hover:bg-white/80"
+      "h-10 sm:h-9 px-3.5 shrink-0 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors border motion-reduce:transition-none active:scale-[0.98]",
+      FOCUS,
+      active ? "bg-[#4F46E5] border-[#4F46E5] text-white" : "bg-[color:var(--surface)] border-[color:var(--line)] text-[color:var(--body)] hover:bg-[color:var(--inset)]"
     )}
   >
     {children}
-    {count !== undefined && <span className={cx("ml-1.5 text-[12px]", active ? "text-white/80" : "text-[#6A6F85]")}>{count}</span>}
+    {count !== undefined && <span className={cx("ml-1.5 text-[12px] tabular-nums", active ? "text-white/80" : "text-[color:var(--muted)]")}>{count}</span>}
   </button>
 );
 
@@ -537,27 +536,27 @@ const CRStudio = () => {
   if (loading) return <PageSpinner />;
 
   const requestsCard = isAdmin && (
-    <Card className="p-4 sm:p-6 mb-5 sm:mb-6">
+    <Card className="p-3.5 min-[380px]:p-4 sm:p-5 mb-2.5 sm:mb-4">
       <SectionTitle
         icon={Inbox}
         title="Role requests"
-        text="Students asking to publish schedules. Approve only people you know."
+        text="Approve only people you know."
         action={<Button size="sm" variant="glass" onClick={load}>Refresh</Button>}
       />
       <Alert type="error" className="mb-3">{reqLoadError}</Alert>
       {requests.length === 0 ? (
         !reqLoadError && (
-          <p className="rounded-2xl border border-dashed border-[#161827]/15 px-4 py-5 text-center text-[13.5px] text-[#6A6F85]">No requests are waiting for review.</p>
+          <p className="rounded-xl bg-[color:var(--inset)] px-4 py-4 text-center text-[13.5px] text-[color:var(--muted)]">No requests are waiting for review.</p>
         )
       ) : (
         <div className="space-y-2.5">
           {requests.map((r) => (
-            <div key={idOf(r)} className="rounded-2xl bg-white/60 border border-white/80 px-4 py-3.5">
-              <p className="text-[14.5px] font-semibold text-[#161827] break-words">
-                {who(r)} <span className="font-normal text-[#6A6F85]">wants to be</span> {roleName[r.role] || r.role}
+            <div key={idOf(r)} className="rounded-xl bg-[color:var(--inset)] px-4 py-3.5 min-w-0">
+              <p className="text-[14.5px] font-semibold text-[color:var(--ink)] break-words">
+                {who(r)} <span className="font-normal text-[color:var(--muted)]">wants to be</span> {roleName[r.role] || r.role}
               </p>
-              <p className="text-[12.5px] text-[#6A6F85] mt-0.5 break-words">{scopeOf(r)}</p>
-              {r.requestNote && <p className="text-[13px] text-[#444A63] mt-2 rounded-xl bg-white/70 px-3 py-2 break-words">“{r.requestNote}”</p>}
+              <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5 break-words">{scopeOf(r)}</p>
+              {r.requestNote && <p className="text-[13px] text-[color:var(--body)] mt-2 rounded-lg bg-[color:var(--surface)] border border-[color:var(--line-soft)] px-3 py-2 break-words">“{r.requestNote}”</p>}
               <div className="grid grid-cols-2 sm:flex gap-2 mt-3">
                 <Button size="sm" onClick={() => openDialog("approve", r)}>Approve</Button>
                 <Button size="sm" variant="glass" onClick={() => openDialog("reject", r)}>Reject</Button>
@@ -570,51 +569,37 @@ const CRStudio = () => {
   );
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-10">
-      {/* hero */}
-      <section className="relative overflow-hidden rounded-[28px] border border-white/80 bg-white/55 backdrop-blur-xl shadow-[inset_0_1px_0_#fff,0_28px_56px_-32px_rgba(30,32,70,0.4)] p-5 sm:p-8 mb-5 sm:mb-6">
-        <span aria-hidden="true" className="pointer-events-none absolute -top-24 -right-16 w-72 h-72 rounded-full bg-[#5B52EE]/25 blur-3xl" />
-        <span aria-hidden="true" className="pointer-events-none absolute -bottom-28 -left-16 w-72 h-72 rounded-full bg-[#2B8DE0]/20 blur-3xl" />
-        <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
-          <div className="max-w-xl">
-            <span className="inline-flex items-center gap-2 h-8 pl-2 pr-3.5 rounded-full bg-white/60 border border-white/80 shadow-[inset_0_1px_0_#fff] text-[12.5px] font-medium text-[#161827]/80">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-white bg-gradient-to-br from-[#4F46E5] to-[#0EA5E9]">
-                <Megaphone className="w-3 h-3" aria-hidden="true" />
-              </span>
-              For class representatives and college admins
-            </span>
-            <h1 className="text-[30px] sm:text-[40px] font-semibold tracking-tight text-[#161827] leading-[1.08] mt-4">CR Studio</h1>
-            <p className="text-[14.5px] sm:text-[15.5px] leading-relaxed text-[#444A63] mt-2">
-              Publish your class's official timetable once. Every change you make reaches the students who joined, automatically.
-            </p>
-          </div>
+    <div className="max-w-6xl xl:max-w-7xl mx-auto px-3 min-[380px]:px-3.5 sm:px-6 py-4 sm:py-6">
+      {/* compact header: one row of title, live counts and actions */}
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 mb-3 sm:mb-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
+          <h1 className="text-[22px] sm:text-[26px] font-semibold tracking-tight text-[color:var(--ink)] leading-tight">CR Studio</h1>
           {canManage && (
-            <div className="flex gap-2 w-full sm:w-auto shrink-0">
-              <Button variant="glass" onClick={refresh} disabled={refreshing} className="!h-12 px-4" aria-label="Refresh schedules">
-                <RefreshCw className={cx("w-4 h-4", refreshing && "animate-spin motion-reduce:animate-none")} />
-              </Button>
-              <Button onClick={openNew} className="flex-1 sm:flex-none !h-12 px-6">
-                <Plus className="w-4 h-4" />
-                New schedule
-              </Button>
+            <div className="flex flex-wrap items-center gap-1.5" aria-label="Summary">
+              <StatChip dot="bg-emerald-500" value={live} label="Live" />
+              <StatChip dot="bg-amber-500" value={drafts} label="Drafts" />
+              {isAdmin ? (
+                <StatChip dot="bg-indigo-500" value={requests.length} label="Requests" />
+              ) : (
+                <StatChip dot="bg-[color:var(--faint)]" value={archivedCount} label="Archived" />
+              )}
             </div>
           )}
         </div>
-
         {canManage && (
-          <div className="relative grid grid-cols-3 gap-2 sm:gap-4 mt-6">
-            <StatTile icon={Rocket} value={live} label="Live" tint="bg-emerald-500/12 text-emerald-600" />
-            <StatTile icon={FileText} value={drafts} label="Drafts" tint="bg-amber-500/15 text-amber-600" />
-            {isAdmin ? (
-              <StatTile icon={Inbox} value={requests.length} label="Requests" tint="bg-indigo-500/12 text-indigo-600" />
-            ) : (
-              <StatTile icon={Archive} value={archivedCount} label="Archived" tint="bg-[#161827]/8 text-[#6A6F85]" />
-            )}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="glass" size="sm" onClick={refresh} disabled={refreshing} className="!h-10 !w-10 !px-0" aria-label="Refresh schedules">
+              <RefreshCw className={cx("w-4 h-4", refreshing && "animate-spin motion-reduce:animate-none")} />
+            </Button>
+            <Button size="sm" onClick={openNew} className="!h-10 px-4">
+              <Plus className="w-4 h-4" />
+              New schedule
+            </Button>
           </div>
         )}
-      </section>
+      </header>
 
-      <Alert type="error" className="mb-5">{error}</Alert>
+      <Alert type="error" className="mb-2.5 sm:mb-4">{error}</Alert>
 
       {/* admins see waiting requests (or a load error) first: it is the thing that needs action */}
       {(requests.length > 0 || reqLoadError) && requestsCard}
@@ -624,16 +609,15 @@ const CRStudio = () => {
         (schedules.length === 0 ? (
           // When loading failed, the error alert above explains it. Never claim "no schedules" then.
           error ? (
-            <div className="mb-5 sm:mb-6">
+            <div className="mb-2.5 sm:mb-4">
               <Button variant="glass" onClick={refresh} disabled={refreshing}>
                 <RefreshCw className={cx("w-4 h-4", refreshing && "animate-spin motion-reduce:animate-none")} />
                 Try again
               </Button>
             </div>
           ) : (
-            <div className="mb-5 sm:mb-6">
+            <div className="mb-2.5 sm:mb-4">
               <EmptyState
-                icon={Megaphone}
                 title="No official schedules yet"
                 text="Create a draft, add your subjects and weekly classes, then publish it so your class can join."
                 action={<Button onClick={openNew}><Plus className="w-4 h-4" />New schedule</Button>}
@@ -641,47 +625,42 @@ const CRStudio = () => {
             </div>
           )
         ) : (
-          <section className="mb-5 sm:mb-6">
-            <SectionTitle
-              title="Your schedules"
-              text="Every schedule of your class appears here, including the ones your classmate CRs created. You can open and edit all of them."
-            />
-
-            {/* search and filters */}
-            <Card className="p-3 sm:p-4 mb-4 space-y-3">
-              <div className="flex flex-col sm:flex-row gap-2.5">
-                <label className="relative flex-1 min-w-0">
+          <section className="mb-2.5 sm:mb-4">
+            {/* search, sort and filters in one compact card */}
+            <Card className="p-2.5 sm:p-3 mb-2.5 sm:mb-3 space-y-2.5">
+              <div className="grid grid-cols-2 sm:flex gap-2">
+                <label className="relative col-span-2 sm:flex-1 min-w-0">
                   <span className="sr-only">Search schedules</span>
-                  <Search className="w-4 h-4 text-[#6A6F85] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                  <Search className="w-4 h-4 text-[color:var(--faint)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
                   <input
                     type="search"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="Search by branch, section, semester or creator"
-                    className="w-full h-10 rounded-full bg-white/70 border border-white/80 shadow-[inset_0_1px_0_#fff] pl-10 pr-4 text-[13.5px] text-[#161827] placeholder:text-[#6A6F85] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                    placeholder="Search branch, section, semester or creator"
+                    className={cx(selectCls, "w-full pl-9 pr-3 placeholder:text-[color:var(--faint)]")}
                   />
                 </label>
-                <select value={semFilter} onChange={(e) => setSemFilter(e.target.value)} className={selectCls} aria-label="Filter by semester">
+                <select value={semFilter} onChange={(e) => setSemFilter(e.target.value)} className={cx(selectCls, "w-full sm:w-auto")} aria-label="Filter by semester">
                   <option value="all">All semesters</option>
                   {semesterOptions.map((n) => (
                     <option key={n} value={n}>Semester {n}</option>
                   ))}
                 </select>
-                <select value={sort} onChange={(e) => setSort(e.target.value)} className={selectCls} aria-label="Sort schedules">
+                <select value={sort} onChange={(e) => setSort(e.target.value)} className={cx(selectCls, "w-full sm:w-auto")} aria-label="Sort schedules">
                   {SORTS.map((s) => (
                     <option key={s.key} value={s.key}>{s.label}</option>
                   ))}
                 </select>
               </div>
 
-              <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5" role="group" aria-label="Filter by status">
+              {/* status and creator filters share one scrolling row */}
+              <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5" role="group" aria-label="Filters">
                 {STATUS_FILTERS.map((f) => (
                   <FilterChip key={f.key} active={statusFilter === f.key} onClick={() => setStatusFilter(f.key)} count={statusCount(f.key)}>
                     {f.label}
                   </FilterChip>
                 ))}
-              </div>
-              <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5" role="group" aria-label="Filter by creator">
+                <span className="w-px h-5 bg-[color:var(--line)] shrink-0" aria-hidden="true" />
                 {OWNER_FILTERS.map((f) => (
                   <FilterChip key={f.key} active={ownerFilter === f.key} onClick={() => setOwnerFilter(f.key)}>
                     {f.label}
@@ -690,10 +669,10 @@ const CRStudio = () => {
               </div>
             </Card>
 
-            <p className="text-[12.5px] text-[#6A6F85] mb-3 px-1" aria-live="polite">
+            <p className="text-[12.5px] text-[color:var(--muted)] mb-2.5 px-1 tabular-nums" aria-live="polite">
               Showing {view.length} of {statusFilter === "archived" ? archivedCount : notArchived}
               {filtersActive && (
-                <button type="button" onClick={clearFilters} className="ml-2 inline-flex items-center gap-1 text-indigo-600 font-medium hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded">
+                <button type="button" onClick={clearFilters} className={cx("ml-2 inline-flex items-center gap-1 text-[#4F46E5] font-medium hover:underline rounded", FOCUS)}>
                   <X className="w-3 h-3" aria-hidden="true" />
                   Clear filters
                 </button>
@@ -701,54 +680,54 @@ const CRStudio = () => {
             </p>
 
             {view.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-[#161827]/15 px-4 py-8 text-center text-[13.5px] text-[#6A6F85]">
+              <p className="rounded-xl bg-[color:var(--inset)] px-4 py-8 text-center text-[13.5px] text-[color:var(--muted)]">
                 No schedules match these filters.
               </p>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-4 sm:gap-5">
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2.5 sm:gap-4">
                 {view.map((s) => {
                   const sid = idOf(s);
                   const counts = s.counts || {};
                   return (
-                    <Link key={sid} to={`/cr-studio/${sid}`} className="group block rounded-3xl focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">
-                      <Card className="relative overflow-hidden p-5 sm:p-6 h-full flex flex-col transition group-hover:bg-white/80 group-hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
+                    <Link key={sid} to={`/cr-studio/${sid}`} className={cx("group block rounded-2xl min-w-0", FOCUS)}>
+                      <Card className="relative overflow-hidden p-4 sm:p-5 h-full flex flex-col transition-colors group-hover:border-[color:var(--line-strong)] motion-reduce:transition-none">
                         <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-1", schedAccent[s.status] || schedAccent.archived)} />
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <h3 className="text-[18px] font-semibold text-[#161827] break-words leading-snug">
+                            <h3 className="text-[17px] font-semibold text-[color:var(--ink)] break-words leading-snug">
                               {[s.branch, s.section && `Section ${s.section}`].filter(Boolean).join(" ") || "Schedule"}
                             </h3>
-                            <p className="text-[13.5px] text-[#444A63] mt-0.5">{[s.semesterLabel, s.academicYear].filter(Boolean).join(" · ")}</p>
-                            <p className="text-[12.5px] text-[#6A6F85] mt-0.5 break-words">{s.college}</p>
+                            <p className="text-[13.5px] text-[color:var(--body)] mt-0.5">{[s.semesterLabel, s.academicYear].filter(Boolean).join(" · ")}</p>
+                            <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5 break-words">{s.college}</p>
                           </div>
                           <Badge tone={schedTone[s.status] || "neutral"}>{schedLabel[s.status] || s.status}</Badge>
                         </div>
 
                         <p className="flex items-center gap-1.5 text-[12.5px] mt-3 min-w-0">
-                          <User className="w-3.5 h-3.5 text-[#6A6F85] shrink-0" aria-hidden="true" />
+                          <User className="w-3.5 h-3.5 text-[color:var(--muted)] shrink-0" aria-hidden="true" />
                           {s.mine ? (
-                            <span className="font-medium text-indigo-600">Created by you</span>
+                            <span className="font-medium text-[#4F46E5]">Created by you</span>
                           ) : (
-                            <span className="text-[#6A6F85] truncate">Created by {s.createdByName || "a classmate CR"}</span>
+                            <span className="text-[color:var(--muted)] truncate">Created by {s.createdByName || "a classmate CR"}</span>
                           )}
                         </p>
 
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-3">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-3 rounded-xl bg-[color:var(--inset)] p-3">
                           <Count icon={BookOpen} value={counts.subjects ?? 0} label="subjects" />
                           <Count icon={CalendarClock} value={counts.rules ?? 0} label="weekly classes" />
                           <Count icon={CalendarRange} value={counts.items ?? 0} label="calendar items" />
                           <Count icon={Users} value={s.students ?? 0} label="students joined" />
                         </div>
 
-                        <p className="flex items-center gap-1.5 text-[13px] text-[#6A6F85] mt-4">
+                        <p className="flex items-center gap-1.5 text-[13px] text-[color:var(--muted)] mt-4 tabular-nums">
                           <CalendarRange className="w-4 h-4 shrink-0" aria-hidden="true" />
-                          {fmtDate(s.semesterStart)} to {fmtDate(s.semesterEnd)}
+                          <span className="min-w-0">{fmtDate(s.semesterStart)} to {fmtDate(s.semesterEnd)}</span>
                         </p>
                         <SemesterMeter start={s.semesterStart} end={s.semesterEnd} className="mt-3" />
 
-                        <p className="text-[13px] text-indigo-600 font-medium mt-auto pt-4 flex items-center gap-1">
+                        <p className="text-[13px] text-[#4F46E5] font-medium mt-auto pt-4 flex items-center gap-1">
                           Open schedule
-                          <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+                          <ChevronRight className="w-4 h-4" aria-hidden="true" />
                         </p>
                       </Card>
                     </Link>
@@ -761,21 +740,21 @@ const CRStudio = () => {
 
       {/* how it works, shown until a role is approved */}
       {!canManage && (
-        <Card className="p-5 sm:p-6 mb-5 sm:mb-6">
+        <Card className="@container p-3.5 min-[380px]:p-4 sm:p-5 mb-2.5 sm:mb-4">
           <SectionTitle
             title="How it works"
             text="Three steps to publish a schedule for your class."
             action={!hasPending && <Button size="sm" onClick={openReq}><Sparkles className="w-4 h-4" />Request a role</Button>}
           />
-          <ol className="grid sm:grid-cols-3 gap-3">
+          <ol className="grid grid-cols-1 @2xl:grid-cols-3 gap-2.5 sm:gap-3">
             {STEPS.map(({ icon: Icon, title, text }, i) => (
-              <li key={title} className="rounded-2xl bg-white/60 border border-white/80 p-4">
+              <li key={title} className="rounded-xl bg-[color:var(--inset)] p-4 min-w-0">
                 <div className="flex items-center gap-2.5">
-                  <span className="w-8 h-8 rounded-full bg-gradient-to-br from-[#5B52EE] to-[#2B8DE0] text-white text-[13px] font-semibold flex items-center justify-center">{i + 1}</span>
-                  <Icon className="w-[18px] h-[18px] text-indigo-600" aria-hidden="true" />
+                  <span className="w-8 h-8 rounded-full bg-[#4F46E5] text-white text-[13px] font-semibold flex items-center justify-center tabular-nums">{i + 1}</span>
+                  <Icon className="w-[18px] h-[18px] text-[#4F46E5]" aria-hidden="true" />
                 </div>
-                <p className="text-[14.5px] font-semibold text-[#161827] mt-3">{title}</p>
-                <p className="text-[13px] leading-snug text-[#6A6F85] mt-1">{text}</p>
+                <p className="text-[14.5px] font-semibold text-[color:var(--ink)] mt-3">{title}</p>
+                <p className="text-[13px] leading-snug text-[color:var(--muted)] mt-1">{text}</p>
               </li>
             ))}
           </ol>
@@ -784,36 +763,35 @@ const CRStudio = () => {
       )}
 
       {/* roles */}
-      <Card className="p-4 sm:p-6 mb-5 sm:mb-6">
+      <Card className="@container p-3.5 min-[380px]:p-4 sm:p-5 mb-2.5 sm:mb-4">
         <SectionTitle
           icon={ShieldCheck}
           title="Your roles"
-          text="A role lets you publish a schedule for your class or college."
           action={canManage && <Button size="sm" variant="glass" onClick={openReq}>Request another role</Button>}
         />
 
         {roles.length === 0 ? (
-          <p className="text-[14px] leading-relaxed text-[#6A6F85]">You are a regular student right now. Use “Request a role” if you are your class's CR.</p>
+          <p className="text-[14px] leading-relaxed text-[color:var(--muted)]">You are a regular student right now. Use “Request a role” if you are your class's CR.</p>
         ) : (
           <div className="space-y-2.5">
             {roles.map((r) => {
               const RoleIcon = r.role === "admin" ? ShieldCheck : Users;
               return (
-                <div key={idOf(r)} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-white/60 border border-white/80 px-3.5 sm:px-4 py-3">
+                <div key={idOf(r)} className="flex flex-col @lg:flex-row @lg:items-center justify-between gap-3 rounded-xl bg-[color:var(--inset)] px-3.5 sm:px-4 py-3 min-w-0">
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
+                    <span className="w-10 h-10 rounded-xl bg-indigo-50 text-[#4F46E5] flex items-center justify-center shrink-0">
                       <RoleIcon className="w-5 h-5" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="text-[14.5px] font-semibold text-[#161827]">{roleName[r.role] || r.role}</span>
+                        <span className="text-[14.5px] font-semibold text-[color:var(--ink)]">{roleName[r.role] || r.role}</span>
                         <Badge tone={roleTone[r.status] || "neutral"}>{statusLabel[r.status] || r.status}</Badge>
                       </div>
-                      <p className="text-[12.5px] text-[#6A6F85] mt-0.5 break-words">{scopeOf(r)}</p>
+                      <p className="text-[12.5px] text-[color:var(--muted)] mt-0.5 break-words">{scopeOf(r)}</p>
                     </div>
                   </div>
                   {(r.status === "pending" || isApproved(r)) && (
-                    <Button size="sm" variant="ghost" className="self-start sm:self-auto shrink-0" onClick={() => openDialog("withdraw", r)}>
+                    <Button size="sm" variant="ghost" className="self-start @lg:self-auto shrink-0" onClick={() => openDialog("withdraw", r)}>
                       {r.status === "pending" ? "Cancel request" : "Step down"}
                     </Button>
                   )}
@@ -837,25 +815,28 @@ const CRStudio = () => {
         dirty={reqOpen && JSON.stringify(req) !== reqInitial}
         error={reqError}
       >
-        <Field as="select" label="Role" value={req.role} onChange={setR("role")}>
-          <option value="cr">Class Representative (one branch and section)</option>
-          <option value="admin">College Admin (whole college)</option>
-        </Field>
-        <Field label="College" value={req.college} onChange={setR("college")} error={reqErrors.college} autoCapitalize="words" maxLength={120} />
-        {req.role === "cr" && (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            <Choice label="Branch" value={req.branch} options={withCurrent(BRANCHES, req.branch)} onChange={setR("branch")} error={reqErrors.branch} />
-            <Choice label="Section" value={req.section} options={withCurrent(SECTIONS, req.section)} onChange={setR("section")} error={reqErrors.section} />
-          </div>
-        )}
-        <Field
-          label="Note for the reviewer (optional)"
-          hint="Helps the admin trust your request, for example who elected you."
-          value={req.requestNote}
-          onChange={setR("requestNote")}
-          placeholder="Elected CR for CSE-A"
-          maxLength={300}
-        />
+        {/* @container: grids follow the dialog width, so fields never overlap */}
+        <div className="@container space-y-4 min-w-0">
+          <Field as="select" label="Role" value={req.role} onChange={setR("role")}>
+            <option value="cr">Class Representative (one branch and section)</option>
+            <option value="admin">College Admin (whole college)</option>
+          </Field>
+          <Field label="College" value={req.college} onChange={setR("college")} error={reqErrors.college} autoCapitalize="words" maxLength={120} />
+          {req.role === "cr" && (
+            <div className="grid grid-cols-1 @sm:grid-cols-2 gap-3 @sm:gap-4 min-w-0">
+              <Choice label="Branch" value={req.branch} options={withCurrent(BRANCHES, req.branch)} onChange={setR("branch")} error={reqErrors.branch} />
+              <Choice label="Section" value={req.section} options={withCurrent(SECTIONS, req.section)} onChange={setR("section")} error={reqErrors.section} />
+            </div>
+          )}
+          <Field
+            label="Note for the reviewer (optional)"
+            hint="Helps the admin trust your request, for example who elected you."
+            value={req.requestNote}
+            onChange={setR("requestNote")}
+            placeholder="Elected CR for CSE-A"
+            maxLength={300}
+          />
+        </div>
       </FormModal>
 
       {/* new schedule */}
@@ -870,37 +851,39 @@ const CRStudio = () => {
         dirty={newDirty}
         error={formError}
       >
-        <p className="text-[13.5px] leading-relaxed text-[#6A6F85]">This creates a draft. Students can't see it until you add your classes and publish.</p>
+        <div className="@container space-y-4 min-w-0">
+          <p className="text-[13.5px] leading-relaxed text-[color:var(--muted)]">This creates a draft. Students can't see it until you add your classes and publish.</p>
 
-        {(duplicate || existingId) && (
-          <Alert type="warning">
-            This class already has a schedule for that semester
-            {duplicate && !existingId && duplicate.createdByName && !duplicate.mine ? `, created by ${duplicate.createdByName}` : ""}.{" "}
-            <Link
-              to={`/cr-studio/${existingId || idOf(duplicate)}`}
-              onClick={() => setNewOpen(false)}
-              className="font-semibold text-indigo-600 underline underline-offset-2"
-            >
-              Open it
-            </Link>{" "}
-            and add your changes there instead of creating a second one.
-          </Alert>
-        )}
+          {(duplicate || existingId) && (
+            <Alert type="warning">
+              This class already has a schedule for that semester
+              {duplicate && !existingId && duplicate.createdByName && !duplicate.mine ? `, created by ${duplicate.createdByName}` : ""}.{" "}
+              <Link
+                to={`/cr-studio/${existingId || idOf(duplicate)}`}
+                onClick={() => setNewOpen(false)}
+                className="font-semibold text-[#4F46E5] underline underline-offset-2"
+              >
+                Open it
+              </Link>{" "}
+              and add your changes there instead of creating a second one.
+            </Alert>
+          )}
 
-        <Field label="College" value={form.college || ""} onChange={setF("college")} error={errors.college} autoCapitalize="words" maxLength={120} />
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <Choice label="Academic year" value={form.academicYear || ""} options={withCurrent(academicYearOptions(), form.academicYear)} onChange={setF("academicYear")} error={errors.academicYear} />
-          <Choice label="Semester" value={form.semesterLabel || ""} options={withCurrent(SEMESTERS, form.semesterLabel)} onChange={setF("semesterLabel")} error={errors.semesterLabel} />
-          <Choice label="Branch" value={form.branch || ""} options={withCurrent(BRANCHES, form.branch)} onChange={setF("branch")} error={errors.branch} />
-          <Choice label="Section" value={form.section || ""} options={withCurrent(SECTIONS, form.section)} onChange={setF("section")} error={errors.section} />
-          <Field label="Semester start" type="date" value={form.semesterStart || ""} onChange={setStart} error={errors.semesterStart} />
-          <Field label="Semester end" type="date" min={form.semesterStart || undefined} value={form.semesterEnd || ""} onChange={setF("semesterEnd")} error={errors.semesterEnd} />
+          <Field label="College" value={form.college || ""} onChange={setF("college")} error={errors.college} autoCapitalize="words" maxLength={120} />
+          <div className="grid grid-cols-1 @md:grid-cols-2 gap-3 @md:gap-4 min-w-0">
+            <Choice label="Academic year" value={form.academicYear || ""} options={withCurrent(academicYearOptions(), form.academicYear)} onChange={setF("academicYear")} error={errors.academicYear} />
+            <Choice label="Semester" value={form.semesterLabel || ""} options={withCurrent(SEMESTERS, form.semesterLabel)} onChange={setF("semesterLabel")} error={errors.semesterLabel} />
+            <Choice label="Branch" value={form.branch || ""} options={withCurrent(BRANCHES, form.branch)} onChange={setF("branch")} error={errors.branch} />
+            <Choice label="Section" value={form.section || ""} options={withCurrent(SECTIONS, form.section)} onChange={setF("section")} error={errors.section} />
+            <Field label="Semester start" type="date" value={form.semesterStart || ""} onChange={setStart} error={errors.semesterStart} />
+            <Field label="Semester end" type="date" min={form.semesterStart || undefined} value={form.semesterEnd || ""} onChange={setF("semesterEnd")} error={errors.semesterEnd} />
+          </div>
+          <p className="text-[12.5px] text-[color:var(--muted)] px-1">
+            Students find your schedule by matching these four values, so they must be the same ones they choose in their setup.
+          </p>
+
+          <GroupsEditor groups={groups} setGroups={setGroups} />
         </div>
-        <p className="text-[12.5px] text-[#6A6F85] px-1">
-          Students find your schedule by matching these four values, so they must be the same ones they choose in their setup.
-        </p>
-
-        <GroupsEditor groups={groups} setGroups={setGroups} />
       </FormModal>
 
       <ActionDialog
